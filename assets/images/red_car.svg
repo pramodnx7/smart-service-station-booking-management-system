@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800" role="img" aria-labelledby="title desc">
+  <title id="title">Red car</title>
+  <desc id="desc">A glossy red sedan with strong highlights on a dark garage floor.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0b1220"/>
+      <stop offset="100%" stop-color="#3f1d1d"/>
+    </linearGradient>
+    <linearGradient id="car" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#fecaca"/>
+      <stop offset="35%" stop-color="#ef4444"/>
+      <stop offset="100%" stop-color="#7f1d1d"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="800" fill="url(#bg)"/>
+  <circle cx="910" cy="165" r="150" fill="#f59e0b" opacity="0.14"/>
+  <path d="M130 620h940" stroke="#fff" stroke-opacity="0.14" stroke-width="10" stroke-linecap="round"/>
+  <path d="M200 540c16-43 55-72 101-72h430c38 0 73 22 91 55l36 67H164c0-26 15-41 36-50z" fill="url(#car)"/>
+  <path d="M312 374h310l88 78H250z" fill="#ffe4e6" opacity="0.84"/>
+  <path d="M346 386h240l57 56H300z" fill="#7f1d1d" opacity="0.76"/>
+  <circle cx="320" cy="605" r="82" fill="#020617"/>
+  <circle cx="320" cy="605" r="46" fill="#94a3b8"/>
+  <circle cx="816" cy="605" r="82" fill="#020617"/>
+  <circle cx="816" cy="605" r="46" fill="#94a3b8"/>
+  <path d="M272 530h600" stroke="#fecaca" stroke-opacity="0.45" stroke-width="12" stroke-linecap="round"/>
+  <path d="M480 430h192" stroke="#fff" stroke-opacity="0.25" stroke-width="10" stroke-linecap="round"/>
+</svg>

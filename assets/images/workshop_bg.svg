@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800" role="img" aria-labelledby="title desc">
+  <title id="title">Workshop background</title>
+  <desc id="desc">A bright service bay with lifts, lights, and workshop equipment.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#06101c"/>
+      <stop offset="100%" stop-color="#1b2b43"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="800" fill="url(#bg)"/>
+  <rect x="80" y="100" width="1040" height="600" rx="40" fill="#0f172a" opacity="0.78"/>
+  <rect x="120" y="140" width="220" height="520" rx="26" fill="#1e293b"/>
+  <rect x="380" y="140" width="220" height="520" rx="26" fill="#1e293b"/>
+  <rect x="640" y="140" width="220" height="520" rx="26" fill="#1e293b"/>
+  <rect x="900" y="140" width="140" height="520" rx="26" fill="#1e293b"/>
+  <rect x="145" y="180" width="170" height="12" rx="6" fill="#38bdf8"/>
+  <rect x="405" y="180" width="170" height="12" rx="6" fill="#38bdf8"/>
+  <rect x="665" y="180" width="170" height="12" rx="6" fill="#38bdf8"/>
+  <path d="M100 640h1000" stroke="#94a3b8" stroke-opacity="0.35" stroke-width="8" stroke-linecap="round"/>
+  <circle cx="240" cy="420" r="84" fill="#0f172a"/>
+  <circle cx="240" cy="420" r="40" fill="#f59e0b" opacity="0.9"/>
+  <circle cx="500" cy="420" r="84" fill="#0f172a"/>
+  <circle cx="500" cy="420" r="40" fill="#f59e0b" opacity="0.9"/>
+  <circle cx="760" cy="420" r="84" fill="#0f172a"/>
+  <circle cx="760" cy="420" r="40" fill="#f59e0b" opacity="0.9"/>
+  <circle cx="980" cy="430" r="48" fill="#0f172a"/>
+  <circle cx="980" cy="430" r="22" fill="#38bdf8" opacity="0.9"/>
+</svg>

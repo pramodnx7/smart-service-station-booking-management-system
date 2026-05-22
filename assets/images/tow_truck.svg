@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800" role="img" aria-labelledby="title desc">
+  <title id="title">Tow truck</title>
+  <desc id="desc">A flatbed tow truck with bright emergency lights.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#06101c"/>
+      <stop offset="100%" stop-color="#0b2943"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="800" fill="url(#bg)"/>
+  <circle cx="220" cy="170" r="120" fill="#38bdf8" opacity="0.16"/>
+  <circle cx="930" cy="160" r="160" fill="#f59e0b" opacity="0.16"/>
+  <path d="M120 635h950" stroke="#fff" stroke-opacity="0.15" stroke-width="10" stroke-linecap="round"/>
+  <path d="M220 510h390l70-96h165l72 72h102c25 0 46 20 46 45v63H188v-22c0-35 28-62 32-62z" fill="#dbeafe" opacity="0.92"/>
+  <path d="M420 414h145l44 49H388z" fill="#38bdf8" opacity="0.24"/>
+  <rect x="250" y="520" width="300" height="28" rx="14" fill="#f59e0b" opacity="0.82"/>
+  <rect x="564" y="447" width="28" height="101" rx="12" fill="#94a3b8"/>
+  <circle cx="340" cy="610" r="74" fill="#020617"/>
+  <circle cx="340" cy="610" r="40" fill="#94a3b8"/>
+  <circle cx="752" cy="610" r="74" fill="#020617"/>
+  <circle cx="752" cy="610" r="40" fill="#94a3b8"/>
+  <rect x="790" y="450" width="110" height="24" rx="12" fill="#38bdf8" opacity="0.85"/>
+  <rect x="904" y="450" width="110" height="24" rx="12" fill="#f59e0b" opacity="0.85"/>
+  <path d="M970 491h90l34 28v58H930v-48z" fill="#1e293b"/>
+  <path d="M986 466h66l25 24v35h-91z" fill="#93c5fd" opacity="0.38"/>
+</svg>

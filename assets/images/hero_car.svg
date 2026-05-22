@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800" role="img" aria-labelledby="title desc">
+  <title id="title">Blue sports car</title>
+  <desc id="desc">Stylized blue sports car with a glowing garage backdrop.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#08111f"/>
+      <stop offset="55%" stop-color="#112949"/>
+      <stop offset="100%" stop-color="#1d4ed8"/>
+    </linearGradient>
+    <linearGradient id="car" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#7dd3fc"/>
+      <stop offset="45%" stop-color="#2563eb"/>
+      <stop offset="100%" stop-color="#0f172a"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="800" fill="url(#bg)"/>
+  <circle cx="930" cy="170" r="180" fill="#f59e0b" opacity="0.18"/>
+  <circle cx="210" cy="160" r="120" fill="#38bdf8" opacity="0.2"/>
+  <path d="M110 615h980" stroke="#e2e8f0" stroke-opacity="0.15" stroke-width="10" stroke-linecap="round"/>
+  <path d="M180 535c18-54 70-92 126-92h220l78-68h178c52 0 100 31 122 79l28 61h74c30 0 54 24 54 54v21H132v-14c0-24 19-41 48-41h0z" fill="url(#car)"/>
+  <path d="M340 360h310l84 82H270z" fill="#dbeafe" opacity="0.9"/>
+  <path d="M370 372h230l58 60H320z" fill="#0f172a" opacity="0.78"/>
+  <ellipse cx="342" cy="606" rx="84" ry="84" fill="#020617"/>
+  <ellipse cx="342" cy="606" rx="48" ry="48" fill="#94a3b8"/>
+  <ellipse cx="830" cy="606" rx="84" ry="84" fill="#020617"/>
+  <ellipse cx="830" cy="606" rx="48" ry="48" fill="#94a3b8"/>
+  <path d="M278 529h610" stroke="#93c5fd" stroke-opacity="0.45" stroke-width="12" stroke-linecap="round"/>
+  <path d="M256 514h712" stroke="#0ea5e9" stroke-opacity="0.28" stroke-width="6" stroke-linecap="round"/>
+  <path d="M460 447h260" stroke="#0f172a" stroke-opacity="0.7" stroke-width="7" stroke-linecap="round"/>
+  <path d="M520 350h125c22 0 39 17 39 39v13H494v-13c0-22 18-39 39-39z" fill="#e0f2fe" opacity="0.82"/>
+  <path d="M940 535h110" stroke="#fde68a" stroke-opacity="0.8" stroke-width="16" stroke-linecap="round"/>
+</svg>
