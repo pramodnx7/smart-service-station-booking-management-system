@@ -1,26 +1,16 @@
 .hero {
   position: relative;
-  min-height: 760px;
+  min-height: 100vh;
+  min-height: 100svh;
   padding: 0 0 96px;
   color: #fff;
   overflow: visible;
   background: #fff;
 }
 
-.hero::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 0;
-  width: 7px;
-  background: #0088ff;
-  z-index: 8;
-}
-
 .hero__backdrop {
   position: absolute;
-  inset: 0 0 140px;
+  inset: 0;
   background:
     linear-gradient(90deg, rgba(3, 12, 27, 0.58) 0%, rgba(4, 15, 33, 0.38) 34%, rgba(4, 15, 33, 0.08) 66%, rgba(4, 15, 33, 0.02) 100%),
     url("../assets/images/hero-blue-workshop.png") center / cover no-repeat;
@@ -34,7 +24,7 @@
   background:
     linear-gradient(180deg, rgba(0, 136, 255, 0.08), transparent 13%),
     linear-gradient(180deg, transparent 79%, rgba(3, 12, 27, 0.42)),
-    repeating-linear-gradient(90deg, transparent 0 76px, rgba(255, 255, 255, 0.035) 76px 77px);
+    none;
 }
 
 .hero .container,
@@ -88,7 +78,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: 14px;
-  margin-top: 25px;
+  margin-top: 50px;
 }
 
 .hero__buttons .btn {
@@ -188,7 +178,7 @@
 .booking-shell {
   position: absolute;
   left: 50%;
-  bottom: 116px;
+  bottom: 95px;
   z-index: 7;
   transform: translate(-50%, 50%);
 }
@@ -329,7 +319,6 @@
 }
 
 @media (max-width: 700px) {
-  .hero::before { width: 4px; }
   .hero .container,
   .booking-shell { width: min(100% - 24px, 1600px); }
   .hero h1 { font-size: clamp(40px, 15vw, 58px); }

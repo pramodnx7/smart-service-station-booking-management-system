@@ -1,0 +1,587 @@
+document.addEventListener('DOMContentLoaded', () => {
+  const storageKey = 'autocare-admin-dashboard-state';
+  const sessionKey = 'autocare-session';
+  const statusLabels = ['All', 'Pending', 'Approved', 'In Progress', 'Completed', 'Cancelled'];
+  const session = getSession();
+
+  if (!session || session.role !== 'admin' || !session.token) {
+    window.location.replace('login.html');
+    return;
+  }
+
+  const icons = {
+    dashboard: '<svg viewBox="0 0 24 24"><path d="M3 13h8V3H3v10Zm10 8h8V11h-8v10ZM3 21h8v-6H3v6Zm10-12h8V3h-8v6Z"/></svg>',
+    users: '<svg viewBox="0 0 24 24"><path d="M17 21a5 5 0 0 0-10 0"/><circle cx="12" cy="8" r="4"/><path d="M3 21a4 4 0 0 1 4-4M21 21a4 4 0 0 0-4-4"/></svg>',
+    car: '<svg viewBox="0 0 24 24"><path d="m3 13 2-5a3 3 0 0 1 3-2h8a3 3 0 0 1 3 2l2 5"/><path d="M5 13h14v5H5z"/><circle cx="7.5" cy="18" r="1.5"/><circle cx="16.5" cy="18" r="1.5"/></svg>',
+    calendar: '<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M8 2v4M16 2v4M3 10h18"/></svg>',
+    tools: '<svg viewBox="0 0 24 24"><path d="m14.7 6.3 3-3a4 4 0 0 1-5 5l-7 7a2 2 0 1 0 3 3l7-7a4 4 0 0 1 5-5l-3 3"/></svg>',
+    invoice: '<svg viewBox="0 0 24 24"><path d="M6 2h9l3 3v17l-3-2-3 2-3-2-3 2V2Z"/><path d="M9 9h6M9 13h6M9 17h4"/></svg>',
+    alert: '<svg viewBox="0 0 24 24"><path d="M12 3 2 21h20L12 3Z"/><path d="M12 9v5M12 18h.01"/></svg>',
+    bell: '<svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"/><path d="M10 21h4"/></svg>',
+    star: '<svg viewBox="0 0 24 24"><path d="m12 2 3 6 6 .9-4.5 4.4 1.1 6.2L12 16.5 6.4 19.5l1.1-6.2L3 8.9 9 8l3-6Z"/></svg>',
+    settings: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2.8 2.8-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6V21h-4v-.1a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1L4.2 17l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.6-1H3v-4h.1a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1L7 4.2l.1.1a1.7 1.7 0 0 0 1.9.3 1.7 1.7 0 0 0 1-1.6V3h4v.1a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1L19.8 7l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6 1h.1v4H21a1.7 1.7 0 0 0-1.6 1Z"/></svg>',
+    menu: '<svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></svg>',
+    search: '<svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>',
+    x: '<svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg>',
+    logout: '<svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5M21 12H9"/></svg>'
+  };
+
+  const defaults = {
+    customers: [
+      { id: 1, name: 'Seril Suten', email: 'seril@example.com', phone: '+94 77 111 2233', status: 'Active' },
+      { id: 2, name: 'Nimal Perera', email: 'nimal@example.com', phone: '+94 76 555 7788', status: 'Active' },
+      { id: 3, name: 'Anjali Silva', email: 'anjali@example.com', phone: '+94 71 234 9000', status: 'Pending' }
+    ],
+    vehicles: [
+      { id: 1, customerId: 1, make: 'Toyota Corolla', model: 'Axio', plate: 'ABC-854', year: '2019', image: 'assets/images/newsletter-red-sports-car.png' },
+      { id: 2, customerId: 1, make: 'Honda Civic', model: 'EX', plate: 'XZ-5676', year: '2019', image: 'assets/images/hero-blue-workshop.png' },
+      { id: 3, customerId: 2, make: 'Suzuki Swift', model: 'RS', plate: 'DEF-0012', year: '2020', image: 'assets/images/service-wheel-closeup.png' }
+    ],
+    bookings: [
+      { id: 1, customerId: 1, vehicleId: 1, service: 'General Service', date: '2026-05-25', time: '10:00', status: 'Pending', queue: 3, progress: 20 },
+      { id: 2, customerId: 2, vehicleId: 3, service: 'Oil Change', date: '2026-05-26', time: '14:30', status: 'Approved', queue: 5, progress: 35 },
+      { id: 3, customerId: 1, vehicleId: 2, service: 'Engine Diagnostics', date: '2026-05-23', time: '09:00', status: 'In Progress', queue: 1, progress: 70 },
+      { id: 4, customerId: 3, vehicleId: 3, service: 'Brake Service', date: '2026-05-20', time: '11:15', status: 'Completed', queue: 0, progress: 100 }
+    ],
+    packages: [
+      { id: 1, name: 'Oil Change', price: 6000, duration: '45 min', description: 'Engine oil, filter replacement and quick inspection.' },
+      { id: 2, name: 'Brake Service', price: 7500, duration: '1 hr', description: 'Brake pads, fluid check and safety testing.' },
+      { id: 3, name: 'Full Service', price: 18500, duration: '3 hr', description: 'Complete inspection, fluids, diagnostics and tune-up.' },
+      { id: 4, name: 'Engine Diagnostics', price: 12000, duration: '1.5 hr', description: 'Computer scan, issue report and repair estimate.' }
+    ],
+    invoices: [
+      { id: 1001, customerId: 1, service: 'General Service', amount: 8500, payment: 'Unpaid', date: '2026-05-25' },
+      { id: 1002, customerId: 2, service: 'Oil Change', amount: 6000, payment: 'Paid', date: '2026-05-18' },
+      { id: 1003, customerId: 3, service: 'Brake Service', amount: 7500, payment: 'Paid', date: '2026-05-10' }
+    ],
+    emergencies: [
+      { id: 1, customerId: 2, location: 'Colombo 05', problem: 'Vehicle will not start after battery warning light.', status: 'Open' },
+      { id: 2, customerId: 1, location: 'Nugegoda', problem: 'Flat tyre and customer shared roadside location.', status: 'Assigned' }
+    ],
+    notifications: [
+      { id: 1, type: 'Booking', message: 'Booking approved for Seril Suten on 25 May 2026.', unread: true },
+      { id: 2, type: 'Payment', message: 'Invoice #1002 payment received.', unread: false },
+      { id: 3, type: 'Service', message: 'Honda Civic diagnostics moved to final testing.', unread: true }
+    ],
+    feedback: [
+      { id: 1, customerId: 1, rating: 5, comment: 'Friendly team and clear service updates.' },
+      { id: 2, customerId: 2, rating: 4, comment: 'Quick oil change and fair pricing.' },
+      { id: 3, customerId: 3, rating: 5, comment: 'Emergency support reached me fast.' }
+    ]
+  };
+
+  let state = loadState();
+  let activeBookingStatus = 'All';
+
+  const selectors = {
+    sidebar: document.getElementById('sidebar'),
+    pageTitle: document.getElementById('page-title'),
+    toast: document.getElementById('toast'),
+    modal: document.getElementById('dashboard-modal'),
+    modalForm: document.getElementById('modal-form'),
+    modalTitle: document.getElementById('modal-title'),
+    modalKicker: document.getElementById('modal-kicker'),
+    modalBody: document.getElementById('modal-body')
+  };
+
+  function getSession() {
+    try {
+      return JSON.parse(localStorage.getItem(sessionKey));
+    } catch (error) {
+      return null;
+    }
+  }
+
+  function applySessionProfile() {
+    const initials = session.name
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part[0].toUpperCase())
+      .join('') || 'AD';
+
+    document.getElementById('profile-initials').textContent = initials;
+    document.getElementById('profile-name').textContent = session.name;
+    document.getElementById('profile-role').textContent = session.role === 'admin' ? 'Manager' : 'Customer';
+  }
+
+  function loadState() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(storageKey));
+      return saved ? { ...defaults, ...saved } : structuredClone(defaults);
+    } catch (error) {
+      return JSON.parse(JSON.stringify(defaults));
+    }
+  }
+
+  function saveState() {
+    localStorage.setItem(storageKey, JSON.stringify(state));
+  }
+
+  async function hydrateFromApi() {
+    try {
+      state = { ...state, ...(await window.AutoCareApi.request('/api/admin/dashboard')) };
+      saveState();
+      renderAll();
+    } catch (error) {
+      showToast(error.message || 'Could not load database data.');
+    }
+  }
+
+  function customerName(id) {
+    return state.customers.find((customer) => customer.id === Number(id))?.name || 'Unknown customer';
+  }
+
+  function vehicleName(id) {
+    const vehicle = state.vehicles.find((item) => item.id === Number(id));
+    return vehicle ? `${vehicle.make} ${vehicle.model}` : 'Unknown vehicle';
+  }
+
+  function formatMoney(amount) {
+    return `LKR ${Number(amount).toLocaleString('en-LK')}`;
+  }
+
+  function statusClass(status) {
+    return status.toLowerCase().replace(/\s+/g, '-') === 'in-progress' ? 'progress' : status.toLowerCase();
+  }
+
+  function injectIcons() {
+    document.querySelectorAll('[data-icon]').forEach((node) => {
+      node.innerHTML = icons[node.dataset.icon] || '';
+    });
+  }
+
+  function showToast(message) {
+    selectors.toast.textContent = message;
+    selectors.toast.classList.add('is-visible');
+    window.setTimeout(() => selectors.toast.classList.remove('is-visible'), 2400);
+  }
+
+  function nextId(collection) {
+    return Math.max(0, ...collection.map((item) => Number(item.id))) + 1;
+  }
+
+  function renderMetrics() {
+    const completed = state.bookings.filter((booking) => booking.status === 'Completed').length;
+    const pending = state.bookings.filter((booking) => booking.status === 'Pending').length;
+    const revenue = state.invoices.reduce((total, invoice) => total + Number(invoice.amount), 0);
+    const emergencies = state.emergencies.filter((item) => item.status !== 'Closed').length;
+    const metrics = [
+      ['Completed Services', completed, 'Finished jobs', 'dashboard', 'tone-green'],
+      ['Pending Bookings', pending, 'Awaiting approval', 'calendar', 'tone-blue'],
+      ['Total Revenue', formatMoney(revenue), 'Invoices generated', 'invoice', 'tone-orange'],
+      ['Emergency Requests', emergencies, 'Open assistance', 'alert', 'tone-red']
+    ];
+
+    document.getElementById('metric-grid').innerHTML = metrics.map(([label, value, note, icon, tone]) => `
+      <article class="metric-card">
+        <span class="metric-card__icon ${tone}" data-icon="${icon}"></span>
+        <div><h3>${label}</h3><strong>${value}</strong><small>${note}</small></div>
+      </article>
+    `).join('');
+    injectIcons();
+  }
+
+  function bookingRows(bookings) {
+    return bookings.map((booking) => `
+      <tr>
+        <td><span class="row-title">#BK-${booking.id}</span><span class="row-sub">${booking.service}</span></td>
+        <td>${customerName(booking.customerId)}</td>
+        <td>${vehicleName(booking.vehicleId)}</td>
+        <td>${booking.date}<span class="row-sub">${booking.time}</span></td>
+        <td><span class="badge badge--${statusClass(booking.status)}">${booking.status}</span></td>
+        <td>${booking.queue ? `#${booking.queue}` : '-'}</td>
+        <td>
+          <div class="row-actions">
+            <button class="mini-btn" type="button" data-action="advance-booking" data-id="${booking.id}">Update</button>
+            <button class="mini-btn" type="button" data-action="reschedule-booking" data-id="${booking.id}">Reschedule</button>
+            <button class="mini-btn mini-btn--red" type="button" data-action="cancel-booking" data-id="${booking.id}">Cancel</button>
+          </div>
+        </td>
+      </tr>
+    `).join('');
+  }
+
+  function renderOverview() {
+    document.getElementById('overview-bookings').innerHTML = bookingRows(state.bookings.slice(0, 5));
+
+    document.getElementById('progress-list').innerHTML = state.bookings
+      .filter((booking) => booking.status !== 'Cancelled')
+      .slice(0, 4)
+      .map((booking) => `
+        <div class="progress-item">
+          <header><strong>${booking.service}</strong><span>${booking.progress}%</span></header>
+          <div class="progress-bar"><span style="width:${booking.progress}%"></span></div>
+          <small>${customerName(booking.customerId)} - ${vehicleName(booking.vehicleId)}</small>
+        </div>
+      `).join('');
+
+    const total = state.invoices.reduce((sum, invoice) => sum + Number(invoice.amount), 0);
+    document.getElementById('revenue-total').textContent = total.toLocaleString('en-LK');
+    document.getElementById('chart-legend').innerHTML = [
+      ['General Service', 40, 'var(--blue)'],
+      ['Oil Change', 25, 'var(--red)'],
+      ['Brake Service', 20, 'var(--yellow)'],
+      ['Diagnostics', 15, '#dfe4eb']
+    ].map(([label, percent, color]) => `<div class="legend-row"><i style="background:${color}"></i><span>${label}</span><strong>${percent}%</strong></div>`).join('');
+  }
+
+  function renderCustomers() {
+    document.getElementById('customers-body').innerHTML = state.customers.map((customer) => {
+      const vehicleCount = state.vehicles.filter((vehicle) => vehicle.customerId === customer.id).length;
+      return `
+        <tr>
+          <td><span class="row-title">${customer.name}</span><span class="row-sub">${customer.email}</span></td>
+          <td>${customer.email}</td>
+          <td>${customer.phone}</td>
+          <td>${vehicleCount}</td>
+          <td><span class="badge badge--${customer.status === 'Active' ? 'completed' : 'pending'}">${customer.status}</span></td>
+          <td><div class="row-actions"><button class="mini-btn" type="button" data-action="edit-customer" data-id="${customer.id}">Edit</button><button class="mini-btn" type="button" data-action="reset-password" data-id="${customer.id}">Reset</button></div></td>
+        </tr>
+      `;
+    }).join('');
+  }
+
+  function renderVehicles() {
+    document.getElementById('vehicle-grid').innerHTML = state.vehicles.map((vehicle) => `
+      <article class="vehicle-card">
+        <img src="${vehicle.image}" alt="${vehicle.make} ${vehicle.model}" />
+        <h3>${vehicle.make} ${vehicle.model}</h3>
+        <p>${customerName(vehicle.customerId)}</p>
+        <div class="card-meta"><span>${vehicle.plate}</span><span>${vehicle.year}</span></div>
+        <div class="row-actions"><button class="mini-btn" type="button" data-action="edit-vehicle" data-id="${vehicle.id}">Edit</button><button class="mini-btn mini-btn--red" type="button" data-action="delete-vehicle" data-id="${vehicle.id}">Delete</button></div>
+      </article>
+    `).join('');
+  }
+
+  function renderBookings() {
+    const tabs = statusLabels.map((status) => `<button class="${status === activeBookingStatus ? 'is-active' : ''}" type="button" data-action="filter-bookings" data-status="${status}">${status}</button>`).join('');
+    document.getElementById('booking-tabs').innerHTML = tabs;
+    const bookings = activeBookingStatus === 'All' ? state.bookings : state.bookings.filter((booking) => booking.status === activeBookingStatus);
+    document.getElementById('bookings-body').innerHTML = bookingRows(bookings);
+  }
+
+  function renderPackages() {
+    document.getElementById('package-grid').innerHTML = state.packages.map((item) => `
+      <article class="package-card">
+        <h3>${item.name}</h3>
+        <p>${item.description}</p>
+        <strong>${formatMoney(item.price)}</strong>
+        <div class="card-meta"><span>${item.duration}</span><button class="mini-btn" type="button" data-action="edit-service" data-id="${item.id}">Edit</button></div>
+      </article>
+    `).join('');
+  }
+
+  function renderBilling() {
+    document.getElementById('billing-body').innerHTML = state.invoices.map((invoice) => `
+      <tr>
+        <td><span class="row-title">#INV-${invoice.id}</span><span class="row-sub">${invoice.date}</span></td>
+        <td>${customerName(invoice.customerId)}</td>
+        <td>${invoice.service}</td>
+        <td>${formatMoney(invoice.amount)}</td>
+        <td><span class="badge badge--${invoice.payment === 'Paid' ? 'completed' : 'pending'}">${invoice.payment}</span></td>
+        <td><div class="row-actions"><button class="mini-btn" type="button" data-action="mark-paid" data-id="${invoice.id}">Mark Paid</button><button class="mini-btn" type="button" data-action="download-invoice" data-id="${invoice.id}">Download</button></div></td>
+      </tr>
+    `).join('');
+  }
+
+  function renderEmergency() {
+    document.getElementById('emergency-grid').innerHTML = state.emergencies.map((item) => `
+      <article class="emergency-card">
+        <span class="badge badge--${item.status === 'Open' ? 'cancelled' : 'approved'}">${item.status}</span>
+        <h3>${customerName(item.customerId)}</h3>
+        <p>${item.problem}</p>
+        <div class="card-meta"><span>${item.location}</span><button class="mini-btn" type="button" data-action="close-emergency" data-id="${item.id}">Resolve</button></div>
+      </article>
+    `).join('');
+  }
+
+  function renderNotifications() {
+    document.getElementById('notification-count').textContent = state.notifications.filter((item) => item.unread).length;
+    document.getElementById('notification-list').innerHTML = state.notifications.map((item) => `
+      <article class="notification-item">
+        <span data-icon="bell"></span>
+        <div><strong>${item.type}</strong><p>${item.message}</p></div>
+      </article>
+    `).join('');
+    injectIcons();
+  }
+
+  function renderFeedback() {
+    document.getElementById('feedback-grid').innerHTML = state.feedback.map((item) => `
+      <article class="feedback-card">
+        <div class="stars">${'*'.repeat(item.rating)}</div>
+        <h3>${customerName(item.customerId)}</h3>
+        <p>${item.comment}</p>
+      </article>
+    `).join('');
+  }
+
+  function renderAll() {
+    renderMetrics();
+    renderOverview();
+    renderCustomers();
+    renderVehicles();
+    renderBookings();
+    renderPackages();
+    renderBilling();
+    renderEmergency();
+    renderNotifications();
+    renderFeedback();
+  }
+
+  function field(name, label, type = 'text', value = '', options = []) {
+    if (type === 'select') {
+      return `<label><span>${label}</span><select name="${name}" required>${options.map((option) => `<option value="${option.value}" ${String(option.value) === String(value) ? 'selected' : ''}>${option.label}</option>`).join('')}</select></label>`;
+    }
+    if (type === 'textarea') {
+      return `<label class="full"><span>${label}</span><textarea name="${name}" required>${value}</textarea></label>`;
+    }
+    return `<label><span>${label}</span><input name="${name}" type="${type}" value="${value}" required /></label>`;
+  }
+
+  function openModal(mode, record = {}) {
+    const customerOptions = state.customers.map((customer) => ({ value: customer.id, label: customer.name }));
+    const vehicleOptions = state.vehicles.map((vehicle) => ({ value: vehicle.id, label: `${vehicle.make} ${vehicle.model} - ${vehicle.plate}` }));
+    const statusOptions = statusLabels.slice(1).map((status) => ({ value: status, label: status }));
+    const paymentOptions = ['Unpaid', 'Paid'].map((payment) => ({ value: payment, label: payment }));
+    const config = {
+      customer: {
+        title: record.id ? 'Edit Customer' : 'Register Customer',
+        body: field('name', 'Full Name', 'text', record.name || '') + field('email', 'Email', 'email', record.email || '') + field('phone', 'Phone', 'tel', record.phone || '') + field('status', 'Status', 'select', record.status || 'Active', [{ value: 'Active', label: 'Active' }, { value: 'Pending', label: 'Pending' }])
+      },
+      vehicle: {
+        title: record.id ? 'Edit Vehicle' : 'Add Vehicle',
+        body: field('customerId', 'Customer', 'select', record.customerId || customerOptions[0]?.value, customerOptions) + field('make', 'Vehicle Make', 'text', record.make || '') + field('model', 'Model', 'text', record.model || '') + field('plate', 'Number Plate', 'text', record.plate || '') + field('year', 'Year', 'number', record.year || '2026')
+      },
+      booking: {
+        title: record.id ? 'Reschedule Booking' : 'Book Service Appointment',
+        body: field('customerId', 'Customer', 'select', record.customerId || customerOptions[0]?.value, customerOptions) + field('vehicleId', 'Vehicle', 'select', record.vehicleId || vehicleOptions[0]?.value, vehicleOptions) + field('service', 'Service', 'select', record.service || state.packages[0]?.name, state.packages.map((item) => ({ value: item.name, label: item.name }))) + field('date', 'Date', 'date', record.date || '') + field('time', 'Time', 'time', record.time || '') + field('status', 'Status', 'select', record.status || 'Pending', statusOptions)
+      },
+      service: {
+        title: record.id ? 'Edit Service Package' : 'Add Service Package',
+        body: field('name', 'Package Name', 'text', record.name || '') + field('price', 'Price', 'number', record.price || '') + field('duration', 'Duration', 'text', record.duration || '') + field('description', 'Description', 'textarea', record.description || '')
+      },
+      invoice: {
+        title: 'Create Invoice',
+        body: field('customerId', 'Customer', 'select', record.customerId || customerOptions[0]?.value, customerOptions) + field('service', 'Service', 'select', record.service || state.packages[0]?.name, state.packages.map((item) => ({ value: item.name, label: item.name }))) + field('amount', 'Amount', 'number', record.amount || '') + field('payment', 'Payment Status', 'select', record.payment || 'Unpaid', paymentOptions) + field('date', 'Date', 'date', record.date || new Date().toISOString().slice(0, 10))
+      },
+      emergency: {
+        title: 'Emergency Service Request',
+        body: field('customerId', 'Customer', 'select', record.customerId || customerOptions[0]?.value, customerOptions) + field('location', 'Shared Location', 'text', record.location || '') + field('status', 'Status', 'select', record.status || 'Open', [{ value: 'Open', label: 'Open' }, { value: 'Assigned', label: 'Assigned' }, { value: 'Closed', label: 'Closed' }]) + field('problem', 'Vehicle Problem Details', 'textarea', record.problem || '')
+      },
+      notification: {
+        title: 'Send Customer Notification',
+        body: field('type', 'Notification Type', 'select', record.type || 'Booking', ['Booking', 'Service', 'Payment'].map((type) => ({ value: type, label: type }))) + field('message', 'Message', 'textarea', record.message || '')
+      }
+    };
+
+    selectors.modalForm.dataset.mode = mode;
+    selectors.modalForm.dataset.id = record.id || '';
+    selectors.modalKicker.textContent = 'Admin Action';
+    selectors.modalTitle.textContent = config[mode].title;
+    selectors.modalBody.innerHTML = config[mode].body;
+    selectors.modal.showModal();
+  }
+
+  async function handleModalSubmit(event) {
+    event.preventDefault();
+    const data = Object.fromEntries(new FormData(selectors.modalForm).entries());
+    const mode = selectors.modalForm.dataset.mode;
+    const id = Number(selectors.modalForm.dataset.id);
+
+    if (mode === 'customer') {
+      const savedCustomer = await window.AutoCareApi.request(id ? `/api/admin/customers/${id}` : '/api/admin/customers', {
+        method: id ? 'PUT' : 'POST',
+        body: JSON.stringify(data)
+      });
+      id ? Object.assign(state.customers.find((item) => item.id === id), savedCustomer) : state.customers.push(savedCustomer);
+    }
+
+    if (mode === 'vehicle') {
+      const payload = { ...data, customerId: Number(data.customerId), image: 'assets/images/hero-blue-workshop.png' };
+      const savedVehicle = await window.AutoCareApi.request(id ? `/api/admin/vehicles/${id}` : '/api/admin/vehicles', {
+        method: id ? 'PUT' : 'POST',
+        body: JSON.stringify(payload)
+      });
+      id ? Object.assign(state.vehicles.find((item) => item.id === id), savedVehicle) : state.vehicles.push(savedVehicle);
+    }
+
+    if (mode === 'booking') {
+      const payload = { ...data, customerId: Number(data.customerId), vehicleId: Number(data.vehicleId), queue: id ? state.bookings.find((item) => item.id === id).queue : state.bookings.length + 1, progress: data.status === 'Completed' ? 100 : 10 };
+      const savedBooking = await window.AutoCareApi.request(id ? `/api/admin/bookings/${id}` : '/api/admin/bookings', {
+        method: id ? 'PUT' : 'POST',
+        body: JSON.stringify(payload)
+      });
+      id ? Object.assign(state.bookings.find((item) => item.id === id), savedBooking) : state.bookings.push(savedBooking);
+    }
+
+    if (mode === 'service') {
+      const payload = { ...data, price: Number(data.price) };
+      const savedService = await window.AutoCareApi.request(id ? `/api/admin/services/${id}` : '/api/admin/services', {
+        method: id ? 'PUT' : 'POST',
+        body: JSON.stringify(payload)
+      });
+      id ? Object.assign(state.packages.find((item) => item.id === id), savedService) : state.packages.push(savedService);
+    }
+
+    if (mode === 'invoice') {
+      const savedInvoice = await window.AutoCareApi.request('/api/admin/invoices', {
+        method: 'POST',
+        body: JSON.stringify({ ...data, customerId: Number(data.customerId), amount: Number(data.amount) })
+      });
+      state.invoices.push(savedInvoice);
+    }
+
+    if (mode === 'emergency') {
+      showToast('Emergency requests are created from the customer dashboard.');
+    }
+
+    if (mode === 'notification') {
+      await window.AutoCareApi.request('/api/admin/notifications', {
+        method: 'POST',
+        body: JSON.stringify(data)
+      });
+      state.notifications.unshift({ id: nextId(state.notifications), ...data, unread: true });
+    }
+
+    selectors.modal.close();
+    saveState();
+    renderAll();
+    showToast('Dashboard data saved successfully.');
+  }
+
+  async function advanceBooking(id) {
+    const flow = ['Pending', 'Approved', 'In Progress', 'Completed'];
+    const booking = state.bookings.find((item) => item.id === Number(id));
+    if (!booking || booking.status === 'Cancelled') return;
+    await window.AutoCareApi.request(`/api/admin/bookings/${id}/status`, { method: 'PUT' });
+    const next = flow[Math.min(flow.indexOf(booking.status) + 1, flow.length - 1)];
+    booking.status = next;
+    booking.progress = next === 'Approved' ? 35 : next === 'In Progress' ? 70 : next === 'Completed' ? 100 : booking.progress;
+    state.notifications.unshift({ id: nextId(state.notifications), type: 'Booking', message: `${customerName(booking.customerId)} booking status changed to ${next}.`, unread: true });
+    saveState();
+    renderAll();
+    showToast(`Booking moved to ${next}.`);
+  }
+
+  async function downloadInvoice(id) {
+    const invoice = state.invoices.find((item) => item.id === Number(id));
+    if (!invoice) return;
+    const text = await window.AutoCareApi.request(`/api/invoices/${invoice.id}/download`);
+    const blob = new Blob([text], { type: 'text/plain' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `invoice-${invoice.id}.txt`;
+    link.click();
+    URL.revokeObjectURL(link.href);
+  }
+
+  async function handleAction(action, id, element) {
+    const numericId = Number(id);
+    if (action === 'new-customer') openModal('customer');
+    if (action === 'edit-customer') openModal('customer', state.customers.find((item) => item.id === numericId));
+    if (action === 'reset-password') showToast(`Password reset link prepared for ${customerName(numericId)}.`);
+    if (action === 'new-vehicle') openModal('vehicle');
+    if (action === 'edit-vehicle') openModal('vehicle', state.vehicles.find((item) => item.id === numericId));
+    if (action === 'delete-vehicle') {
+      await window.AutoCareApi.request(`/api/admin/vehicles/${numericId}`, { method: 'DELETE' });
+      state.vehicles = state.vehicles.filter((item) => item.id !== numericId);
+      saveState();
+      renderAll();
+      showToast('Vehicle removed from account.');
+    }
+    if (action === 'new-booking') openModal('booking');
+    if (action === 'reschedule-booking') openModal('booking', state.bookings.find((item) => item.id === numericId));
+    if (action === 'advance-booking') await advanceBooking(numericId);
+    if (action === 'cancel-booking') {
+      await window.AutoCareApi.request(`/api/admin/bookings/${numericId}/cancel`, { method: 'PUT' });
+      const booking = state.bookings.find((item) => item.id === numericId);
+      booking.status = 'Cancelled';
+      booking.progress = 0;
+      saveState();
+      renderAll();
+      showToast('Booking cancelled.');
+    }
+    if (action === 'filter-bookings') {
+      activeBookingStatus = element.dataset.status;
+      renderBookings();
+    }
+    if (action === 'new-service') openModal('service');
+    if (action === 'edit-service') openModal('service', state.packages.find((item) => item.id === numericId));
+    if (action === 'new-invoice') openModal('invoice');
+    if (action === 'mark-paid') {
+      await window.AutoCareApi.request(`/api/admin/invoices/${numericId}/pay`, { method: 'PUT' });
+      state.invoices.find((item) => item.id === numericId).payment = 'Paid';
+      saveState();
+      renderAll();
+      showToast('Payment marked as paid.');
+    }
+    if (action === 'download-invoice') await downloadInvoice(numericId);
+    if (action === 'new-emergency' || action === 'open-emergency') openModal('emergency');
+    if (action === 'close-emergency') {
+      await window.AutoCareApi.request(`/api/admin/emergencies/${numericId}/close`, { method: 'PUT' });
+      state.emergencies.find((item) => item.id === numericId).status = 'Closed';
+      saveState();
+      renderAll();
+      showToast('Emergency request resolved.');
+    }
+    if (action === 'send-notification' || action === 'show-notifications') openModal('notification');
+    if (action === 'close-modal') selectors.modal.close();
+    if (action === 'logout') {
+      window.AutoCareApi.logout();
+    }
+  }
+
+  function bindEvents() {
+    document.querySelectorAll('.side-nav__item').forEach((button) => {
+      button.addEventListener('click', () => {
+        document.querySelectorAll('.side-nav__item').forEach((item) => item.classList.remove('is-active'));
+      if (!button.dataset.view) return;
+      document.querySelectorAll('.view').forEach((panel) => panel.classList.remove('is-active'));
+        button.classList.add('is-active');
+        document.querySelector(`[data-view-panel="${button.dataset.view}"]`).classList.add('is-active');
+        selectors.pageTitle.textContent = button.textContent.trim();
+        selectors.sidebar.classList.remove('is-open');
+      });
+    });
+
+    document.addEventListener('click', (event) => {
+      const actionButton = event.target.closest('[data-action]');
+      if (!actionButton) return;
+      handleAction(actionButton.dataset.action, actionButton.dataset.id, actionButton).catch((error) => showToast(error.message || 'Action failed.'));
+    });
+
+    document.getElementById('mobile-menu').addEventListener('click', () => selectors.sidebar.classList.toggle('is-open'));
+    selectors.modalForm.addEventListener('submit', (event) => {
+      handleModalSubmit(event).catch((error) => showToast(error.message || 'Save failed.'));
+    });
+
+    document.querySelectorAll('[data-table-search]').forEach((input) => {
+      input.addEventListener('input', () => {
+        const table = document.getElementById(input.dataset.tableSearch);
+        table.querySelectorAll('tbody tr').forEach((row) => {
+          row.style.display = row.textContent.toLowerCase().includes(input.value.toLowerCase()) ? '' : 'none';
+        });
+      });
+    });
+
+    document.getElementById('global-search').addEventListener('input', (event) => {
+      const value = event.target.value.toLowerCase();
+      document.querySelectorAll('tbody tr, .vehicle-card, .package-card, .emergency-card, .feedback-card').forEach((item) => {
+        item.style.display = item.textContent.toLowerCase().includes(value) || !value ? '' : 'none';
+      });
+    });
+
+    document.getElementById('settings-form').addEventListener('submit', (event) => {
+      event.preventDefault();
+      showToast('Settings saved for this browser session.');
+    });
+  }
+
+  injectIcons();
+  applySessionProfile();
+  renderAll();
+  bindEvents();
+  hydrateFromApi();
+});

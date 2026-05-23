@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="AutoCare admin dashboard for managing customers, vehicles, bookings, services, invoices, emergency requests and support." />
+  <title>AutoCare | Admin Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/admin-dashboard.css" />
+</head>
+<body>
+  <div class="dashboard-shell">
+    <aside class="sidebar" id="sidebar">
+      <a class="brand" href="admin-dashboard.html" aria-label="AutoCare admin home">
+        <span class="brand__mark">
+          <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16 2 28 7v8c0 7.5-4.7 12.6-12 15C8.7 27.6 4 22.5 4 15V7l12-5Z"/><path d="m10 17 4 4 8-10"/></svg>
+        </span>
+        <span><strong>Auto <b>Care</b></strong><small>Admin Console</small></span>
+      </a>
+
+      <nav class="side-nav" aria-label="Admin navigation">
+        <button class="side-nav__item is-active" type="button" data-view="overview"><span data-icon="dashboard"></span>Dashboard</button>
+        <button class="side-nav__item" type="button" data-view="customers"><span data-icon="users"></span>Customers</button>
+        <button class="side-nav__item" type="button" data-view="vehicles"><span data-icon="car"></span>Vehicles</button>
+        <button class="side-nav__item" type="button" data-view="bookings"><span data-icon="calendar"></span>Bookings</button>
+        <button class="side-nav__item" type="button" data-view="services"><span data-icon="tools"></span>Services</button>
+        <button class="side-nav__item" type="button" data-view="billing"><span data-icon="invoice"></span>Billing</button>
+        <button class="side-nav__item" type="button" data-view="emergency"><span data-icon="alert"></span>Emergency</button>
+        <button class="side-nav__item" type="button" data-view="notifications"><span data-icon="bell"></span>Notifications</button>
+        <button class="side-nav__item" type="button" data-view="feedback"><span data-icon="star"></span>Feedback</button>
+        <button class="side-nav__item" type="button" data-view="settings"><span data-icon="settings"></span>Settings</button>
+        <button class="side-nav__item" type="button" data-action="logout"><span data-icon="logout"></span>Logout</button>
+      </nav>
+
+      <div class="help-card">
+        <span>Need help?</span>
+        <strong>+94 77 023 4567</strong>
+        <small>support@autocare.lk</small>
+        <button class="btn btn--yellow" type="button" data-action="open-emergency">Emergency Support</button>
+      </div>
+    </aside>
+
+    <div class="workspace">
+      <header class="topbar">
+        <button class="icon-btn mobile-menu" type="button" id="mobile-menu" aria-label="Open menu"><span data-icon="menu"></span></button>
+        <div>
+          <p class="eyebrow">Service Station Management</p>
+          <h1 id="page-title">Dashboard</h1>
+        </div>
+        <label class="search-box">
+          <span data-icon="search"></span>
+          <input id="global-search" type="search" placeholder="Search customers, vehicles, bookings..." />
+        </label>
+        <button class="icon-btn" type="button" data-action="show-notifications" aria-label="Notifications">
+          <span data-icon="bell"></span>
+          <b id="notification-count">0</b>
+        </button>
+        <div class="admin-profile">
+          <span id="profile-initials">AD</span>
+          <div><strong id="profile-name">Admin</strong><small id="profile-role">Manager</small></div>
+        </div>
+      </header>
+
+      <main class="content">
+        <section class="view is-active" data-view-panel="overview">
+          <div class="metric-grid" id="metric-grid"></div>
+
+          <div class="dashboard-grid">
+            <article class="panel panel--large">
+              <div class="panel__header">
+                <div><h2>Upcoming Bookings</h2><p>Approve, reschedule, cancel and track queue positions.</p></div>
+                <button class="btn btn--blue" type="button" data-action="new-booking">New Booking</button>
+              </div>
+              <div class="table-wrap"><table><thead><tr><th>Booking</th><th>Customer</th><th>Vehicle</th><th>Date</th><th>Status</th><th>Queue</th><th>Action</th></tr></thead><tbody id="overview-bookings"></tbody></table></div>
+            </article>
+
+            <aside class="panel quick-actions">
+              <div class="panel__header"><h2>Quick Actions</h2></div>
+              <button type="button" data-action="new-customer"><span data-icon="users"></span><strong>Register Customer</strong><small>Create account access</small></button>
+              <button type="button" data-action="new-vehicle"><span data-icon="car"></span><strong>Add Vehicle</strong><small>Attach vehicle to customer</small></button>
+              <button type="button" data-action="new-booking"><span data-icon="calendar"></span><strong>Book Service</strong><small>Schedule appointment</small></button>
+              <button type="button" data-action="new-emergency"><span data-icon="alert"></span><strong>Emergency Request</strong><small>Breakdown assistance</small></button>
+              <button type="button" data-action="new-invoice"><span data-icon="invoice"></span><strong>Create Invoice</strong><small>Billing and payment</small></button>
+            </aside>
+          </div>
+
+          <div class="dashboard-grid dashboard-grid--even">
+            <article class="panel">
+              <div class="panel__header"><h2>Service Progress</h2></div>
+              <div id="progress-list" class="progress-list"></div>
+            </article>
+            <article class="panel">
+              <div class="panel__header"><h2>Revenue Overview</h2><select id="revenue-filter"><option>This Year</option><option>This Month</option><option>This Week</option></select></div>
+              <div class="donut-layout">
+                <div class="donut-chart" aria-label="Service revenue chart"><span><small>LKR</small><strong id="revenue-total">0</strong><em>Total</em></span></div>
+                <div class="chart-legend" id="chart-legend"></div>
+              </div>
+            </article>
+          </div>
+        </section>
+
+        <section class="view" data-view-panel="customers">
+          <div class="panel">
+            <div class="panel__header">
+              <div><h2>Customer Accounts</h2><p>Register accounts, reset access, edit profiles and manage customer status.</p></div>
+              <button class="btn btn--blue" type="button" data-action="new-customer">Add Customer</button>
+            </div>
+            <div class="table-tools"><input data-table-search="customers-table" type="search" placeholder="Search customers..." /></div>
+            <div class="table-wrap"><table id="customers-table"><thead><tr><th>Name</th><th>Email</th><th>Phone</th><th>Vehicles</th><th>Status</th><th>Action</th></tr></thead><tbody id="customers-body"></tbody></table></div>
+          </div>
+        </section>
+
+        <section class="view" data-view-panel="vehicles">
+          <div class="panel">
+            <div class="panel__header">
+              <div><h2>Vehicle Management</h2><p>Add, edit, delete and view all registered customer vehicles.</p></div>
+              <button class="btn btn--blue" type="button" data-action="new-vehicle">Add Vehicle</button>
+            </div>
+            <div class="vehicle-grid" id="vehicle-grid"></div>
+          </div>
+        </section>
+
+        <section class="view" data-view-panel="bookings">
+          <div class="panel">
+            <div class="panel__header">
+              <div><h2>Booking System</h2><p>Manage appointment requests, approval, queue tracking and service status.</p></div>
+              <button class="btn btn--blue" type="button" data-action="new-booking">Book Appointment</button>
+            </div>
+            <div class="status-tabs" id="booking-tabs"></div>
+            <div class="table-wrap"><table><thead><tr><th>Booking</th><th>Customer</th><th>Vehicle</th><th>Date & Time</th><th>Status</th><th>Queue</th><th>Actions</th></tr></thead><tbody id="bookings-body"></tbody></table></div>
+          </div>
+        </section>
+
+        <section class="view" data-view-panel="services">
+          <div class="panel">
+            <div class="panel__header">
+              <div><h2>Service Packages</h2><p>Packages available to customers for online booking.</p></div>
+              <button class="btn btn--blue" type="button" data-action="new-service">Add Package</button>
+            </div>
+            <div class="package-grid" id="package-grid"></div>
+          </div>
+        </section>
+
+        <section class="view" data-view-panel="billing">
+          <div class="panel">
+            <div class="panel__header">
+              <div><h2>Billing & Payments</h2><p>View invoices, download receipts and track payment history.</p></div>
+              <button class="btn btn--blue" type="button" data-action="new-invoice">Create Invoice</button>
+            </div>
+            <div class="table-wrap"><table><thead><tr><th>Invoice</th><th>Customer</th><th>Service</th><th>Amount</th><th>Payment</th><th>Action</th></tr></thead><tbody id="billing-body"></tbody></table></div>
+          </div>
+        </section>
+
+        <section class="view" data-view-panel="emergency">
+          <div class="panel">
+            <div class="panel__header">
+              <div><h2>Emergency Assistance</h2><p>Breakdown requests, shared locations and vehicle problem details.</p></div>
+              <button class="btn btn--red" type="button" data-action="new-emergency">New Request</button>
+            </div>
+            <div class="emergency-grid" id="emergency-grid"></div>
+          </div>
+        </section>
+
+        <section class="view" data-view-panel="notifications">
+          <div class="panel">
+            <div class="panel__header">
+              <div><h2>Notifications</h2><p>Booking, service completion and payment updates sent to customers.</p></div>
+              <button class="btn btn--blue" type="button" data-action="send-notification">Send Update</button>
+            </div>
+            <div class="notification-list" id="notification-list"></div>
+          </div>
+        </section>
+
+        <section class="view" data-view-panel="feedback">
+          <div class="panel">
+            <div class="panel__header"><div><h2>Feedback & Ratings</h2><p>Customer experience reviews and support follow-ups.</p></div></div>
+            <div class="feedback-grid" id="feedback-grid"></div>
+          </div>
+        </section>
+
+        <section class="view" data-view-panel="settings">
+          <div class="panel">
+            <div class="panel__header"><div><h2>System Settings</h2><p>Admin profile, password, Supabase connection notes and support contacts.</p></div></div>
+            <form class="settings-form" id="settings-form">
+              <label><span>Station Name</span><input name="stationName" value="AutoCare Service Station" required /></label>
+              <label><span>Support Phone</span><input name="supportPhone" value="+94 77 023 4567" required /></label>
+              <label><span>Support Email</span><input name="supportEmail" type="email" value="support@autocare.lk" required /></label>
+              <label><span>Admin Password</span><input name="password" type="password" placeholder="Change password" /></label>
+              <label class="file-control"><span>Admin Profile Picture</span><input name="profilePicture" type="file" accept="image/*" /></label>
+              <div class="database-note">
+                <strong>Database connection</strong>
+                <p>Use the provided Supabase PostgreSQL URLs only in a backend server or migration tool. Browser JavaScript should use secure API endpoints or Supabase anon keys with Row Level Security.</p>
+              </div>
+              <button class="btn btn--yellow" type="submit">Save Settings</button>
+            </form>
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <dialog class="modal" id="dashboard-modal">
+    <form method="dialog" class="modal__card" id="modal-form">
+      <div class="modal__header">
+        <div><p class="eyebrow" id="modal-kicker">Manage</p><h2 id="modal-title">Record</h2></div>
+        <button class="icon-btn" type="button" data-action="close-modal" aria-label="Close dialog"><span data-icon="x"></span></button>
+      </div>
+      <div class="modal__body" id="modal-body"></div>
+      <div class="modal__actions">
+        <button class="btn btn--ghost" type="button" data-action="close-modal">Cancel</button>
+        <button class="btn btn--blue" type="submit" id="modal-submit">Save</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <script src="js/api.js"></script>
+  <script src="js/admin-dashboard.js"></script>
+</body>
+</html>

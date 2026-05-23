@@ -1,0 +1,364 @@
+:root {
+  --navy: #021936;
+  --blue: #2f55d4;
+  --yellow: #ffc400;
+  --red: #f04445;
+  --green: #29b36a;
+  --ink: #18233a;
+  --muted: #8792a8;
+  --line: #e9edf5;
+  --page: #f6f8fc;
+  --shadow: 0 24px 70px rgba(8, 31, 60, 0.16);
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  color: var(--ink);
+  background: var(--page);
+  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+button,
+input { font: inherit; }
+
+button { cursor: pointer; }
+
+.login-shell {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: minmax(360px, 0.92fr) minmax(420px, 1.08fr);
+}
+
+.login-visual {
+  position: relative;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: clamp(28px, 4vw, 56px);
+  color: #fff;
+  background:
+    linear-gradient(90deg, rgba(2, 15, 34, 0.9), rgba(2, 15, 34, 0.58)),
+    url("../assets/images/hero-blue-workshop.png") center / cover no-repeat;
+  overflow: hidden;
+}
+
+.login-visual::after {
+  content: "";
+  position: absolute;
+  inset: auto 0 0;
+  height: 38%;
+  background: linear-gradient(180deg, transparent, rgba(2, 15, 34, 0.86));
+  pointer-events: none;
+}
+
+.brand {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  color: inherit;
+  text-decoration: none;
+}
+
+.brand__mark {
+  width: 70px;
+  height: 70px;
+  color: var(--yellow);
+}
+
+.brand__mark svg {
+  width: 100%;
+  height: 100%;
+  fill: rgba(47, 85, 212, 0.25);
+  stroke: currentColor;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.brand strong {
+  display: block;
+  font-size: 30px;
+  font-weight: 800;
+}
+
+.brand b {
+  color: var(--yellow);
+  font-weight: inherit;
+}
+
+.brand small {
+  display: block;
+  margin-top: 5px;
+  color: rgba(255, 255, 255, 0.64);
+}
+
+.visual-copy {
+  position: relative;
+  z-index: 1;
+  max-width: 620px;
+}
+
+.eyebrow {
+  margin: 0 0 10px;
+  color: var(--yellow);
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+
+.visual-copy h1 {
+  margin: 0;
+  font-size: clamp(38px, 4.6vw, 68px);
+  line-height: 0.98;
+  letter-spacing: 0;
+}
+
+.preview-card {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  padding: 14px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 8px;
+  backdrop-filter: blur(14px);
+}
+
+.preview-card div {
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+}
+
+.preview-card span {
+  display: block;
+  width: 28px;
+  height: 5px;
+  margin-bottom: 16px;
+  background: var(--yellow);
+  border-radius: 999px;
+}
+
+.preview-card strong,
+.preview-card small {
+  display: block;
+}
+
+.preview-card small {
+  margin-top: 5px;
+  color: rgba(255, 255, 255, 0.64);
+}
+
+.login-panel {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: clamp(22px, 4vw, 56px);
+}
+
+.login-card {
+  width: min(100%, 500px);
+  padding: clamp(24px, 4vw, 42px);
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+}
+
+.login-card__header {
+  margin-bottom: 24px;
+}
+
+.login-card__header .eyebrow {
+  color: var(--blue);
+}
+
+.login-card h2 {
+  margin: 0;
+  font-size: clamp(30px, 4vw, 42px);
+  line-height: 1;
+}
+
+.login-card__header p:last-child {
+  margin: 12px 0 0;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.role-tabs {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  padding: 6px;
+  margin-bottom: 22px;
+  background: #f3f6fb;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.role-tabs button {
+  min-height: 42px;
+  color: var(--muted);
+  background: transparent;
+  border: 0;
+  border-radius: 7px;
+  font-weight: 900;
+}
+
+.role-tabs button.is-active {
+  color: #fff;
+  background: var(--blue);
+}
+
+form {
+  display: grid;
+  gap: 16px;
+}
+
+label {
+  display: grid;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+input {
+  width: 100%;
+  min-height: 50px;
+  padding: 0 15px;
+  color: var(--ink);
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  outline: none;
+}
+
+input:focus {
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px rgba(47, 85, 212, 0.12);
+}
+
+.form-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.remember {
+  display: flex;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 9px;
+  color: var(--muted);
+}
+
+.remember input {
+  width: 16px;
+  min-height: 16px;
+}
+
+.link-btn {
+  padding: 0;
+  color: var(--blue);
+  background: transparent;
+  border: 0;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.form-status {
+  min-height: 20px;
+  margin: 0;
+  color: var(--red);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.form-status.is-success {
+  color: var(--green);
+}
+
+.btn {
+  min-height: 50px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 18px;
+  border: 0;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.btn--yellow {
+  color: var(--navy);
+  background: var(--yellow);
+}
+
+.demo-box {
+  margin-top: 22px;
+  padding: 16px;
+  background: #f8fbff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.demo-box strong {
+  display: block;
+  margin-bottom: 8px;
+}
+
+.demo-box p,
+.register-note {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.register-note {
+  text-align: center;
+  margin-top: 18px;
+}
+
+@media (max-width: 940px) {
+  .login-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .login-visual {
+    min-height: 46vh;
+  }
+
+  .login-panel {
+    min-height: auto;
+  }
+}
+
+@media (max-width: 620px) {
+  .login-visual,
+  .login-panel {
+    padding: 18px;
+  }
+
+  .preview-card {
+    grid-template-columns: 1fr;
+  }
+
+  .form-row {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
