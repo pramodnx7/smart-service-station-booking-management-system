@@ -1,16 +1,15 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="AutoPro Service Station - Expert Care For Your Car. Professional auto repair, maintenance, and emergency assistance." />
-  <title>AutoPro | Expert Car Service Station</title>
+  <meta name="description" content="AutoCare service station landing page with booking, repair pricing, recent work, articles and emergency support." />
+  <title>AutoCare | Smart Service Station</title>
 
-  <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Barlow+Condensed:wght@600;700;800&display=swap" rel="stylesheet" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800;900&family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
 
-  <!-- CSS Modules -->
   <link rel="stylesheet" href="css/style.css" />
   <link rel="stylesheet" href="css/navbar.css" />
   <link rel="stylesheet" href="css/hero.css" />
@@ -18,624 +17,351 @@
   <link rel="stylesheet" href="css/footer.css" />
 </head>
 <body>
-
-  <!-- ===== NAVBAR ===== -->
   <header class="navbar" id="navbar">
-    <div class="navbar__top">
-      <div class="container">
-        <div class="navbar__top-info">
-          <span><span class="stabilaicon"></span> +1 (800) 123-4567</span>
-          <span>support@autopro.com</span>
-          <span>Sat: 8:00 AM - 6:00 PM</span>
-        </div>
-        <div class="navbar__top-social">
-          <a href="https://facebook.com" class="social-link" aria-label="Facebook" target="_blank" rel="noreferrer">f</a>
-          <a href="https://x.com" class="social-link" aria-label="Twitter" target="_blank" rel="noreferrer">t</a>
-          <a href="https://instagram.com" class="social-link" aria-label="Instagram" target="_blank" rel="noreferrer">in</a>
-        </div>
-      </div>
-    </div>
-    <div class="navbar__main">
-      <div class="container navbar__main-inner">
-        <a href="#hero" class="navbar__logo" id="logo">
-          <span class="logo-icon"></span>
-          <span class="logo-copy">
-            <span class="logo-text">Auto<span class="logo-accent">Care</span></span>
-            <span class="logo-subtitle">Service Station</span>
-          </span>
-        </a>
-        <nav class="navbar__nav" id="nav-menu">
-          <a href="#hero" class="nav-link active">Home</a>
-          <a href="#services" class="nav-link">Services</a>
-          <a href="#about" class="nav-link">About Us</a>
-          <a href="#pricing" class="nav-link">Pricing</a>
-          <a href="#articles" class="nav-link">Blog</a>
-          <a href="#contact" class="nav-link">Contact</a>
-        </nav>
-        <div class="navbar__actions">
-          <a href="#services" class="btn btn--nav-outline">Our Services</a>
-          <button class="btn btn--primary" id="btn-appointment">Book Appointment</button>
-          <button class="hamburger" id="hamburger" aria-label="Toggle menu">
-            <span></span><span></span><span></span>
-          </button>
-        </div>
+    <div class="container navbar__inner">
+      <a href="#hero" class="navbar__logo" aria-label="AutoCare home">
+        <span class="logo-mark" aria-hidden="true">
+          <svg viewBox="0 0 32 32"><path d="M16 2 28 7v8c0 7.5-4.7 12.6-12 15C8.7 27.6 4 22.5 4 15V7l12-5Z"/><path d="m10 17 4 4 8-10"/></svg>
+        </span>
+        <span class="logo-copy">
+          <strong>Auto<span>Care</span></strong>
+          <small>Service Station</small>
+        </span>
+      </a>
+
+      <nav class="navbar__nav" id="nav-menu" aria-label="Primary navigation">
+        <a href="#hero" class="nav-link active">Home</a>
+        <a href="#services" class="nav-link">Services</a>
+        <a href="#about" class="nav-link">About</a>
+        <a href="#pricing" class="nav-link">Pricing</a>
+        <a href="#work" class="nav-link">Work</a>
+        <a href="#articles" class="nav-link">Blog</a>
+      </nav>
+
+      <div class="navbar__actions">
+        <a href="#services" class="btn btn--ghost">Our Services</a>
+        <a href="#booking-form" class="btn btn--yellow">Book Appointment</a>
+        <button class="hamburger" id="hamburger" type="button" aria-label="Toggle menu">
+          <span></span><span></span><span></span>
+        </button>
       </div>
     </div>
   </header>
 
-    <!-- ===== HERO ===== -->
-  <section class="hero" id="hero">
-    <div class="hero__bg"></div>
-    <div class="container hero__content">
-      <div class="hero__text">
-        <h1 class="hero__title">EXPERT CARE<br><span class="hero__title--accent">FOR YOUR CAR</span></h1>
-        <p class="hero__subtitle">Professional car servicing, repairs and maintenance<br>with quality you can trust.</p>
-        <div class="hero__cta">
-          <a href="#contact" class="btn btn--primary btn--lg" id="btn-book-hero">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg> BOOK APPOINTMENT
-          </a>
-          <a href="#services" class="btn btn--dark-outline btn--lg" id="btn-services-hero">
-            <span class="services-circle-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polygon points="10 8 16 12 10 16 10 8"></polygon></svg></span> OUR SERVICES
-          </a>
-        </div>
-        
-        <div class="hero__features">
-          <div class="hero__feature">
-            <span class="feature-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--clr-accent)" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg></span>
-            <div class="feature-text"><strong>Expert Technicians</strong><span>Certified & Experienced</span></div>
-          </div>
-          <div class="hero__feature">
-            <span class="feature-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--clr-accent)" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg></span>
-            <div class="feature-text"><strong>Genuine Parts</strong><span>100% Original Parts</span></div>
-          </div>
-          <div class="hero__feature">
-            <span class="feature-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--clr-accent)" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg></span>
-            <div class="feature-text"><strong>Modern Equipment</strong><span>Latest Technology</span></div>
-          </div>
-          <div class="hero__feature">
-            <span class="feature-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--clr-accent)" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg></span>
-            <div class="feature-text"><strong>Quick Service</strong><span>On-time Delivery</span></div>
-          </div>
-          <div class="hero__feature">
-            <span class="feature-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--clr-accent)" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg></span>
-            <div class="feature-text"><strong>Customer Support</strong><span>24/7 Support</span></div>
+  <main>
+    <section class="hero" id="hero">
+      <div class="hero__backdrop" aria-hidden="true"></div>
+      <div class="container hero__grid">
+        <div class="hero__copy">
+          <h1>Expert Care<br /><span>For Your Car</span></h1>
+          <p>Professional car servicing, repairs and maintenance with quality you can trust.</p>
+          <div class="hero__buttons">
+            <a href="#booking-form" class="btn btn--yellow btn--large">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M8 2v4M16 2v4M3 10h18"/></svg>
+              Book Appointment
+            </a>
+            <a href="#services" class="btn btn--ghost btn--large">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="m10 8 6 4-6 4V8Z"/></svg>
+              Our Services
+            </a>
           </div>
         </div>
 
-      </div>
-      <div class="hero__image">
-        <img src="assets/images/hero_car.svg" alt="Blue sports car at AutoCare service station" />
-      </div>
-    </div>
-    
-    <div class="hero__booking-wrapper">
-        <div class="container">
-            <form class="booking-bar" id="booking-form">
-                <div class="booking-bar__title">
-                    <span class="booking-bar__icon"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--clr-accent)" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg></span>
-                    <div class="booking-bar__label">
-                    <strong>BOOK YOUR</strong>
-                    <span>SERVICE NOW</span>
-                    </div>
-                </div>
-                
-                <div class="booking-field">
-                    <label for="book-service" class="booking-field__label">Select Service</label>
-                    <div class="booking-field__input-wrap">
-                    <select id="book-service" class="booking-field__input">
-                        <option value="">Choose Service</option>
-                        <option>Engine Repair</option>
-                        <option>Oil Change</option>
-                        <option>Brake Service</option>
-                        <option>Tire Service</option>
-                    </select>
-                    <span class="booking-field__arrow"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg></span>
-                    </div>
-                </div>
-                <div class="booking-field">
-                    <label for="book-vehicle" class="booking-field__label">Select Vehicle</label>
-                    <div class="booking-field__input-wrap">
-                    <select id="book-vehicle" class="booking-field__input">
-                        <option value="">Choose Vehicle</option>
-                        <option>Sedan</option>
-                        <option>SUV</option>
-                        <option>Truck</option>
-                    </select>
-                    <span class="booking-field__arrow"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg></span>
-                    </div>
-                </div>
-                <div class="booking-field">
-                    <label for="book-date" class="booking-field__label">Select Date</label>
-                    <div class="booking-field__input-wrap">
-                    <input type="text" placeholder="Choose Date" id="book-date" class="booking-field__input" onfocus="(this.type='date')" onblur="(this.type='text')" />
-                    <span class="booking-field__icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg></span>
-                    </div>
-                </div>
-                <div class="booking-field">
-                    <label for="book-time" class="booking-field__label">Select Time</label>
-                    <div class="booking-field__input-wrap">
-                    <input type="text" placeholder="Choose Time" id="book-time" class="booking-field__input" onfocus="(this.type='time')" onblur="(this.type='text')" />
-                    <span class="booking-field__icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg></span>
-                    </div>
-                </div>
-                <button type="submit" class="btn btn--primary booking-bar__btn" id="btn-book-now">BOOK NOW</button>
-            </form>
+        <div class="hero__car" aria-hidden="true">
+          <img src="assets/images/hero-blue-workshop.png" alt="" />
         </div>
-    </div>
-  </section>
+      </div>
 
-  <!-- ===== STATS ===== -->
-  <section class="stats" id="stats">
-    <div class="container stats__grid">
-      <div class="stat-card">
-        <span class="stat-icon" aria-hidden="true">
-          <svg viewBox="0 0 48 48" fill="none">
-            <circle cx="24" cy="13" r="8" stroke="currentColor" stroke-width="3"/>
-            <path d="M14 39v-5c0-6 4-10 10-10s10 4 10 10v5" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
-            <circle cx="12" cy="28" r="5" stroke="currentColor" stroke-width="3"/>
-            <circle cx="36" cy="28" r="5" stroke="currentColor" stroke-width="3"/>
-            <path d="M5 39v-3c0-4 3-7 7-7M43 39v-3c0-4-3-7-7-7M20 12h8" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
-          </svg>
-        </span>
-        <h3 class="stat-number" data-target="20000" data-format="compact">0</h3>
-        <p class="stat-label">Happy Customers</p>
+      <div class="hero__features" aria-label="AutoCare service advantages">
+        <div class="container hero__features-grid">
+          <article>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 21a8 8 0 0 0-16 0"/><circle cx="12" cy="7" r="4"/></svg>
+            <strong>Expert Technicians</strong>
+            <span>Certified & experienced</span>
+          </article>
+          <article>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 7h-3l-2-3H9L7 7H4v9h3l2 3h6l2-3h3V7Z"/><path d="M10 11h4"/></svg>
+            <strong>Genuine Parts</strong>
+            <span>100% Original Parts</span>
+          </article>
+          <article>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/><circle cx="12" cy="12" r="3"/></svg>
+            <strong>Modern Equipment</strong>
+            <span>Latest Technology</span>
+          </article>
+          <article>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+            <strong>Quick Service</strong>
+            <span>On-time Delivery</span>
+          </article>
+          <article>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 0 1 16 0v5a3 3 0 0 1-3 3h-2"/><path d="M4 12v4h4v-4H4Zm12 0v4h4v-4h-4Z"/></svg>
+            <strong>Customer Support</strong>
+            <span>24/7 Support</span>
+          </article>
+        </div>
       </div>
-      <div class="stat-card">
-        <span class="stat-icon" aria-hidden="true">
-          <svg viewBox="0 0 48 48" fill="none">
-            <path d="M12 24v-5c0-7 5-12 12-12s12 5 12 12v5" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
-            <path d="M14 22h20v8c0 6-4 10-10 10s-10-4-10-10v-8Z" stroke="currentColor" stroke-width="3"/>
-            <path d="M9 25c0-4 2-7 5-8M39 25c0-4-2-7-5-8M20 8l2 10M28 8l-2 10M19 30h.01M29 30h.01" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
-            <path d="M18 42h12" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
-          </svg>
-        </span>
-        <h3 class="stat-number" data-target="10">0</h3>
-        <p class="stat-label">Expert Technicians</p>
-      </div>
-      <div class="stat-card">
-        <span class="stat-icon" aria-hidden="true">
-          <svg viewBox="0 0 48 48" fill="none">
-            <circle cx="24" cy="13" r="8" stroke="currentColor" stroke-width="3"/>
-            <path d="M14 39v-5c0-6 4-10 10-10s10 4 10 10v5" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
-            <circle cx="12" cy="28" r="5" stroke="currentColor" stroke-width="3"/>
-            <circle cx="36" cy="28" r="5" stroke="currentColor" stroke-width="3"/>
-            <path d="M5 39v-3c0-4 3-7 7-7M43 39v-3c0-4-3-7-7-7M20 12h8" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
-          </svg>
-        </span>
-        <h3 class="stat-number" data-target="20000" data-format="compact">0</h3>
-        <p class="stat-label">Happy Customers</p>
-      </div>
-      <div class="stat-card">
-        <span class="stat-icon" aria-hidden="true">
-          <svg viewBox="0 0 48 48" fill="none">
-            <path d="M12 24v-5c0-7 5-12 12-12s12 5 12 12v5" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
-            <path d="M14 22h20v8c0 6-4 10-10 10s-10-4-10-10v-8Z" stroke="currentColor" stroke-width="3"/>
-            <path d="M9 25c0-4 2-7 5-8M39 25c0-4-2-7-5-8M20 8l2 10M28 8l-2 10M19 30h.01M29 30h.01" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
-            <path d="M18 42h12" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
-          </svg>
-        </span>
-        <h3 class="stat-number" data-target="10">0</h3>
-        <p class="stat-label">Expert Technicians</p>
-      </div>
-      <div class="stat-card">
-        <span class="stat-icon" aria-hidden="true">
-          <svg viewBox="0 0 48 48" fill="none">
-            <path d="M10 28v-4c0-8 6-14 14-14s14 6 14 14v4" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
-            <path d="M10 26h5v11h-5c-2 0-4-2-4-4v-3c0-2 2-4 4-4ZM38 26h-5v11h5c2 0 4-2 4-4v-3c0-2-2-4-4-4Z" stroke="currentColor" stroke-width="3"/>
-            <path d="M33 37c0 4-3 6-8 6h-4" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
-          </svg>
-        </span>
-        <h3 class="stat-number stat-number--static">24/7</h3>
-        <p class="stat-label">Support Available</p>
-      </div>
-    </div>
-  </section>
 
-  <!-- ===== ABOUT ===== -->
-  <section class="about section" id="about">
-    <div class="container">
-      <div class="about__headline">
-        <h2>Our Company <span>History</span></h2>
+      <div class="container booking-shell">
+        <form class="booking-bar" id="booking-form">
+          <div class="booking-bar__title">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M8 2v4M16 2v4M3 10h18"/></svg>
+            <span><strong>Book Your</strong> Service Now</span>
+          </div>
+          <label>
+            <span>Select Service</span>
+            <select required>
+              <option value="">Choose Service</option>
+              <option>Engine Repair</option>
+              <option>Oil Change</option>
+              <option>Brake Service</option>
+              <option>Tire Service</option>
+            </select>
+          </label>
+          <label>
+            <span>Select Vehicle</span>
+            <select required>
+              <option value="">Choose Vehicle</option>
+              <option>Sedan</option>
+              <option>SUV</option>
+              <option>Truck</option>
+              <option>Sports Car</option>
+            </select>
+          </label>
+          <label>
+            <span>Select Date</span>
+            <input type="date" required />
+          </label>
+          <label>
+            <span>Select Time</span>
+            <input type="time" required />
+          </label>
+          <button class="btn btn--yellow" type="submit">Book Now</button>
+        </form>
       </div>
-      <div class="about__content">
+    </section>
+
+    <section class="stats" aria-label="AutoCare statistics">
+      <div class="container stats__grid">
+        <article><svg viewBox="0 0 24 24"><path d="M17 21a5 5 0 0 0-10 0"/><circle cx="12" cy="8" r="4"/><path d="M3 21a4 4 0 0 1 4-4M21 21a4 4 0 0 0-4-4"/></svg><strong class="stat-number" data-target="20000" data-format="compact">0</strong><span>Happy Customers</span></article>
+        <article><svg viewBox="0 0 24 24"><path d="M8 20V9a4 4 0 0 1 8 0v11"/><path d="M6 12h12M10 20h4"/></svg><strong class="stat-number" data-target="10">0</strong><span>Expert Technicians</span></article>
+        <article><svg viewBox="0 0 24 24"><path d="M17 21a5 5 0 0 0-10 0"/><circle cx="12" cy="8" r="4"/><path d="M3 21a4 4 0 0 1 4-4M21 21a4 4 0 0 0-4-4"/></svg><strong class="stat-number" data-target="20000" data-format="compact">0</strong><span>Happy Customers</span></article>
+        <article><svg viewBox="0 0 24 24"><path d="M8 20V9a4 4 0 0 1 8 0v11"/><path d="M6 12h12M10 20h4"/></svg><strong class="stat-number" data-target="10">0</strong><span>Expert Technicians</span></article>
+        <article><svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 0 1 16 0v5a3 3 0 0 1-3 3h-2"/><path d="M4 12v4h4v-4H4Zm12 0v4h4v-4h-4Z"/></svg><strong>24/7</strong><span>Support Available</span></article>
+      </div>
+    </section>
+
+    <section class="about section" id="about">
+      <div class="container about__grid">
         <div class="about__visual">
-          <div class="about__image">
-            <img src="assets/images/mechanic_work.svg" alt="AutoPro mechanic servicing a vehicle" />
+          <img class="about__photo" src="assets/images/about-mechanic-red-car.png" alt="Mechanic servicing a red car" />
+          <img class="about__small-car" src="assets/images/newsletter-red-sports-car.png" alt="Serviced red car" />
+        </div>
+        <div class="about__content">
+          <div class="section-heading">
+            <h2>Our Company <span>History</span></h2>
           </div>
-          <img src="assets/images/hero_car.svg" alt="AutoPro serviced car" class="about__car" />
-          <div class="about__badge">
-            <span class="badge-number">20+</span>
-            <span class="badge-text">Years of Excellence</span>
+          <div class="tabs" id="about-tabs" role="tablist" aria-label="Company information">
+            <button class="tab-btn tab-btn--active" id="tab-history" type="button" data-tab="history" role="tab" aria-selected="true">History</button>
+            <button class="tab-btn" id="tab-description" type="button" data-tab="description" role="tab" aria-selected="false">Description</button>
+            <button class="tab-btn" id="tab-reviews" type="button" data-tab="reviews" role="tab" aria-selected="false">Reviews</button>
+          </div>
+          <div class="about__text" id="tab-panel-history" role="tabpanel" aria-labelledby="tab-history">
+            <span class="eyebrow">History</span>
+            <p>From one service bay to a full automotive care center, AutoCare was built on clear diagnostics, honest pricing and workmanship that customers can trust.</p>
+            <ul>
+              <li>Fast vehicle inspection</li>
+              <li>Advanced diagnostics</li>
+              <li>Genuine replacement parts</li>
+              <li>Roadside support</li>
+            </ul>
+          </div>
+          <div class="about__text hidden" id="tab-panel-description" role="tabpanel" aria-labelledby="tab-description">
+            <span class="eyebrow">Description</span>
+            <p>We provide complete service for daily drivers, family vehicles and performance cars, including maintenance, repairs, AC, brakes, tyres and emergency assistance.</p>
+            <ul>
+              <li>Transparent service process</li>
+              <li>Skilled mechanical team</li>
+              <li>Comfortable booking flow</li>
+              <li>Warranty-backed service</li>
+            </ul>
+          </div>
+          <div class="about__text hidden" id="tab-panel-reviews" role="tabpanel" aria-labelledby="tab-reviews">
+            <span class="eyebrow">Reviews</span>
+            <p>The team explained the issue clearly, fixed it on time and kept the price fair. That mix of speed and confidence is why drivers return.</p>
+            <div class="review-mini">
+              <img src="assets/images/workshop-lift-mechanic.png" alt="Customer avatar" />
+              <span><strong>CMorwerFHouin</strong><small>AutoCare Client</small></span>
+            </div>
           </div>
         </div>
-        <div class="about__story">
-          <div class="tabs" id="about-tabs" role="tablist" aria-label="Company information tabs">
-            <button class="tab-btn tab-btn--active" data-tab="company" id="tab-company" role="tab" aria-selected="true">Company</button>
-            <button class="tab-btn" data-tab="history" id="tab-history" role="tab" aria-selected="false">History</button>
-            <button class="tab-btn" data-tab="reviews" id="tab-reviews" role="tab" aria-selected="false">Reviews</button>
+      </div>
+    </section>
+
+    <section class="services section" id="services">
+      <div class="container">
+        <div class="service-strip">
+          <article><img src="assets/images/workshop-lift-mechanic.png" alt="General service" /><strong>General Service</strong><span>LKR 8,500</span></article>
+          <article><img src="assets/images/about-mechanic-red-car.png" alt="Oil change" /><strong>Oil Change</strong><span>LKR 6,000</span></article>
+          <article><img src="assets/images/service-wheel-closeup.png" alt="Brake service" /><strong>Brake Service</strong><span>LKR 7,500</span></article>
+          <article><img src="assets/images/hero-blue-workshop.png" alt="Engine repair" /><strong>Engine Repair</strong><span>LKR 12,000</span></article>
+          <article><img src="assets/images/workshop-lift-mechanic.png" alt="AC service" /><strong>AC Service</strong><span>LKR 8,000</span></article>
+          <article><img src="assets/images/service-wheel-closeup.png" alt="Tire service" /><strong>Tire Service</strong><span>LKR 5,500</span></article>
+        </div>
+      </div>
+    </section>
+
+    <section class="pricing section" id="pricing">
+      <div class="container">
+        <div class="section-heading section-heading--row">
+          <div>
+            <h2>Repair <span>Pricing</span> Plan</h2>
+            <p>Price is what you pay, value is what you get.</p>
           </div>
-          <div class="about__text" id="tab-panel-company" role="tabpanel" aria-labelledby="tab-company" aria-hidden="false">
-            <span class="section-label">Who We Are</span>
-            <h3 class="section-title">Trusted Service, Built on Care</h3>
-            <p>AutoPro has been delivering dependable automotive care since 2005. Our certified team combines practical experience with modern diagnostics to keep every vehicle safe, efficient, and road ready.</p>
-            <!DOCTYPE html>
-            <html lang="en">
-            <head>
-              <meta charset="UTF-8" />
-              <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-              <meta name="description" content="AutoCare service station landing page with booking, pricing, recent work and contact sections." />
-              <title>AutoCare | Expert Car Service</title>
+          <a href="#booking-form" class="inline-link">View More Plans</a>
+        </div>
+        <div class="pricing__grid">
+          <article class="pricing-card">
+            <img src="assets/images/workshop-lift-mechanic.png" alt="Basic repair plan" />
+            <div class="pricing-card__body">
+              <span>Monthly | Basic Plan</span>
+              <strong><small>$</small>659.00</strong>
+              <ul><li>Oil, filter and fluid check</li><li>Brake inspection</li><li>Quick health report</li><li>Basic support</li></ul>
+            </div>
+            <a href="#booking-form">Get Started Now</a>
+          </article>
+          <article class="pricing-card pricing-card--featured">
+            <img src="assets/images/about-mechanic-red-car.png" alt="Popular repair plan" />
+            <div class="pricing-card__body">
+              <span>Monthly | Popular Plan</span>
+              <strong><small>$</small>799.00</strong>
+              <ul><li>Starter plan features</li><li>Engine diagnostics</li><li>Battery and AC check</li><li>Priority service slot</li></ul>
+            </div>
+            <a href="#booking-form">Get Started Now</a>
+          </article>
+          <article class="pricing-card">
+            <img src="assets/images/service-wheel-closeup.png" alt="Premium repair plan" />
+            <div class="pricing-card__body">
+              <span>Monthly | Premium Plan</span>
+              <strong><small>$</small>899.00</strong>
+              <ul><li>Popular plan features</li><li>Wheel alignment</li><li>Transmission inspection</li><li>Extended warranty</li></ul>
+            </div>
+            <a href="#booking-form">Get Started Now</a>
+          </article>
+        </div>
+      </div>
+    </section>
 
-              <link rel="preconnect" href="https://fonts.googleapis.com" />
-              <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Barlow+Condensed:wght@600;700;800&display=swap" rel="stylesheet" />
+    <section class="testimonial">
+      <div class="container testimonial__inner">
+        <img src="assets/images/workshop-lift-mechanic.png" alt="Mechanic repairing a vehicle" />
+        <blockquote>
+          <span>"</span>
+          <p>Expert is the best choice for your car services. They are so professional in their services. I just love them and their work.</p>
+          <cite>Ronald Jonson - AutoCare Client</cite>
+        </blockquote>
+      </div>
+    </section>
 
-              <link rel="stylesheet" href="css/style.css" />
-              <link rel="stylesheet" href="css/navbar.css" />
-              <link rel="stylesheet" href="css/hero.css" />
-              <link rel="stylesheet" href="css/sections.css" />
-              <link rel="stylesheet" href="css/footer.css" />
-            </head>
-            <body>
-              <header class="navbar" id="navbar">
-                <div class="navbar__top">
-                  <div class="container">
-                    <div class="navbar__top-info">
-                      <span><span class="stabilaicon"></span> +1 (800) 123-4567</span>
-                      <span>support@autocare.com</span>
-                      <span>Mon - Sat: 8:00 AM - 6:00 PM</span>
-                    </div>
-                    <div class="navbar__top-social">
-                      <a href="https://facebook.com" class="social-link" aria-label="Facebook" target="_blank" rel="noreferrer">f</a>
-                      <a href="https://x.com" class="social-link" aria-label="Twitter" target="_blank" rel="noreferrer">t</a>
-                      <a href="https://instagram.com" class="social-link" aria-label="Instagram" target="_blank" rel="noreferrer">in</a>
-                    </div>
-                  </div>
-                </div>
-                <div class="navbar__main">
-                  <div class="container navbar__main-inner">
-                    <a href="#hero" class="navbar__logo" id="logo">
-                      <span class="logo-icon"></span>
-                      <span class="logo-copy">
-                        <span class="logo-text">Auto<span class="logo-accent">Care</span></span>
-                        <span class="logo-subtitle">Service Station</span>
-                      </span>
-                    </a>
-                    <nav class="navbar__nav" id="nav-menu">
-                      <a href="#hero" class="nav-link active">Home</a>
-                      <a href="#about" class="nav-link">About Us</a>
-                      <a href="#services" class="nav-link">Service</a>
-                      <a href="#pricing" class="nav-link">Pricing</a>
-                      <a href="#articles" class="nav-link">Blog</a>
-                      <a href="#contact" class="nav-link">Contact</a>
-                    </nav>
-                    <div class="navbar__actions">
-                      <a href="#services" class="btn btn--nav-outline">Our Services</a>
-                      <a href="#contact" class="btn btn--primary" id="btn-appointment">Book Appointment</a>
-                      <button class="hamburger" id="hamburger" aria-label="Toggle menu">
-                        <span></span><span></span><span></span>
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </header>
+    <section class="work section" id="work">
+      <div class="container">
+        <div class="section-heading section-heading--center">
+          <h2>Recent Complete <span>Work</span></h2>
+          <p>Bringing car service to life, one project at a time.</p>
+          <div class="gallery__controls">
+            <button type="button" id="gallery-prev" aria-label="Previous work">‹</button>
+            <button type="button" id="gallery-next" aria-label="Next work">›</button>
+          </div>
+        </div>
+        <div class="gallery__slider" id="gallery-grid">
+          <article class="gallery-item"><img src="assets/images/service-wheel-closeup.png" alt="Suspension inspection" /><span>Suspension Inspection</span></article>
+          <article class="gallery-item gallery-item--wide"><img src="assets/images/workshop-lift-mechanic.png" alt="Exhaust system repair" /><span>Exhaust System Repair</span></article>
+          <article class="gallery-item"><img src="assets/images/about-mechanic-red-car.png" alt="Engine diagnostics" /><span>Engine Diagnostics</span></article>
+        </div>
+      </div>
+    </section>
 
-              <section class="hero" id="hero">
-                <div class="hero__bg"></div>
-                <div class="container hero__content">
-                  <div class="hero__text">
-                    <p class="hero__eyebrow">AutoCare Service Station</p>
-                    <h1 class="hero__title">EXPERT CARE<br><span class="hero__title--accent">FOR YOUR CAR</span></h1>
-                    <p class="hero__subtitle">Professional car servicing, repairs and maintenance with quick turnaround, honest pricing and dependable support when you need it most.</p>
-                    <div class="hero__cta">
-                      <a href="#contact" class="btn btn--primary btn--lg" id="btn-book-hero">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
-                        Book Appointment
-                      </a>
-                      <a href="#services" class="btn btn--dark-outline btn--lg" id="btn-services-hero">
-                        <span class="services-circle-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polygon points="10 8 16 12 10 16 10 8"></polygon></svg></span>
-                        Our Services
-                      </a>
-                    </div>
-                  </div>
-                  <div class="hero__image">
-                    <img src="assets/images/hero_car.svg" alt="Blue sports car at the service station" />
-                  </div>
-                </div>
-                <div class="container hero__features">
-                  <div class="hero__feature"><span class="feature-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg></span><div class="feature-text"><strong>Expert Technicians</strong><span>Certified team</span></div></div>
-                  <div class="hero__feature"><span class="feature-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg></span><div class="feature-text"><strong>Genuine Parts</strong><span>Original quality</span></div></div>
-                  <div class="hero__feature"><span class="feature-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg></span><div class="feature-text"><strong>Modern Equipment</strong><span>Latest tools</span></div></div>
-                  <div class="hero__feature"><span class="feature-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg></span><div class="feature-text"><strong>Quick Service</strong><span>On-time delivery</span></div></div>
-                  <div class="hero__feature"><span class="feature-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg></span><div class="feature-text"><strong>Support</strong><span>24/7 assistance</span></div></div>
-                </div>
-                <div class="hero__booking-wrapper">
-                  <div class="container">
-                    <form class="booking-bar" id="booking-form">
-                      <div class="booking-bar__title">
-                        <span class="booking-bar__icon"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg></span>
-                        <div class="booking-bar__label"><strong>BOOK YOUR</strong><span>SERVICE NOW</span></div>
-                      </div>
-                      <div class="booking-field">
-                        <label for="book-service" class="booking-field__label">Select Service</label>
-                        <div class="booking-field__input-wrap">
-                          <select id="book-service" class="booking-field__input">
-                            <option value="">Choose Service</option>
-                            <option>Engine Repair</option>
-                            <option>Oil Change</option>
-                            <option>Brake Service</option>
-                            <option>Tire Service</option>
-                          </select>
-                          <span class="booking-field__arrow"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg></span>
-                        </div>
-                      </div>
-                      <div class="booking-field">
-                        <label for="book-vehicle" class="booking-field__label">Select Vehicle</label>
-                        <div class="booking-field__input-wrap">
-                          <select id="book-vehicle" class="booking-field__input">
-                            <option value="">Choose Vehicle</option>
-                            <option>Sedan</option>
-                            <option>SUV</option>
-                            <option>Truck</option>
-                          </select>
-                          <span class="booking-field__arrow"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg></span>
-                        </div>
-                      </div>
-                      <div class="booking-field">
-                        <label for="book-date" class="booking-field__label">Select Date</label>
-                        <div class="booking-field__input-wrap">
-                          <input type="text" placeholder="Choose Date" id="book-date" class="booking-field__input" onfocus="(this.type='date')" onblur="(this.type='text')" />
-                          <span class="booking-field__icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg></span>
-                        </div>
-                      </div>
-                      <div class="booking-field">
-                        <label for="book-time" class="booking-field__label">Select Time</label>
-                        <div class="booking-field__input-wrap">
-                          <input type="text" placeholder="Choose Time" id="book-time" class="booking-field__input" onfocus="(this.type='time')" onblur="(this.type='text')" />
-                          <span class="booking-field__icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg></span>
-                        </div>
-                      </div>
-                      <button type="submit" class="btn btn--primary booking-bar__btn" id="btn-book-now">BOOK NOW</button>
-                    </form>
-                  </div>
-                </div>
-              </section>
+    <section class="emergency" id="contact">
+      <div class="container emergency__inner">
+        <div>
+          <span>Need immediate assistance?</span>
+          <h2>Need Emergency Assistance?</h2>
+          <p>Our team is available 24/7 to assist you on the road.</p>
+          <a class="btn btn--yellow" href="tel:+18001234567">Request Emergency Help</a>
+        </div>
+        <img src="assets/images/emergency-tow-banner.png" alt="Tow truck and rescue vehicles" />
+      </div>
+    </section>
 
-              <section class="stats" id="stats">
-                <div class="container stats__grid">
-                  <div class="stat-card"><span class="stat-icon" aria-hidden="true"><svg viewBox="0 0 48 48" fill="none"><circle cx="24" cy="13" r="8" stroke="currentColor" stroke-width="3"/><path d="M14 39v-5c0-6 4-10 10-10s10 4 10 10v5" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg></span><h3 class="stat-number" data-target="20000" data-format="compact">0</h3><p class="stat-label">Happy Customers</p></div>
-                  <div class="stat-card"><span class="stat-icon" aria-hidden="true"><svg viewBox="0 0 48 48" fill="none"><path d="M12 24v-5c0-7 5-12 12-12s12 5 12 12v5" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><path d="M14 22h20v8c0 6-4 10-10 10s-10-4-10-10v-8Z" stroke="currentColor" stroke-width="3"/></svg></span><h3 class="stat-number" data-target="10">0</h3><p class="stat-label">Expert Technicians</p></div>
-                  <div class="stat-card"><span class="stat-icon" aria-hidden="true"><svg viewBox="0 0 48 48" fill="none"><circle cx="24" cy="13" r="8" stroke="currentColor" stroke-width="3"/><path d="M14 39v-5c0-6 4-10 10-10s10 4 10 10v5" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg></span><h3 class="stat-number" data-target="20000" data-format="compact">0</h3><p class="stat-label">Happy Customers</p></div>
-                  <div class="stat-card"><span class="stat-icon" aria-hidden="true"><svg viewBox="0 0 48 48" fill="none"><path d="M12 24v-5c0-7 5-12 12-12s12 5 12 12v5" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><path d="M14 22h20v8c0 6-4 10-10 10s-10-4-10-10v-8Z" stroke="currentColor" stroke-width="3"/></svg></span><h3 class="stat-number" data-target="10">0</h3><p class="stat-label">Expert Technicians</p></div>
-                  <div class="stat-card"><span class="stat-icon" aria-hidden="true"><svg viewBox="0 0 48 48" fill="none"><path d="M10 28v-4c0-8 6-14 14-14s14 6 14 14v4" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><path d="M10 26h5v11h-5c-2 0-4-2-4-4v-3c0-2 2-4 4-4ZM38 26h-5v11h5c2 0 4-2 4-4v-3c0-2-2-4-4-4Z" stroke="currentColor" stroke-width="3"/></svg></span><h3 class="stat-number stat-number--static">24/7</h3><p class="stat-label">Support Available</p></div>
-                </div>
-              </section>
+    <section class="articles section" id="articles">
+      <div class="container">
+        <div class="section-heading section-heading--row">
+          <div>
+            <h2>Our <span>Latest</span> Articles</h2>
+            <p>Stay fresh with your car services news and blog.</p>
+          </div>
+          <a href="#articles" class="inline-link">All Blog & News</a>
+        </div>
+        <div class="articles__grid">
+          <article class="article-card"><img src="assets/images/about-mechanic-red-car.png" alt="Mechanic checking vehicle" /><div><span>23 Jan 2026 | Maintenance</span><h3>A well-maintained car is like a well tuned instrument.</h3><a href="#articles">Read More</a></div></article>
+          <article class="article-card"><img src="assets/images/workshop-lift-mechanic.png" alt="Technician inside workshop" /><div><span>11 Jan 2026 | Auto Service</span><h3>The best car service is the one that keeps you moving forward.</h3><a href="#articles">Read More</a></div></article>
+          <article class="article-card"><img src="assets/images/hero-blue-workshop.png" alt="Covered car in workshop" /><div><span>07 Jan 2026 | Car Care</span><h3>We provide peace of mind with top-notch car service.</h3><a href="#articles">Read More</a></div></article>
+        </div>
+      </div>
+    </section>
 
-              <section class="about section" id="about">
-                <div class="container">
-                  <div class="about__headline">
-                    <h2>Our Company <span>History</span></h2>
-                  </div>
-                  <div class="about__content">
-                    <div class="about__visual">
-                      <div class="about__image">
-                        <img src="assets/images/mechanic_work.svg" alt="Mechanic working on a vehicle" />
-                      </div>
-                      <img src="assets/images/hero_car.svg" alt="Serviced blue car" class="about__car" />
-                      <div class="about__badge"><span class="badge-number">20+</span><span class="badge-text">Years of Excellence</span></div>
-                    </div>
-                    <div class="about__story">
-                      <div class="tabs" id="about-tabs" role="tablist" aria-label="Company information tabs">
-                        <button class="tab-btn tab-btn--active" data-tab="history" id="tab-history" role="tab" aria-selected="true">History</button>
-                        <button class="tab-btn" data-tab="company" id="tab-company" role="tab" aria-selected="false">Description</button>
-                        <button class="tab-btn" data-tab="reviews" id="tab-reviews" role="tab" aria-selected="false">Reviews</button>
-                      </div>
-                      <div class="about__text" id="tab-panel-history" role="tabpanel" aria-labelledby="tab-history" aria-hidden="false">
-                        <span class="section-label">History</span>
-                        <h3 class="section-title">Built on Honest Service and Care</h3>
-                        <p>AutoCare has grown from a single workshop into a trusted automotive service station by focusing on clear communication, reliable workmanship and consistent results.</p>
-                        <ul class="about__list">
-                          <li><span class="stabilaicon"></span> Skilled Mechanics</li>
-                          <li><span class="stabilaicon"></span> Advanced Diagnostics</li>
-                          <li><span class="stabilaicon"></span> Genuine Parts</li>
-                          <li><span class="stabilaicon"></span> 24/7 Support</li>
-                        </ul>
-                      </div>
-                      <div class="about__text hidden" id="tab-panel-company" role="tabpanel" aria-labelledby="tab-company" aria-hidden="true">
-                        <span class="section-label">Description</span>
-                        <h3 class="section-title">Complete Service Under One Roof</h3>
-                        <p>We handle inspections, repairs, maintenance and emergency support with a practical process that keeps the customer informed from start to finish.</p>
-                        <p>Every job starts with diagnosis and ends with a service that is safe, tested and ready for the road.</p>
-                        <a href="#pricing" class="btn btn--primary">Explore Services</a>
-                      </div>
-                      <div class="about__text hidden" id="tab-panel-reviews" role="tabpanel" aria-labelledby="tab-reviews" aria-hidden="true">
-                        <span class="section-label">Reviews</span>
-                        <h3 class="section-title">Customers Trust the Result</h3>
-                        <p>Drivers come back because the work is explained clearly, the pricing is transparent and the service feels dependable from booking to handoff.</p>
-                        <div class="about__review">
-                          <div class="about__review-avatar"><img src="assets/images/service_team.svg" alt="Customer review avatar" /></div>
-                          <div><strong>CMorwerFHouin</strong><span>AutoCare Client</span></div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </section>
+    <section class="newsletter">
+      <div class="container newsletter__inner">
+        <img src="assets/images/newsletter-red-sports-car.png" alt="Red sports car" />
+        <div>
+          <h2>Subscribe <span>Our Newsletter</span></h2>
+          <form id="newsletter-form">
+            <input type="email" placeholder="Your Email" aria-label="Email address" required />
+            <button class="btn btn--red" type="submit">Subscribe</button>
+          </form>
+        </div>
+      </div>
+    </section>
+  </main>
 
-              <section class="services section" id="services">
-                <div class="container">
-                  <div class="section-header">
-                    <span class="section-label">What We Do</span>
-                    <h2 class="section-title">Our <span class="text-accent">Services</span></h2>
-                    <p class="section-subtitle">Practical maintenance and repair services tailored to everyday vehicles.</p>
-                  </div>
-                  <div class="services__grid">
-                    <article class="service-card"><div class="service-card__image"><img src="assets/images/mechanic_work.svg" alt="Engine repair" /></div><div class="service-card__icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M14 7h3l3 3v4h-3l-2 3H8l-2-3H4v-4h3l3-3h4Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M9 11h6M10 3h4M12 3v4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></div><h3>Engine Repair</h3><p>Diagnostics, tune-ups and full repair support.</p><span class="service-card__price">LKR 12,500</span></article>
-                    <article class="service-card"><div class="service-card__image"><img src="assets/images/workshop_bg.svg" alt="Oil change" /></div><div class="service-card__icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M9 3h6l1 5 3 4v6a3 3 0 0 1-3 3H8a3 3 0 0 1-3-3v-6l3-4 1-5Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M9 8h6M12 12v5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></div><h3>Oil Change</h3><p>Fast oil and filter replacement service.</p><span class="service-card__price">LKR 6,500</span></article>
-                    <article class="service-card"><div class="service-card__image"><img src="assets/images/hero_car.svg" alt="Brake service" /></div><div class="service-card__icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2"/></svg></div><h3>Brake Service</h3><p>Inspection, pad replacement and fluid flush.</p><span class="service-card__price">LKR 7,500</span></article>
-                    <article class="service-card"><div class="service-card__image"><img src="assets/images/red_car.svg" alt="Tire service" /></div><div class="service-card__icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="2" stroke="currentColor" stroke-width="2"/></svg></div><h3>Tire Service</h3><p>Balancing, rotation and alignment support.</p><span class="service-card__price">LKR 5,500</span></article>
-                    <article class="service-card"><div class="service-card__image"><img src="assets/images/service_team.svg" alt="AC repair" /></div><div class="service-card__icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M12 3v18M5 6l14 12M19 6 5 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></div><h3>AC Service</h3><p>Refrigerant, cooling and compressor checks.</p><span class="service-card__price">LKR 8,000</span></article>
-                    <article class="service-card"><div class="service-card__image"><img src="assets/images/workshop_bg.svg" alt="Battery service" /></div><div class="service-card__icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M7 7V5h10v2h2v12H5V7h2Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M9 13h6M12 10v6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></div><h3>Battery Service</h3><p>Testing, charging and replacement support.</p><span class="service-card__price">LKR 4,500</span></article>
-                  </div>
-                </div>
-              </section>
-
-              <section class="pricing section" id="pricing">
-                <div class="container">
-                  <div class="section-header">
-                    <span class="section-label">Transparent Rates</span>
-                    <h2 class="section-title">Repair <span class="text-accent">Pricing</span> Plan</h2>
-                    <p class="section-subtitle">Price is what you pay, value is what you get.</p>
-                  </div>
-                  <div class="pricing__grid">
-                    <article class="pricing-card"><div class="pricing-card__image"><img src="assets/images/mechanic_work.svg" alt="Basic plan" /></div><div class="pricing-card__header"><div class="pricing-card__meta"><span>Monthly</span><span>Basic Plan</span></div><h3>Starter</h3><div class="pricing-card__price"><span class="price-currency">$</span>659.00</div></div><ul class="pricing-card__features"><li><span class="stabilaicon"></span> Oil and filter change</li><li><span class="stabilaicon"></span> Brake inspection</li><li><span class="stabilaicon"></span> Tire rotation</li><li><span class="stabilaicon"></span> Fluid top-up</li></ul><a href="#contact" class="pricing-card__btn">Get Started Now</a></article>
-                    <article class="pricing-card pricing-card--featured"><div class="pricing-card__image"><img src="assets/images/hero_car.svg" alt="Popular plan" /></div><div class="pricing-card__header"><div class="pricing-card__meta"><span>Monthly</span><span>Popular Plan</span></div><h3>Standard</h3><div class="pricing-card__price"><span class="price-currency">$</span>799.00</div></div><ul class="pricing-card__features"><li><span class="stabilaicon"></span> Everything in Starter</li><li><span class="stabilaicon"></span> Engine diagnostics</li><li><span class="stabilaicon"></span> Battery test</li><li><span class="stabilaicon"></span> AC check</li></ul><a href="#contact" class="pricing-card__btn">Get Started Now</a></article>
-                    <article class="pricing-card"><div class="pricing-card__image"><img src="assets/images/workshop_bg.svg" alt="Premium plan" /></div><div class="pricing-card__header"><div class="pricing-card__meta"><span>Monthly</span><span>Premium Plan</span></div><h3>Advanced</h3><div class="pricing-card__price"><span class="price-currency">$</span>899.00</div></div><ul class="pricing-card__features"><li><span class="stabilaicon"></span> Everything in Standard</li><li><span class="stabilaicon"></span> Full transmission service</li><li><span class="stabilaicon"></span> Wheel alignment</li><li><span class="stabilaicon"></span> 12-month warranty</li></ul><a href="#contact" class="pricing-card__btn">Get Started Now</a></article>
-                  </div>
-                </div>
-              </section>
-
-              <section class="testimonial-banner">
-                <div class="container testimonial-banner__inner">
-                  <div class="testimonial-banner__image"><img src="assets/images/mechanic_work.svg" alt="Mechanic working inside the shop" /></div>
-                  <div class="testimonial-banner__content">
-                    <span class="quote-mark">&ldquo;</span>
-                    <p class="testimonial-text">Expert is the best choice for car services. They are professional, honest and always take the time to explain the work in a way that makes sense.</p>
-                    <div class="testimonial-author"><strong>James Morrison</strong><span>Loyal Client Since 2015</span></div>
-                  </div>
-                </div>
-              </section>
-
-              <section class="gallery section" id="gallery">
-                <div class="container">
-                  <div class="section-header gallery__header">
-                    <div>
-                      <span class="section-label">Our Work</span>
-                      <h2 class="section-title">Recent Complete <span class="text-accent">Work</span></h2>
-                      <p class="section-subtitle">Bringing car service to life, one project at a time.</p>
-                    </div>
-                    <div class="gallery__controls" aria-label="Gallery controls">
-                      <button type="button" class="gallery__arrow" id="gallery-prev" aria-label="Previous work">←</button>
-                      <button type="button" class="gallery__arrow gallery__arrow--next" id="gallery-next" aria-label="Next work">→</button>
-                    </div>
-                  </div>
-                  <div class="gallery__slider" id="gallery-grid" aria-label="Recent complete work slider">
-                    <button type="button" class="gallery-item" id="gi-1"><img src="assets/images/service_team.svg" alt="Service team work" /><div class="gallery-item__overlay"><h4>Service Team</h4><p>Detailed inspection and repairs</p></div></button>
-                    <button type="button" class="gallery-item" id="gi-2"><img src="assets/images/mechanic_work.svg" alt="Exhaust system repair" /><div class="gallery-item__overlay"><h4>Exhaust System Repair</h4><p>Noise, leak and performance fixes</p></div></button>
-                    <button type="button" class="gallery-item" id="gi-3"><img src="assets/images/hero_car.svg" alt="Car detailing and tuning" /><div class="gallery-item__overlay"><h4>Performance Tune</h4><p>Fine tuning and road testing</p></div></button>
-                  </div>
-                </div>
-              </section>
-
-              <section class="emergency" id="emergency">
-                <div class="container emergency__inner">
-                  <div class="emergency__text">
-                    <span class="section-label">Need Immediate Assistance?</span>
-                    <h2>NEED EMERGENCY ASSISTANCE?</h2>
-                    <p>Our team is available 24/7 to assist you on the road.</p>
-                    <a href="tel:+18001234567" class="btn btn--primary btn--lg" id="btn-call">Request Emergency Help</a>
-                  </div>
-                  <div class="emergency__actions">
-                    <img src="assets/images/tow_truck.svg" alt="Tow truck ready to help" class="emergency__truck" />
-                  </div>
-                </div>
-              </section>
-
-              <section class="articles section" id="articles">
-                <div class="container">
-                  <div class="section-header">
-                    <span class="section-label">Stay Informed</span>
-                    <h2 class="section-title">Our <span class="text-accent">Latest</span> Articles</h2>
-                    <p class="section-subtitle">Stay fresh with your car services news and blog.</p>
-                  </div>
-                  <div class="articles__grid">
-                    <article class="article-card"><div class="article-card__img"><img src="assets/images/mechanic_work.svg" alt="Article 1" /></div><div class="article-card__body"><span class="article-card__tag">11 Jul 2026</span><h3><a href="#articles">A well-maintained car is like a tuned instrument.</a></h3><div class="article-card__meta"><span>Maintenance</span><a href="#articles" class="read-more">READ MORE</a></div></div></article>
-                    <article class="article-card"><div class="article-card__img"><img src="assets/images/service_team.svg" alt="Article 2" /></div><div class="article-card__body"><span class="article-card__tag">09 Jul 2026</span><h3><a href="#articles">The best car service is the one that keeps you moving.</a></h3><div class="article-card__meta"><span>Safety</span><a href="#articles" class="read-more">READ MORE</a></div></div></article>
-                    <article class="article-card"><div class="article-card__img"><img src="assets/images/workshop_bg.svg" alt="Article 3" /></div><div class="article-card__body"><span class="article-card__tag">07 Jul 2026</span><h3><a href="#articles">We provide peace of mind with top-notch car service.</a></h3><div class="article-card__meta"><span>Repair</span><a href="#articles" class="read-more">READ MORE</a></div></div></article>
-                  </div>
-                </div>
-              </section>
-
-              <section class="newsletter" id="newsletter">
-                <div class="container newsletter__inner">
-                  <div class="newsletter__text">
-                    <h2>Subscribe <span class="text-accent">Our Newsletter</span></h2>
-                    <p>Get the latest service updates, deals and maintenance tips in your inbox.</p>
-                    <form class="newsletter__form" id="newsletter-form">
-                      <input type="email" id="newsletter-email" placeholder="Your Email" aria-label="Email address" required />
-                      <button type="submit" class="btn btn--primary" id="btn-subscribe">Subscribe</button>
-                    </form>
-                  </div>
-                  <div class="newsletter__image">
-                    <img src="assets/images/red_car.svg" alt="Red sports car" />
-                  </div>
-                </div>
-              </section>
-
-              <footer class="footer" id="footer">
-                <div class="container footer__grid">
-                  <div class="footer__brand">
-                    <a href="#hero" class="navbar__logo footer-logo">
-                      <span class="logo-icon"></span>
-                      <span class="logo-copy">
-                        <span class="logo-text">Auto<span class="logo-accent">Care</span></span>
-                        <span class="logo-subtitle">Service Station</span>
-                      </span>
-                    </a>
-                    <p>Reliable service, transparent pricing and support that keeps your vehicle on the road.</p>
-                    <div class="footer__social">
-                      <a href="https://facebook.com" class="social-link" aria-label="Facebook" target="_blank" rel="noreferrer">f</a>
-                      <a href="https://x.com" class="social-link" aria-label="Twitter" target="_blank" rel="noreferrer">t</a>
-                      <a href="https://instagram.com" class="social-link" aria-label="Instagram" target="_blank" rel="noreferrer">in</a>
-                    </div>
-                  </div>
-                  <div class="footer__links">
-                    <h4>Our Services</h4>
-                    <ul>
-                      <li><a href="#services">Engine Repair</a></li>
-                      <li><a href="#services">Oil Change</a></li>
-                      <li><a href="#services">Brake Service</a></li>
-                      <li><a href="#services">Tire Service</a></li>
-                      <li><a href="#services">AC Service</a></li>
-                      <li><a href="#services">Battery Service</a></li>
-                    </ul>
-                  </div>
-                  <div class="footer__links">
-                    <h4>Quick Links</h4>
-                    <ul>
-                      <li><a href="#about">About Us</a></li>
-                      <li><a href="#pricing">Pricing</a></li>
-                      <li><a href="#gallery">Recent Work</a></li>
-                      <li><a href="#articles">Blog</a></li>
-                      <li><a href="#contact">Contact</a></li>
-                      <li><a href="#footer">Support</a></li>
-                    </ul>
-                  </div>
-                  <div class="footer__contact" id="contact">
-                    <h4>Contact Us</h4>
-                    <address>
-                      <p><span class="stabilaicon"></span> 123 AutoCare Drive, Motor City</p>
-                      <p><span class="stabilaicon"></span> <a href="tel:+18001234567">+1 (800) 123-4567</a></p>
-                      <p><span class="stabilaicon"></span> <a href="mailto:support@autocare.com">support@autocare.com</a></p>
-                      <p><span class="stabilaicon"></span> Mon - Sat: 8:00 AM - 6:00 PM</p>
-                    </address>
-                  </div>
-                </div>
-                <div class="footer__bottom">
-                  <div class="container">
-                    <p>© 2026 AutoCare Service Station. All Rights Reserved.</p>
-                    <div class="footer__bottom-links">
-                      <a href="#footer">Privacy Policy</a>
-                      <a href="#footer">Terms of Service</a>
-                      <a href="#footer">Sitemap</a>
-                    </div>
-                  </div>
-                </div>
-              </footer>
-
-              <script src="js/navbar.js"></script>
-              <script src="js/counter.js"></script>
-              <script src="js/slider.js"></script>
-              <script src="js/main.js"></script>
-            </body>
-            </html>
+  <footer class="footer">
+    <div class="container footer__grid">
+      <div class="footer__brand">
+        <a href="#hero" class="navbar__logo">
+          <span class="logo-mark" aria-hidden="true"><svg viewBox="0 0 32 32"><path d="M16 2 28 7v8c0 7.5-4.7 12.6-12 15C8.7 27.6 4 22.5 4 15V7l12-5Z"/><path d="m10 17 4 4 8-10"/></svg></span>
+          <span class="logo-copy"><strong>Auto<span>Care</span></strong><small>Service Station</small></span>
+        </a>
+        <p>Reliable repairs, transparent pricing and support that keeps your vehicle ready for the road.</p>
+      </div>
+      <div>
+        <h3>Our Services</h3>
+        <a href="#services">Tire Fix & Balancing</a>
+        <a href="#services">Car Diagnostics</a>
+        <a href="#services">Engine Repair</a>
+        <a href="#services">AC Services</a>
+      </div>
+      <div>
+        <h3>Quick Links</h3>
+        <a href="#about">About Us</a>
+        <a href="#pricing">Repair Rates</a>
+        <a href="#work">Recent Work</a>
+        <a href="#articles">News & Articles</a>
+      </div>
+      <div>
+        <h3>Contact</h3>
+        <p>123 AutoCare Drive, Motor City</p>
+        <p><a href="tel:+18001234567">+1 (800) 123-4567</a></p>
+        <p><a href="mailto:support@autocare.com">support@autocare.com</a></p>
+      </div>
     </div>
+    <div class="footer__bottom">
+      <div class="container">Copyright 2026 AutoCare Service Station. All rights reserved.</div>
+    </div>
+  </footer>
+
+  <script src="js/navbar.js"></script>
+  <script src="js/counter.js"></script>
+  <script src="js/slider.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>
