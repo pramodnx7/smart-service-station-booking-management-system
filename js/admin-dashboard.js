@@ -5,7 +5,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const session = getSession();
 
   if (!session || session.role !== 'admin' || !session.token) {
-    window.location.replace('login.html');
+    window.location.replace('index.html');
     return;
   }
 

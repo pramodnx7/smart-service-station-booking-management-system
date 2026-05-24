@@ -1,12 +1,12 @@
 :root {
-  --navy: #021936;
+  --navy: #061a34;
   --blue: #2f55d4;
   --yellow: #ffc400;
-  --red: #f04445;
-  --green: #29b36a;
-  --ink: #18233a;
-  --muted: #8792a8;
-  --line: #e9edf5;
+  --red: #f0445f;
+  --green: #21a667;
+  --ink: #183656;
+  --muted: #8793a6;
+  --line: #e6ebf2;
   --page: #f6f8fc;
   --shadow: 0 24px 70px rgba(8, 31, 60, 0.16);
 }
@@ -20,15 +20,14 @@ body {
   font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
-button,
-input { font: inherit; }
-
+a { color: inherit; text-decoration: none; }
+button, input { font: inherit; }
 button { cursor: pointer; }
 
 .login-shell {
   min-height: 100vh;
   display: grid;
-  grid-template-columns: minmax(360px, 0.92fr) minmax(420px, 1.08fr);
+  grid-template-columns: minmax(360px, 0.9fr) minmax(420px, 1.1fr);
 }
 
 .login-visual {
@@ -40,7 +39,7 @@ button { cursor: pointer; }
   padding: clamp(28px, 4vw, 56px);
   color: #fff;
   background:
-    linear-gradient(90deg, rgba(2, 15, 34, 0.9), rgba(2, 15, 34, 0.58)),
+    linear-gradient(90deg, rgba(3, 14, 31, 0.92), rgba(3, 14, 31, 0.52)),
     url("../assets/images/hero-blue-workshop.png") center / cover no-repeat;
   overflow: hidden;
 }
@@ -49,31 +48,34 @@ button { cursor: pointer; }
   content: "";
   position: absolute;
   inset: auto 0 0;
-  height: 38%;
-  background: linear-gradient(180deg, transparent, rgba(2, 15, 34, 0.86));
+  height: 42%;
+  background: linear-gradient(180deg, transparent, rgba(3, 14, 31, 0.88));
   pointer-events: none;
 }
 
-.brand {
+.brand,
+.visual-copy,
+.preview-strip {
   position: relative;
   z-index: 1;
+}
+
+.brand {
   display: flex;
   align-items: center;
   gap: 14px;
-  color: inherit;
-  text-decoration: none;
 }
 
 .brand__mark {
-  width: 70px;
-  height: 70px;
+  width: 66px;
+  height: 66px;
   color: var(--yellow);
 }
 
 .brand__mark svg {
   width: 100%;
   height: 100%;
-  fill: rgba(47, 85, 212, 0.25);
+  fill: rgba(47, 85, 212, 0.24);
   stroke: currentColor;
   stroke-width: 2.2;
   stroke-linecap: round;
@@ -83,24 +85,16 @@ button { cursor: pointer; }
 .brand strong {
   display: block;
   font-size: 30px;
-  font-weight: 800;
+  font-weight: 900;
+  letter-spacing: 0;
 }
 
-.brand b {
-  color: var(--yellow);
-  font-weight: inherit;
-}
+.brand strong span { color: var(--yellow); }
 
 .brand small {
   display: block;
   margin-top: 5px;
-  color: rgba(255, 255, 255, 0.64);
-}
-
-.visual-copy {
-  position: relative;
-  z-index: 1;
-  max-width: 620px;
+  color: rgba(255, 255, 255, 0.66);
 }
 
 .eyebrow {
@@ -108,22 +102,24 @@ button { cursor: pointer; }
   color: var(--yellow);
   font-size: 12px;
   font-weight: 900;
-  letter-spacing: 0.13em;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
+}
+
+.visual-copy {
+  max-width: 620px;
 }
 
 .visual-copy h1 {
   margin: 0;
-  font-size: clamp(38px, 4.6vw, 68px);
+  font-size: clamp(38px, 4.8vw, 68px);
   line-height: 0.98;
   letter-spacing: 0;
 }
 
-.preview-card {
-  position: relative;
-  z-index: 1;
+.preview-strip {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
   padding: 14px;
   background: rgba(255, 255, 255, 0.1);
@@ -132,29 +128,26 @@ button { cursor: pointer; }
   backdrop-filter: blur(14px);
 }
 
-.preview-card div {
-  padding: 16px;
+.preview-strip article {
+  min-height: 96px;
+  padding: 18px;
   background: rgba(255, 255, 255, 0.1);
   border-radius: 8px;
 }
 
-.preview-card span {
-  display: block;
-  width: 28px;
-  height: 5px;
-  margin-bottom: 16px;
-  background: var(--yellow);
-  border-radius: 999px;
-}
-
-.preview-card strong,
-.preview-card small {
+.preview-strip strong,
+.preview-strip span {
   display: block;
 }
 
-.preview-card small {
-  margin-top: 5px;
-  color: rgba(255, 255, 255, 0.64);
+.preview-strip strong {
+  margin-bottom: 8px;
+  font-size: 18px;
+}
+
+.preview-strip span {
+  color: rgba(255, 255, 255, 0.68);
+  line-height: 1.45;
 }
 
 .login-panel {
@@ -165,7 +158,7 @@ button { cursor: pointer; }
 }
 
 .login-card {
-  width: min(100%, 500px);
+  width: min(100%, 520px);
   padding: clamp(24px, 4vw, 42px);
   background: #fff;
   border: 1px solid var(--line);
@@ -193,9 +186,9 @@ button { cursor: pointer; }
   line-height: 1.6;
 }
 
-.role-tabs {
+.role-switch {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
   padding: 6px;
   margin-bottom: 22px;
@@ -204,16 +197,31 @@ button { cursor: pointer; }
   border-radius: 8px;
 }
 
-.role-tabs button {
-  min-height: 42px;
+.role-switch button {
+  min-height: 64px;
+  display: grid;
+  gap: 4px;
+  justify-items: start;
+  padding: 10px 14px;
   color: var(--muted);
   background: transparent;
   border: 0;
   border-radius: 7px;
+  text-align: left;
+}
+
+.role-switch span {
+  color: inherit;
   font-weight: 900;
 }
 
-.role-tabs button.is-active {
+.role-switch small {
+  color: inherit;
+  font-size: 11px;
+  line-height: 1.2;
+}
+
+.role-switch button.is-active {
   color: #fff;
   background: var(--blue);
 }
@@ -256,7 +264,6 @@ input:focus {
 
 .remember {
   display: flex;
-  grid-template-columns: auto 1fr;
   align-items: center;
   gap: 9px;
   color: var(--muted);
@@ -308,6 +315,9 @@ input:focus {
 }
 
 .demo-box {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
   margin-top: 22px;
   padding: 16px;
   background: #f8fbff;
@@ -316,21 +326,25 @@ input:focus {
 }
 
 .demo-box strong {
-  display: block;
-  margin-bottom: 8px;
+  grid-column: 1 / -1;
 }
 
-.demo-box p,
+.demo-box button {
+  min-height: 38px;
+  color: var(--blue);
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 900;
+}
+
 .register-note {
-  margin: 6px 0 0;
+  margin: 18px 0 0;
   color: var(--muted);
   font-size: 13px;
   line-height: 1.5;
-}
-
-.register-note {
   text-align: center;
-  margin-top: 18px;
 }
 
 @media (max-width: 940px) {
@@ -353,7 +367,8 @@ input:focus {
     padding: 18px;
   }
 
-  .preview-card {
+  .preview-strip,
+  .demo-box {
     grid-template-columns: 1fr;
   }
 

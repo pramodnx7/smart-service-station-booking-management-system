@@ -1,10 +1,18 @@
-# AutoCare Backend + Supabase Setup
+# AutoCare Backend + Firebase Setup
 
-## 1. Create environment file
+## 1. Create the environment file
 
-Copy `.env.example` to `.env` and replace `YOUR_PASSWORD` with your Supabase database password.
+Copy `.env.example` to `.env`, then set your Firebase project values:
 
-Do not add `.env` to Git.
+```bash
+PORT=3000
+NODE_ENV=development
+JWT_SECRET=replace-with-a-long-random-secret
+FIREBASE_PROJECT_ID=your-firebase-project-id
+FIREBASE_SERVICE_ACCOUNT_PATH=./serviceAccountKey.json
+```
+
+Do not commit `.env` or the service account JSON file.
 
 ## 2. Install dependencies
 
@@ -12,16 +20,15 @@ Do not add `.env` to Git.
 npm install
 ```
 
-## 3. Create database tables
+## 3. Seed Firestore demo data
 
-Run the SQL files against Supabase using the direct database URL:
+The server seeds missing demo data automatically on startup. You can also run it manually:
 
 ```bash
-npm run db:schema
-npm run db:seed
+npm run firebase:seed
 ```
 
-The seed creates:
+Demo accounts:
 
 - Admin: `admin@autocare.lk` / `admin123`
 - Customer: `customer@autocare.lk` / `customer123`
@@ -34,10 +41,11 @@ npm start
 
 Open:
 
+- Site: `http://localhost:3000/`
 - Login: `http://localhost:3000/login.html`
 - Admin dashboard: `http://localhost:3000/admin-dashboard.html`
 - Customer dashboard: `http://localhost:3000/customer-dashboard.html`
 
 ## Security Note
 
-Supabase PostgreSQL URLs are used only by `server.js`. The browser talks to `/api/...` routes and never receives the database password.
+Firestore is accessed through the server with Firebase Admin SDK. The browser only calls `/api/...` routes and never receives Firebase admin credentials.

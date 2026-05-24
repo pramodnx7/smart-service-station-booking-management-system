@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="description" content="AutoCare secure login for admin and customer dashboard access." />
   <title>AutoCare | Login</title>
+
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
@@ -17,18 +18,17 @@
         <span class="brand__mark">
           <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16 2 28 7v8c0 7.5-4.7 12.6-12 15C8.7 27.6 4 22.5 4 15V7l12-5Z"/><path d="m10 17 4 4 8-10"/></svg>
         </span>
-        <span><strong>Auto <b>Care</b></strong><small>Smart Service Station</small></span>
+        <span><strong>Auto<span>Care</span></strong><small>Smart Service Station</small></span>
       </a>
 
       <div class="visual-copy">
         <p class="eyebrow">Secure Dashboard Access</p>
-        <h1>Manage bookings, vehicles, invoices and service progress in one place.</h1>
+        <h1>Manage bookings, vehicles, invoices and service progress.</h1>
       </div>
 
-      <div class="preview-card">
-        <div><span></span><strong>Today</strong><small>8 bookings</small></div>
-        <div><span></span><strong>Queue</strong><small>3 waiting</small></div>
-        <div><span></span><strong>Revenue</strong><small>LKR 58,450</small></div>
+      <div class="preview-strip">
+        <article><strong>Admin</strong><span>Bookings, customers, billing</span></article>
+        <article><strong>Customer</strong><span>Vehicles, appointments, invoices</span></article>
       </div>
     </section>
 
@@ -36,13 +36,19 @@
       <div class="login-card">
         <div class="login-card__header">
           <p class="eyebrow">Welcome Back</p>
-          <h2>Login to AutoCare</h2>
-          <p>Use your account to access the service station dashboard.</p>
+          <h2 id="login-title">Admin Login</h2>
+          <p id="login-copy">Sign in as an admin to manage service station operations.</p>
         </div>
 
-        <div class="role-tabs" role="tablist" aria-label="Login role">
-          <button class="is-active" type="button" data-role="admin">Admin</button>
-          <button type="button" data-role="customer">Customer</button>
+        <div class="role-switch" role="tablist" aria-label="Login role">
+          <button class="is-active" type="button" data-role="admin" role="tab" aria-selected="true">
+            <span>Admin</span>
+            <small>Manager dashboard</small>
+          </button>
+          <button type="button" data-role="customer" role="tab" aria-selected="false">
+            <span>Customer</span>
+            <small>Service dashboard</small>
+          </button>
         </div>
 
         <form id="login-form" novalidate>
@@ -54,21 +60,23 @@
             <span>Password</span>
             <input id="password" name="password" type="password" autocomplete="current-password" placeholder="Enter password" required />
           </label>
+
           <div class="form-row">
             <label class="remember"><input name="remember" type="checkbox" /> Remember me</label>
             <button class="link-btn" type="button" id="forgot-password">Forgot password?</button>
           </div>
+
           <p class="form-status" id="form-status" aria-live="polite"></p>
-          <button class="btn btn--yellow" type="submit">Login</button>
+          <button class="btn btn--yellow" id="login-submit" type="submit">Login as Admin</button>
         </form>
 
         <div class="demo-box">
           <strong>Demo Accounts</strong>
-          <p>Admin: admin@autocare.lk / admin123</p>
-          <p>Customer: customer@autocare.lk / customer123</p>
+          <button type="button" data-demo-role="admin">Use admin demo</button>
+          <button type="button" data-demo-role="customer">Use customer demo</button>
         </div>
 
-        <p class="register-note">New customer? <button type="button" class="link-btn" id="register-demo">Create demo account</button></p>
+        <p class="register-note">New customer? <button type="button" class="link-btn" id="register-demo">Create demo customer</button></p>
       </div>
     </section>
   </main>

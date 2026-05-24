@@ -46,7 +46,10 @@
 .hero__copy {
   align-self: center;
   max-width: 760px;
-  padding-top: 10px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 18px;
   animation: fade-up 520ms ease both;
 }
 
@@ -84,7 +87,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: 14px;
-  margin-top: 210px;
+  margin-top: 24px;
 }
 
 .hero__buttons .btn {
@@ -108,14 +111,14 @@
   width: min(1130px, 71vw);
   filter: drop-shadow(0 35px 32px rgba(0, 0, 0, 0.48));
   animation: float-car 6.2s ease-in-out infinite;
-  display: none;
+  display: block;
 }
 
 .hero__features {
   position: absolute;
   left: 0;
   right: 0;
-  top: 432px;
+  padding-top: 550px;
   z-index: 4;
 }
 
@@ -195,7 +198,8 @@
 .booking-shell {
   position: absolute;
   left: 50%;
-  bottom: 95px;
+  padding-top: 260px;
+  bottom: 10px;
   z-index: 7;
   transform: translate(-50%, 50%);
 }
@@ -296,10 +300,6 @@
     width: min(100% - 64px, 1600px);
   }
 
-  .hero__car {
-    right: -250px;
-    width: 1040px;
-  }
 
   .booking-bar {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -390,5 +390,8 @@
   .booking-bar {
     padding: 20px;
     gap: 14px;
+  }
+  .hero__car {
+    display: none;
   }
 }

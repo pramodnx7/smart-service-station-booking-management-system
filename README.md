@@ -36,8 +36,9 @@ The system is developed to improve operational efficiency, reduce manual errors,
 - JavaScript
 
 ### Backend / Database
-- Supabase
-- PostgreSQL
+- Node.js
+- Express
+- Firebase Firestore
 
 ### Design & Development Tools
 - Figma

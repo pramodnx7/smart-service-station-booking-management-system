@@ -1,0 +1,147 @@
+[debug] [2026-05-24T07:26:05.762Z] ----------------------------------------------------------------------
+[debug] [2026-05-24T07:26:05.767Z] Command:       C:\Program Files\nodejs\node.exe C:\Users\pramo\AppData\Local\npm-cache\_npx\ba4f1959e38407b5\node_modules\firebase-tools\lib\bin\firebase.js firestore:databases:list --project service-station-mt-system
+[debug] [2026-05-24T07:26:05.767Z] CLI Version:   15.18.0
+[debug] [2026-05-24T07:26:05.767Z] Platform:      win32
+[debug] [2026-05-24T07:26:05.767Z] Node Version:  v24.13.1
+[debug] [2026-05-24T07:26:05.768Z] Time:          Sun May 24 2026 12:56:05 GMT+0530 (India Standard Time)
+[debug] [2026-05-24T07:26:05.768Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2026-05-24T07:26:13.758Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2026-05-24T07:26:13.758Z] > authorizing via signed-in user (pramodnaranpanawa2001@gmail.com)
+[debug] [2026-05-24T07:26:13.758Z] [iam] checking project service-station-mt-system for permissions ["datastore.databases.list","firebase.projects.get"]
+[debug] [2026-05-24T07:26:13.760Z] Checked if tokens are valid: false, expires at: 1779608434847
+[debug] [2026-05-24T07:26:13.760Z] Checked if tokens are valid: false, expires at: 1779608434847
+[debug] [2026-05-24T07:26:13.761Z] > refreshing access token with scopes: []
+[debug] [2026-05-24T07:26:13.763Z] >>> [apiv2][query] POST https://www.googleapis.com/oauth2/v3/token [none]
+[debug] [2026-05-24T07:26:13.763Z] >>> [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2026-05-24T07:26:22.538Z] <<< [apiv2][status] POST https://www.googleapis.com/oauth2/v3/token 200
+[debug] [2026-05-24T07:26:22.538Z] <<< [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2026-05-24T07:26:22.544Z] >>> [apiv2][query] POST https://cloudresourcemanager.googleapis.com/v1/projects/service-station-mt-system:testIamPermissions [none]
+[debug] [2026-05-24T07:26:22.544Z] >>> [apiv2][(partial)header] POST https://cloudresourcemanager.googleapis.com/v1/projects/service-station-mt-system:testIamPermissions  x-goog-user-project=service-station-mt-system
+[debug] [2026-05-24T07:26:22.544Z] >>> [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/service-station-mt-system:testIamPermissions {"permissions":["datastore.databases.list","firebase.projects.get"]}
+[debug] [2026-05-24T07:26:31.596Z] <<< [apiv2][status] POST https://cloudresourcemanager.googleapis.com/v1/projects/service-station-mt-system:testIamPermissions 200
+[debug] [2026-05-24T07:26:31.596Z] <<< [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/service-station-mt-system:testIamPermissions {"permissions":["datastore.databases.list","firebase.projects.get"]}
+[debug] [2026-05-24T07:26:31.596Z] Checked if tokens are valid: true, expires at: 1779611181538
+[debug] [2026-05-24T07:26:31.597Z] Checked if tokens are valid: true, expires at: 1779611181538
+[debug] [2026-05-24T07:26:31.597Z] >>> [apiv2][query] GET https://firestore.googleapis.com/v1/projects/service-station-mt-system/databases [none]
+[debug] [2026-05-24T07:26:32.688Z] <<< [apiv2][status] GET https://firestore.googleapis.com/v1/projects/service-station-mt-system/databases 200
+[debug] [2026-05-24T07:26:32.688Z] <<< [apiv2][body] GET https://firestore.googleapis.com/v1/projects/service-station-mt-system/databases {}
+[info] No databases found.
+[debug] [2026-05-24T07:27:35.578Z] ----------------------------------------------------------------------
+[debug] [2026-05-24T07:27:35.581Z] Command:       C:\Program Files\nodejs\node.exe C:\Users\pramo\AppData\Local\npm-cache\_npx\ba4f1959e38407b5\node_modules\firebase-tools\lib\bin\firebase.js firestore:locations --project service-station-mt-system
+[debug] [2026-05-24T07:27:35.581Z] CLI Version:   15.18.0
+[debug] [2026-05-24T07:27:35.581Z] Platform:      win32
+[debug] [2026-05-24T07:27:35.581Z] Node Version:  v24.13.1
+[debug] [2026-05-24T07:27:35.581Z] Time:          Sun May 24 2026 12:57:35 GMT+0530 (India Standard Time)
+[debug] [2026-05-24T07:27:35.582Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2026-05-24T07:27:36.869Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2026-05-24T07:27:36.870Z] > authorizing via signed-in user (pramodnaranpanawa2001@gmail.com)
+[debug] [2026-05-24T07:27:36.870Z] [iam] checking project service-station-mt-system for permissions ["datastore.locations.list","firebase.projects.get"]
+[debug] [2026-05-24T07:27:36.872Z] Checked if tokens are valid: true, expires at: 1779611181538
+[debug] [2026-05-24T07:27:36.872Z] Checked if tokens are valid: true, expires at: 1779611181538
+[debug] [2026-05-24T07:27:36.873Z] >>> [apiv2][query] POST https://cloudresourcemanager.googleapis.com/v1/projects/service-station-mt-system:testIamPermissions [none]
+[debug] [2026-05-24T07:27:36.874Z] >>> [apiv2][(partial)header] POST https://cloudresourcemanager.googleapis.com/v1/projects/service-station-mt-system:testIamPermissions  x-goog-user-project=service-station-mt-system
+[debug] [2026-05-24T07:27:36.874Z] >>> [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/service-station-mt-system:testIamPermissions {"permissions":["datastore.locations.list","firebase.projects.get"]}
+[debug] [2026-05-24T07:27:38.564Z] <<< [apiv2][status] POST https://cloudresourcemanager.googleapis.com/v1/projects/service-station-mt-system:testIamPermissions 200
+[debug] [2026-05-24T07:27:38.565Z] <<< [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/service-station-mt-system:testIamPermissions {"permissions":["datastore.locations.list","firebase.projects.get"]}
+[debug] [2026-05-24T07:27:38.565Z] Checked if tokens are valid: true, expires at: 1779611181538
+[debug] [2026-05-24T07:27:38.565Z] Checked if tokens are valid: true, expires at: 1779611181538
+[debug] [2026-05-24T07:27:38.565Z] >>> [apiv2][query] GET https://firestore.googleapis.com/v1/projects/service-station-mt-system/locations [none]
+[debug] [2026-05-24T07:27:39.191Z] <<< [apiv2][status] GET https://firestore.googleapis.com/v1/projects/service-station-mt-system/locations 200
+[debug] [2026-05-24T07:27:39.192Z] <<< [apiv2][body] GET https://firestore.googleapis.com/v1/projects/service-station-mt-system/locations {"locations":[{"name":"projects/service-station-mt-system/locations/eur3","labels":{"appengine.googleapis.com/geo":"europe-west","cloud.googleapis.com/location":"eur3","cloud.googleapis.com/geo":"eur3"},"metadata":{"@type":"type.googleapis.com/google.firestore.admin.v1.LocationMetadata"},"locationId":"eur3","displayName":"Europe"},{"name":"projects/service-station-mt-system/locations/nam5","labels":{"appengine.googleapis.com/geo":"us-central","cloud.googleapis.com/location":"nam5","cloud.googleapis.com/geo":"nam5"},"metadata":{"@type":"type.googleapis.com/google.firestore.admin.v1.LocationMetadata"},"locationId":"nam5","displayName":"United States"},{"name":"projects/service-station-mt-system/locations/nam7","labels":{"cloud.googleapis.com/location":"nam7","cloud.googleapis.com/geo":"nam7"},"metadata":{"@type":"type.googleapis.com/google.firestore.admin.v1.LocationMetadata"},"locationId":"nam7","displayName":"United States"},{"name":"projects/service-station-mt-system/locations/africa-south1","labels":{"cloud.googleapis.com/location":"africa-south1","cloud.googleapis.com/region":"africa-south1"},"metadata":{"@type":"type.googleapis.com/google.firestore.admin.v1.LocationMetadata"},"locationId":"africa-south1","displayName":"Johannesburg"},{"name":"projects/service-station-mt-system/locations/asia-east1","labels":{"appengine.googleapis.com/region":"asia-east1","cloud.googleapis.com/location":"asia-east1","cloud.googleapis.com/region":"asia-east1"},"metadata":{"@type":"type.googleapis.com/google.firestore.admin.v1.LocationMetadata"},"locationId":"asia-east1","displayName":"Taiwan"},{"name":"projects/service-station-mt-system/locations/asia-east2","labels":{"appengine.googleapis.com/region":"asia-east2","cloud.googleapis.com/location":"asia-east2","cloud.googleapis.com/region":"asia-east2"},"metadata":{"@type":"type.googleapis.com/google.firestore.admin.v1.LocationMetadata"},"locationId":"asia-east2","displayName":"Hong Kong"},{"name":"projects/service-station-mt-system/locations/asia-northeast1","labels":{"appengine.googleapis.com/region":"asia-northeast1","cloud.googleapis.com/location":"asia-northeast1","cloud.googleapis.com/region":"asia-northeast1"},"metadata":{"@type":"type.googleapis.com/google.firestore.admin.v1.LocationMetadata"},"locationId":"asia-northeast1","displayName":"Tokyo"},{"name":"projects/service-station-mt-system/locations/asia-northeast2","labels":{"appengine.googleapis.com/region":"asia-northeast2","cloud.googleapis.com/location":"asia-northeast2","cloud.googleapis.com/region":"asia-northeast2"},"metadata":{"@type":"type.googleapis.com/google.firestore.admin.v1.LocationMetadata"},"locationId":"asia-northeast2","displayName":"Osaka"},{"name":"projects/service-station-mt-system/locations/asia-northeast3","labels":{"appengine.googleapis.com/region":"asia-northeast3","cloud.googleapis.com/location":"asia-northeast3","cloud.googleapis.com/region":"asia-northeast3"},"metadata":{"@type":"type.googleapis.com/google.firestore.admin.v1.LocationMetadata"},"locationId":"asia-northeast3","displayName":"Seoul"},{"name":"projects/service-station-mt-system/locations/asia-south1","labels":{"appengine.googleapis.com/region":"asia-south1","cloud.googleapis.com/location":"asia-south1","cloud.googleapis.com/region":"asia-south1"},"metadata":{"@type":"type.googleapis.com/google.firestore.admin.v1.LocationMetadata"},"locationId":"asia-south1","displayName":"Mumbai"},{"name":"projects/service-station-mt-system/locations/asia-south2","labels":{"cloud.googleapis.com/location":"asia-south2","cloud.googleapis.com/region":"asia-south2"},"metadata":{"@type":"type.googleapis.com/google.firestore.admin.v1.LocationMetadata"},"locationId":"asia-south2","displayName":"Delhi"},{"name":"projects/service-station-mt-system/locations/asia-southeast1","labels":{"appengine.googleapis.com/region":"asia-southeast1","cloud.googleapis.com/location":"asia-southeast1","cloud.googleapis.com/region":"asia-southeast1"},"metadata":{"@type":"type.googleapis.com/google.firestore.admin.v1.LocationMetadata"},"locationId":"asia-southeast1","displayName":"Singapore"},{"name":"projects/service-station-mt-system/locations/asia-southeast2","labels":{"appengine.googleapis.com/region":"asia-southeast2","cloud.googleapis.com/location":"asia-southeast2","cloud.googleapis.com/region":"asia-southeast2"},"metadata":{"@type":"type.googleapis.com/google.firestore.admin.v1.LocationMetadata"},"locationId":"asia-southeast2","displayName":"Jakarta"},{"name":"projects/service-station-mt-system/locations/asia-southeast3","labels":{"cloud.googleapis.com/location":"asia-southeast3","cloud.googleapis.com/region":"asia-southeast3"},"metadata":{"@type":"type.googleapis.com/google.firestore.admin.v1.LocationMetadata"},"locationId":"asia-southeast3","displayName":"Bangkok"},{"name":"projects/service-station-mt-system/locations/australia-southeast1","labels":{"appengine.googleapis.com/region":"australia-southeast1","cloud.googleapis.com/location":"australia-southeast1","cloud.googleapis.com/region":"australia-southeast1"},"metadata":{"@type":"type.googleapis.com/google.firestore.admin.v1.LocationMetadata"},"locationId":"australia-southeast1","displayName":"Sydney"},{"name":"projects/service-station-mt-system/locations/australia-southeast2","labels":{"cloud.googleapis.com/location":"australia-southeast2","cloud.googleapis.com/region":"australia-southeast2"},"metadata":{"@type":"type.googleapis.com/google.firestore.admin.v1.LocationMetadata"},"locationId":"australia-southeast2","displayName":"Melbourne"},{"name":"projects/service-station-mt-system/locations/europe-central2","labels":{"appengine.googleapis.com/region":"europe-central2","cloud.googleapis.com/location":"europe-central2","cloud.googleapis.com/region":"europe-central2"},"metadata":{"@type":"type.googleapis.com/google.firestore.admin.v1.LocationMetadata"},"locationId":"europe-central2","displayName":"Warsaw"},{"name":"projects/service-station-mt-system/locations/europe-north1","labels":{"cloud.googleapis.com/location":"europe-north1","cloud.googleapis.com/region":"europe-north1"},"metadata":{"@type":"type.googleapis.com/google.firestore.admin.v1.LocationMetadata"},"locationId":"europe-north1","displayName":"Finland"},{"name":"projects/service-station-mt-system/locations/europe-north2","labels":{"cloud.googleapis.com/location":"europe-north2","cloud.googleapis.com/region":"europe-north2"},"metadata":{"@type":"type.googleapis.com/google.firestore.admin.v1.LocationMetadata"},"locationId":"europe-north2","displayName":"Stockholm"},{"name":"projects/service-station-mt-system/locations/europe-southwest1","labels":{"cloud.googleapis.com/location":"europe-southwest1","cloud.googleapis.com/region":"europe-southwest1"},"metadata":{"@type":"type.googleapis.com/google.firestore.admin.v1.LocationMetadata"},"locationId":"europe-southwest1","displayName":"Madrid"},{"name":"projects/service-station-mt-system/locations/europe-west1","labels":{"cloud.googleapis.com/location":"europe-west1","cloud.googleapis.com/region":"europe-west1"},"metadata":{"@type":"type.googleapis.com/google.firestore.admin.v1.LocationMetadata"},"locationId":"europe-west1","displayName":"Belgium"},{"name":"projects/service-station-mt-system/locations/europe-west10","labels":{"cloud.googleapis.com/location":"europe-west10","cloud.googleapis.com/region":"europe-west10"},"metadata":{"@type":"type.googleapis.com/google.firestore.admin.v1.LocationMetadata"},"locationId":"europe-west10","displayName":"Berlin"},{"name":"projects/service-station-mt-system/locations/europe-west12","labels":{"cloud.googleapis.com/location":"europe-west12","cloud.googleapis.com/region":"europe-west12"},"metadata":{"@type":"type.googleapis.com/google.firestore.admin.v1.LocationMetadata"},"locationId":"europe-west12","displayName":"Turin"},{"name":"projects/service-station-mt-system/locations/europe-west2","labels":{"appengine.googleapis.com/region":"europe-west2","cloud.googleapis.com/location":"europe-west2","cloud.googleapis.com/region":"europe-west2"},"metadata":{"@type":"type.googleapis.com/google.firestore.admin.v1.LocationMetadata"},"locationId":"europe-west2","displayName":"London"},{"name":"projects/service-station-mt-system/locations/europe-west3","labels":{"appengine.googleapis.com/region":"europe-west3","cloud.googleapis.com/location":"europe-west3","cloud.googleapis.com/region":"europe-west3"},"metadata":{"@type":"type.googleapis.com/google.firestore.admin.v1.LocationMetadata"},"locationId":"europe-west3","displayName":"Frankfurt"},{"name":"projects/service-station-mt-system/locations/europe-west4","labels":{"cloud.googleapis.com/location":"europe-west4","cloud.googleapis.com/region":"europe-west4"},"metadata":{"@type":"type.googleapis.com/google.firestore.admin.v1.LocationMetadata"},"locationId":"europe-west4","displayName":"Netherlands"},{"name":"projects/service-station-mt-system/locations/europe-west6","labels":{"appengine.googleapis.com/region":"europe-west6","cloud.googleapis.com/location":"europe-west6","cloud.googleapis.com/region":"europe-west6"},"metadata":{"@type":"type.googleapis.com/google.firestore.admin.v1.LocationMetadata"},"locationId":"europe-west6","displayName":"Zurich"},{"name":"projects/service-station-mt-system/locations/europe-west8","labels":{"cloud.googleapis.com/location":"europe-west8","cloud.googleapis.com/region":"europe-west8"},"metadata":{"@type":"type.googleapis.com/google.firestore.admin.v1.LocationMetadata"},"locationId":"europe-west8","displayName":"Milan"},{"name":"projects/service-station-mt-system/locations/europe-west9","labels":{"cloud.googleapis.com/location":"europe-west9","cloud.googleapis.com/region":"europe-west9"},"metadata":{"@type":"type.googleapis.com/google.firestore.admin.v1.LocationMetadata"},"locationId":"europe-west9","displayName":"Paris"},{"name":"projects/service-station-mt-system/locations/me-central1","labels":{"cloud.googleapis.com/location":"me-central1","cloud.googleapis.com/region":"me-central1"},"metadata":{"@type":"type.googleapis.com/google.firestore.admin.v1.LocationMetadata"},"locationId":"me-central1","displayName":"Doha"},{"name":"projects/service-station-mt-system/locations/me-central2","labels":{"cloud.googleapis.com/location":"me-central2","cloud.googleapis.com/region":"me-central2"},"metadata":{"@type":"type.googleapis.com/google.firestore.admin.v1.LocationMetadata"},"locationId":"me-central2","displayName":"Dammam"},{"name":"projects/service-station-mt-system/locations/me-west1","labels":{"cloud.googleapis.com/location":"me-west1","cloud.googleapis.com/region":"me-west1"},"metadata":{"@type":"type.googleapis.com/google.firestore.admin.v1.LocationMetadata"},"locationId":"me-west1","displayName":"Tel Aviv"},{"name":"projects/service-station-mt-system/locations/northamerica-northeast1","labels":{"appengine.googleapis.com/region":"northamerica-northeast1","cloud.googleapis.com/location":"northamerica-northeast1","cloud.googleapis.com/region":"northamerica-northeast1"},"metadata":{"@type":"type.googleapis.com/google.firestore.admin.v1.LocationMetadata"},"locationId":"northamerica-northeast1","displayName":"Montréal"},{"name":"projects/service-station-mt-system/locations/northamerica-northeast2","labels":{"cloud.googleapis.com/location":"northamerica-northeast2","cloud.googleapis.com/region":"northamerica-northeast2"},"metadata":{"@type":"type.googleapis.com/google.firestore.admin.v1.LocationMetadata"},"locationId":"northamerica-northeast2","displayName":"Toronto"},{"name":"projects/service-station-mt-system/locations/northamerica-south1","labels":{"cloud.googleapis.com/location":"northamerica-south1","cloud.googleapis.com/region":"northamerica-south1"},"metadata":{"@type":"type.googleapis.com/google.firestore.admin.v1.LocationMetadata"},"locationId":"northamerica-south1","displayName":"Mexico"},{"name":"projects/service-station-mt-system/locations/southamerica-east1","labels":{"appengine.googleapis.com/region":"southamerica-east1","cloud.googleapis.com/location":"southamerica-east1","cloud.googleapis.com/region":"southamerica-east1"},"metadata":{"@type":"type.googleapis.com/google.firestore.admin.v1.LocationMetadata"},"locationId":"southamerica-east1","displayName":"São Paulo"},{"name":"projects/service-station-mt-system/locations/southamerica-west1","labels":{"cloud.googleapis.com/location":"southamerica-west1","cloud.googleapis.com/region":"southamerica-west1"},"metadata":{"@type":"type.googleapis.com/google.firestore.admin.v1.LocationMetadata"},"locationId":"southamerica-west1","displayName":"Santiago"},{"name":"projects/service-station-mt-system/locations/us-central1","labels":{"cloud.googleapis.com/location":"us-central1","cloud.googleapis.com/region":"us-central1"},"metadata":{"@type":"type.googleapis.com/google.firestore.admin.v1.LocationMetadata"},"locationId":"us-central1","displayName":"Iowa"},{"name":"projects/service-station-mt-system/locations/us-east1","labels":{"appengine.googleapis.com/region":"us-east1","cloud.googleapis.com/location":"us-east1","cloud.googleapis.com/region":"us-east1"},"metadata":{"@type":"type.googleapis.com/google.firestore.admin.v1.LocationMetadata"},"locationId":"us-east1","displayName":"South Carolina"},{"name":"projects/service-station-mt-system/locations/us-east4","labels":{"appengine.googleapis.com/region":"us-east4","cloud.googleapis.com/location":"us-east4","cloud.googleapis.com/region":"us-east4"},"metadata":{"@type":"type.googleapis.com/google.firestore.admin.v1.LocationMetadata"},"locationId":"us-east4","displayName":"Northern Virginia"},{"name":"projects/service-station-mt-system/locations/us-east5","labels":{"cloud.googleapis.com/location":"us-east5","cloud.googleapis.com/region":"us-east5"},"metadata":{"@type":"type.googleapis.com/google.firestore.admin.v1.LocationMetadata"},"locationId":"us-east5","displayName":"Columbus"},{"name":"projects/service-station-mt-system/locations/us-south1","labels":{"cloud.googleapis.com/location":"us-south1","cloud.googleapis.com/region":"us-south1"},"metadata":{"@type":"type.googleapis.com/google.firestore.admin.v1.LocationMetadata"},"locationId":"us-south1","displayName":"Dallas"},{"name":"projects/service-station-mt-system/locations/us-west1","labels":{"appengine.googleapis.com/region":"us-west1","cloud.googleapis.com/location":"us-west1","cloud.googleapis.com/region":"us-west1"},"metadata":{"@type":"type.googleapis.com/google.firestore.admin.v1.LocationMetadata"},"locationId":"us-west1","displayName":"Oregon"},{"name":"projects/service-station-mt-system/locations/us-west2","labels":{"appengine.googleapis.com/region":"us-west2","cloud.googleapis.com/location":"us-west2","cloud.googleapis.com/region":"us-west2"},"metadata":{"@type":"type.googleapis.com/google.firestore.admin.v1.LocationMetadata"},"locationId":"us-west2","displayName":"Los Angeles"},{"name":"projects/service-station-mt-system/locations/us-west3","labels":{"appengine.googleapis.com/region":"us-west3","cloud.googleapis.com/location":"us-west3","cloud.googleapis.com/region":"us-west3"},"metadata":{"@type":"type.googleapis.com/google.firestore.admin.v1.LocationMetadata"},"locationId":"us-west3","displayName":"Salt Lake City"},{"name":"projects/service-station-mt-system/locations/us-west4","labels":{"appengine.googleapis.com/region":"us-west4","cloud.googleapis.com/location":"us-west4","cloud.googleapis.com/region":"us-west4"},"metadata":{"@type":"type.googleapis.com/google.firestore.admin.v1.LocationMetadata"},"locationId":"us-west4","displayName":"Las Vegas"}]}
+[info] ┌────────────────────┬──────────────────────────────┐
+│ Display Name       │ LocationId                   │
+├────────────────────┼──────────────────────────────┤
+│ Johannesburg       │ africa-south1                │
+├────────────────────┼──────────────────────────────┤
+│ Taiwan             │ asia-east1                   │
+├────────────────────┼──────────────────────────────┤
+│ Hong Kong          │ asia-east2                   │
+├────────────────────┼──────────────────────────────┤
+│ Tokyo              │ asia-northeast1              │
+├────────────────────┼──────────────────────────────┤
+│ Osaka              │ asia-northeast2              │
+├────────────────────┼──────────────────────────────┤
+│ Seoul              │ asia-northeast3              │
+├────────────────────┼──────────────────────────────┤
+│ Mumbai             │ asia-south1                  │
+├────────────────────┼──────────────────────────────┤
+│ Delhi              │ asia-south2                  │
+├────────────────────┼──────────────────────────────┤
+│ Singapore          │ asia-southeast1              │
+├────────────────────┼──────────────────────────────┤
+│ Jakarta            │ asia-southeast2              │
+├────────────────────┼──────────────────────────────┤
+│ Bangkok            │ asia-southeast3              │
+├────────────────────┼──────────────────────────────┤
+│ Sydney             │ australia-southeast1         │
+├────────────────────┼──────────────────────────────┤
+│ Melbourne          │ australia-southeast2         │
+├────────────────────┼──────────────────────────────┤
+│ Europe             │ eur3                         │
+├────────────────────┼──────────────────────────────┤
+│ Warsaw             │ europe-central2              │
+├────────────────────┼──────────────────────────────┤
+│ Finland            │ europe-north1                │
+├────────────────────┼──────────────────────────────┤
+│ Stockholm          │ europe-north2                │
+├────────────────────┼──────────────────────────────┤
+│ Madrid             │ europe-southwest1            │
+├────────────────────┼──────────────────────────────┤
+│ Belgium            │ europe-west1                 │
+├────────────────────┼──────────────────────────────┤
+│ Berlin             │ europe-west10                │
+├────────────────────┼──────────────────────────────┤
+│ Turin              │ europe-west12                │
+├────────────────────┼──────────────────────────────┤
+│ London             │ europe-west2                 │
+├────────────────────┼──────────────────────────────┤
+│ Frankfurt          │ europe-west3                 │
+├────────────────────┼──────────────────────────────┤
+│ Netherlands        │ europe-west4                 │
+├────────────────────┼──────────────────────────────┤
+│ Zurich             │ europe-west6                 │
+├────────────────────┼──────────────────────────────┤
+│ Milan              │ europe-west8                 │
+├────────────────────┼──────────────────────────────┤
+│ Paris              │ europe-west9                 │
+├────────────────────┼──────────────────────────────┤
+│ Doha               │ me-central1                  │
+├────────────────────┼──────────────────────────────┤
+│ Dammam             │ me-central2                  │
+├────────────────────┼──────────────────────────────┤
+│ Tel Aviv           │ me-west1                     │
+├────────────────────┼──────────────────────────────┤
+│ United States      │ nam5                         │
+├────────────────────┼──────────────────────────────┤
+│ United States      │ nam7                         │
+├────────────────────┼──────────────────────────────┤
+│ Montréal           │ northamerica-northeast1      │
+├────────────────────┼──────────────────────────────┤
+│ Toronto            │ northamerica-northeast2      │
+├────────────────────┼──────────────────────────────┤
+│ Mexico             │ northamerica-south1          │
+├────────────────────┼──────────────────────────────┤
+│ São Paulo          │ southamerica-east1           │
+├────────────────────┼──────────────────────────────┤
+│ Santiago           │ southamerica-west1           │
+├────────────────────┼──────────────────────────────┤
+│ Iowa               │ us-central1                  │
+├────────────────────┼──────────────────────────────┤
+│ South Carolina     │ us-east1                     │
+├────────────────────┼──────────────────────────────┤
+│ Northern Virginia  │ us-east4                     │
+├────────────────────┼──────────────────────────────┤
+│ Columbus           │ us-east5                     │
+├────────────────────┼──────────────────────────────┤
+│ Dallas             │ us-south1                    │
+├────────────────────┼──────────────────────────────┤
+│ Oregon             │ us-west1                     │
+├────────────────────┼──────────────────────────────┤
+│ Los Angeles        │ us-west2                     │
+├────────────────────┼──────────────────────────────┤
+│ Salt Lake City     │ us-west3                     │
+├────────────────────┼──────────────────────────────┤
+│ Las Vegas          │ us-west4                     │
+└────────────────────┴──────────────────────────────┘
