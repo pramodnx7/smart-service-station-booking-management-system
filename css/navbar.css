@@ -3,7 +3,7 @@
   inset: 0 0 auto;
   z-index: 20;
   color: #fff;
-  background: rgba(2, 11, 25, 0.72);
+  background: rgba(2, 11, 25, 0.88);
   border-top: 4px solid #0088ff;
   transition: background 180ms ease, box-shadow 180ms ease;
 }
