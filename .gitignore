@@ -4,5 +4,6 @@ serviceAccountKey.json
 *-firebase-adminsdk-*.json
 node_modules/
 npm-debug.log*
+firebase-debug.log
 
 /src/generated/prisma

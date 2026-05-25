@@ -1,5 +1,6 @@
 const path = require('path');
 const admin = require('firebase-admin');
+const { getFirestore } = require('firebase-admin/firestore');
 
 const hasFirebaseCredentials = Boolean(
   process.env.FIREBASE_SERVICE_ACCOUNT
@@ -45,10 +46,11 @@ function initializeFirebase() {
   return admin.initializeApp(options);
 }
 
-initializeFirebase();
+const app = initializeFirebase();
+const databaseId = process.env.FIRESTORE_DATABASE_ID?.trim();
 
 module.exports = {
   admin,
-  db: admin.firestore(),
+  db: databaseId ? getFirestore(app, databaseId) : getFirestore(app),
   hasFirebaseCredentials
 };
