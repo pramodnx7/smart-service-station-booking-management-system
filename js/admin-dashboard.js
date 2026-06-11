@@ -196,6 +196,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <button class="mini-btn" type="button" data-action="advance-booking" data-id="${booking.id}">Update</button>
             <button class="mini-btn" type="button" data-action="reschedule-booking" data-id="${booking.id}">Reschedule</button>
             <button class="mini-btn mini-btn--red" type="button" data-action="cancel-booking" data-id="${booking.id}">Cancel</button>
+            <button class="mini-btn mini-btn--danger" type="button" data-action="delete-booking" data-id="${booking.id}">Delete</button>
           </div>
         </td>
       </tr>
@@ -507,6 +508,13 @@ document.addEventListener('DOMContentLoaded', () => {
       saveState();
       renderAll();
       showToast('Booking cancelled.');
+    }
+    if (action === 'delete-booking') {
+      await window.AutoCareApi.request(`/api/admin/bookings/${numericId}`, { method: 'DELETE' });
+      state.bookings = state.bookings.filter((item) => item.id !== numericId);
+      saveState();
+      renderAll();
+      showToast('Booking deleted.');
     }
     if (action === 'filter-bookings') {
       activeBookingStatus = element.dataset.status;

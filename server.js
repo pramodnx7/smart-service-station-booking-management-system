@@ -229,6 +229,26 @@ app.put('/api/admin/bookings/:id/cancel', requireAuth('admin'), async (req, res,
   }
 });
 
+app.delete('/api/admin/bookings/:id', requireAuth('admin'), async (req, res, next) => {
+  try {
+    const deleted = await store.deleteBooking(req.params.id, null, false);
+    if (!deleted) return res.status(404).json({ message: 'Booking not found.' });
+    res.status(204).end();
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.delete('/api/customer/bookings/:id', requireAuth('customer'), async (req, res, next) => {
+  try {
+    const deleted = await store.deleteBooking(req.params.id, req.user.id, true);
+    if (!deleted) return res.status(404).json({ message: 'Booking not found or access denied.' });
+    res.status(204).end();
+  } catch (error) {
+    next(error);
+  }
+});
+
 app.post('/api/admin/notifications', requireAuth('admin'), async (req, res, next) => {
   try {
     requireFields(req.body, ['type', 'message']);
