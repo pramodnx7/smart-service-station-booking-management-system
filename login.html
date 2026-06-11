@@ -26,10 +26,6 @@
         <h1>Manage bookings, vehicles, invoices and service progress.</h1>
       </div>
 
-      <div class="preview-strip">
-        <article><strong>Admin</strong><span>Bookings, customers, billing</span></article>
-        <article><strong>Customer</strong><span>Vehicles, appointments, invoices</span></article>
-      </div>
     </section>
 
     <section class="login-panel">
@@ -70,13 +66,30 @@
           <button class="btn btn--yellow" id="login-submit" type="submit">Login as Admin</button>
         </form>
 
-        <div class="demo-box">
-          <strong>Demo Accounts</strong>
-          <button type="button" data-demo-role="admin">Use admin demo</button>
-          <button type="button" data-demo-role="customer">Use customer demo</button>
-        </div>
+        <section id="signup-panel" hidden>
+          <form id="signup-form" novalidate>
+            <label>
+              <span>Full Name</span>
+              <input id="signup-name" name="name" type="text" autocomplete="name" placeholder="New Customer" required />
+            </label>
+            <label>
+              <span>Email Address</span>
+              <input id="signup-email" name="email" type="email" autocomplete="email" placeholder="customer@example.com" required />
+            </label>
+            <label>
+              <span>Phone Number</span>
+              <input id="signup-phone" name="phone" type="tel" autocomplete="tel" placeholder="+94 77 000 1111" required />
+            </label>
+            <label>
+              <span>Password</span>
+              <input id="signup-password" name="password" type="password" autocomplete="new-password" placeholder="Create a password" required />
+            </label>
+            <button class="btn btn--yellow" id="signup-submit" type="submit">Create Account</button>
+          </form>
+        </section>
 
-        <p class="register-note">New customer? <button type="button" class="link-btn" id="register-demo">Create demo customer</button></p>
+        <p class="register-note" id="login-note">New customer? <button type="button" class="link-btn" id="open-signup">Create account</button></p>
+        <p class="register-note hidden" id="signup-note">Already registered? <button type="button" class="link-btn" id="open-login">Go to login</button></p>
       </div>
     </section>
   </main>

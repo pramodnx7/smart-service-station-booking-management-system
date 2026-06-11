@@ -76,7 +76,7 @@ button { cursor: pointer; }
 .btn:hover { transform: translateY(-2px); }
 .btn--yellow { color: #071b35; background: var(--yellow); box-shadow: 0 16px 32px rgba(255, 196, 0, 0.22); }
 .btn--red { color: #fff; background: var(--red); }
-.btn--ghost { color: #fff; background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.16); }
+.btn--ghost { color: #071b35; background: rgb(255, 196, 0); border: 1px solid rgba(255, 255, 255, 0.16); }
 .btn--large { min-height: 52px; padding-inline: 25px; }
 
 .section-heading {

@@ -249,7 +249,7 @@ document.addEventListener('DOMContentLoaded', () => {
         <h3>${vehicle.make} ${vehicle.model}</h3>
         <p>${customerName(vehicle.customerId)}</p>
         <div class="card-meta"><span>${vehicle.plate}</span><span>${vehicle.year}</span></div>
-        <div class="row-actions"><button class="mini-btn" type="button" data-action="edit-vehicle" data-id="${vehicle.id}">Edit</button><button class="mini-btn mini-btn--red" type="button" data-action="delete-vehicle" data-id="${vehicle.id}">Delete</button></div>
+        <div class="row-actions"><button class="mini-btn" type="button" data-action="new-booking-for-vehicle" data-id="${vehicle.id}">Book Service</button><button class="mini-btn" type="button" data-action="edit-vehicle" data-id="${vehicle.id}">Edit</button><button class="mini-btn mini-btn--red" type="button" data-action="delete-vehicle" data-id="${vehicle.id}">Delete</button></div>
       </article>
     `).join('');
   }
@@ -484,6 +484,11 @@ document.addEventListener('DOMContentLoaded', () => {
     if (action === 'reset-password') showToast(`Password reset link prepared for ${customerName(numericId)}.`);
     if (action === 'new-vehicle') openModal('vehicle');
     if (action === 'edit-vehicle') openModal('vehicle', state.vehicles.find((item) => item.id === numericId));
+    if (action === 'new-booking-for-vehicle') {
+      const vehicle = state.vehicles.find((item) => item.id === numericId);
+      if (!vehicle) return;
+      openModal('booking', { customerId: vehicle.customerId, vehicleId: vehicle.id });
+    }
     if (action === 'delete-vehicle') {
       await window.AutoCareApi.request(`/api/admin/vehicles/${numericId}`, { method: 'DELETE' });
       state.vehicles = state.vehicles.filter((item) => item.id !== numericId);

@@ -201,7 +201,7 @@
 .pricing-card {
   display: grid;
   grid-template-rows: auto 1fr auto;
-  background: #fff;
+  background:var(--navy-2);
   border: 2px solid #ffd8de;
   box-shadow: var(--soft-shadow);
   overflow: hidden;
@@ -238,7 +238,7 @@
 }
 
 .pricing-card__body strong {
-  color: var(--red);
+  color: var(--yellow);
   font-family: "Barlow Condensed", sans-serif;
   font-size: 48px;
   line-height: 0.9;
@@ -267,7 +267,7 @@
 .pricing-card li::before {
   content: "□";
   margin-right: 8px;
-  color: var(--red);
+  color: var(--yellow);
 }
 
 .pricing-card > a {

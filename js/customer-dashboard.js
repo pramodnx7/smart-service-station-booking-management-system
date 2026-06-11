@@ -1,5 +1,6 @@
 document.addEventListener('DOMContentLoaded', () => {
   const sessionKey = 'autocare-session';
+  const pendingBookingKey = 'autocare-pending-booking';
   const storageKey = 'autocare-customer-dashboard-state';
   const session = getSession();
 
@@ -7,6 +8,9 @@ document.addEventListener('DOMContentLoaded', () => {
     window.location.replace('index.html');
     return;
   }
+
+  const initialView = (window.location.hash || new URLSearchParams(window.location.search).get('view') || '').replace(/^#/, '');
+  let pendingBooking = loadPendingBooking();
 
   const icons = {
     dashboard: '<svg viewBox="0 0 24 24"><path d="M3 13h8V3H3v10Zm10 8h8V11h-8v10ZM3 21h8v-6H3v6Zm10-12h8V3h-8v6Z"/></svg>',
@@ -75,6 +79,19 @@ document.addEventListener('DOMContentLoaded', () => {
     } catch (error) {
       return JSON.parse(JSON.stringify(defaults));
     }
+  }
+
+  function loadPendingBooking() {
+    try {
+      return JSON.parse(localStorage.getItem(pendingBookingKey));
+    } catch (error) {
+      return null;
+    }
+  }
+
+  function clearPendingBooking() {
+    localStorage.removeItem(pendingBookingKey);
+    pendingBooking = null;
   }
 
   function saveState() {
@@ -297,6 +314,16 @@ document.addEventListener('DOMContentLoaded', () => {
     els.modal.showModal();
   }
 
+  function openPendingBooking() {
+    if (!pendingBooking) return;
+    openModal('booking', {
+      vehicleId: state.vehicles[0]?.id,
+      service: pendingBooking.service,
+      date: pendingBooking.date,
+      time: pendingBooking.time
+    });
+  }
+
   async function handleModalSubmit(event) {
     event.preventDefault();
     const data = Object.fromEntries(new FormData(els.modalForm).entries());
@@ -320,6 +347,7 @@ document.addEventListener('DOMContentLoaded', () => {
         body: JSON.stringify(payload)
       });
       id ? Object.assign(state.bookings.find((item) => item.id === id), savedBooking) : state.bookings.push(savedBooking);
+      clearPendingBooking();
       state.notifications.unshift({ id: nextId(state.notifications), type: 'Booking Update', message: 'Your booking request has been saved.', unread: true });
       showToast('Booking saved successfully.');
     }
@@ -451,5 +479,11 @@ document.addEventListener('DOMContentLoaded', () => {
   injectIcons();
   renderAll();
   bindEvents();
+  if (initialView && document.querySelector(`[data-view-panel="${initialView}"]`)) {
+    switchView(initialView);
+  }
+  if (pendingBooking) {
+    window.setTimeout(() => openPendingBooking(), 300);
+  }
   hydrateFromApi();
 });

@@ -39,8 +39,7 @@
       </nav>
 
       <div class="navbar__actions">
-        <a href="login.html?role=customer" class="btn btn--yellow">Customer Login</a>
-        <a href="login.html?role=admin" class="btn btn--ghost">Admin Login</a>
+        <a href="login.html?role=customer" class="btn btn--yellow">Login</a>
         <button class="hamburger" id="hamburger" type="button" aria-label="Toggle menu">
           <span></span><span></span><span></span>
         </button>
@@ -55,20 +54,7 @@
         <div class="hero__copy">
           <h1>Expert Care<br />For <span>Your Car</span></h1>
           <p>Professional car servicing, repairs and maintenance with quality you can trust.</p>
-          <div class="hero__buttons">
-            <a href="#booking-form" class="btn btn--yellow btn--large">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M8 2v4M16 2v4M3 10h18"/></svg>
-              Book Appointment
-            </a>
-            <a href="login.html?role=customer" class="btn btn--ghost btn--large">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 21a8 8 0 0 0-16 0"/><circle cx="12" cy="7" r="4"/></svg>
-              Customer Login
-            </a>
-            <a href="#services" class="btn btn--ghost btn--large">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="m10 8 6 4-6 4V8Z"/></svg>
-              Our Services
-            </a>
-          </div>
+          
         </div>
 
 
@@ -102,7 +88,7 @@
         </div>
       </div>
 
-      <div class="container booking-shell">
+      <div class="container booking-shell hidden">
         <form class="booking-bar" id="booking-form">
           <div class="booking-bar__title">
             <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M8 2v4M16 2v4M3 10h18"/></svg>
@@ -136,8 +122,11 @@
             <span>Select Time</span>
             <input type="time" required />
           </label>
-          <button class="btn btn--yellow" type="submit">Book Now</button>
+          <button class="btn btn--yellow" type="submit" id="booking-submit">Book Now</button>
         </form>
+        <div class="booking-bar__actions">
+          <a class="btn btn--ghost booking-bar__login-option hidden" id="booking-login-option" href="login.html?role=customer&next=customer-dashboard.html%23bookings">Log in to continue your booking</a>
+        </div>
       </div>
     </section>
 
@@ -225,28 +214,28 @@
             <img src="assets/images/workshop-lift-mechanic.png" alt="Basic repair plan" />
             <div class="pricing-card__body">
               <span>Monthly | Basic Plan</span>
-              <strong><small>$</small>659.00</strong>
+              <strong><small>Rs</small>16000.00</strong>
               <ul><li>Oil, filter and fluid check</li><li>Brake inspection</li><li>Quick health report</li><li>Basic support</li></ul>
             </div>
-            <a href="#booking-form">Get Started Now</a>
+            <a href="login.html?role=customer&next=customer-dashboard.html%23bookings">Get Started Now</a>
           </article>
           <article class="pricing-card pricing-card--featured">
             <img src="assets/images/about-mechanic-red-car.png" alt="Popular repair plan" />
             <div class="pricing-card__body">
               <span>Monthly | Popular Plan</span>
-              <strong><small>$</small>799.00</strong>
+              <strong><small>Rs</small>20000.00</strong>
               <ul><li>Starter plan features</li><li>Engine diagnostics</li><li>Battery and AC check</li><li>Priority service slot</li></ul>
             </div>
-            <a href="#booking-form">Get Started Now</a>
+            <a href="login.html?role=customer&next=customer-dashboard.html%23bookings">Get Started Now</a>
           </article>
           <article class="pricing-card">
             <img src="assets/images/service-wheel-closeup.png" alt="Premium repair plan" />
             <div class="pricing-card__body">
               <span>Monthly | Premium Plan</span>
-              <strong><small>$</small>899.00</strong>
+              <strong><small>Rs</small>18000.00</strong>
               <ul><li>Popular plan features</li><li>Wheel alignment</li><li>Transmission inspection</li><li>Extended warranty</li></ul>
             </div>
-            <a href="#booking-form">Get Started Now</a>
+            <a href="login.html?role=customer&next=customer-dashboard.html%23bookings">Get Started Now</a>
           </article>
         </div>
       </div>

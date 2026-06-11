@@ -205,14 +205,40 @@
 }
 
 .booking-bar {
+  box-sizing: border-box;
   display: grid;
-  grid-template-columns: 226px repeat(4, minmax(150px, 1fr)) 180px;
+  grid-template-columns: minmax(220px, 1.15fr) repeat(4, minmax(0, 1fr));
   gap: 24px;
   align-items: center;
   min-height: 164px;
   padding: 0 43px;
-  background: #06254b;
+  color: #fff;
+  background: linear-gradient(180deg, rgba(18, 49, 90, 0.98), rgba(12, 35, 66, 0.98));
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 30px;
   box-shadow: 0 24px 42px rgba(5, 17, 36, 0.24);
+  backdrop-filter: blur(10px);
+  overflow: hidden;
+}
+
+.booking-bar__actions {
+  display: flex;
+  justify-content: center;
+  margin-top: 16px;
+}
+
+.booking-bar__login-option {
+  min-height: 54px;
+  padding: 0 22px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.booking-bar__login-option.hidden {
+  display: none;
 }
 
 .booking-bar__title {
@@ -289,7 +315,11 @@
 }
 
 .booking-bar button {
+  grid-column: 1 / -1;
+  justify-self: stretch;
+  width: 100%;
   min-height: 62px;
+  padding-inline: 24px;
   font-size: 11px;
 }
 
@@ -305,11 +335,17 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
     min-height: 0;
     padding: 28px;
+    border-radius: 24px;
   }
 
   .booking-bar__title,
   .booking-bar button {
     grid-column: 1 / -1;
+  }
+
+  .booking-bar button {
+    justify-self: stretch;
+    width: 100%;
   }
 }
 
@@ -383,6 +419,11 @@
     grid-template-columns: 1fr;
   }
 
+
+  .booking-bar button {
+    justify-self: stretch;
+    width: 100%;
+  }
   .hero__buttons {
     display: grid;
   }
@@ -390,6 +431,15 @@
   .booking-bar {
     padding: 20px;
     gap: 14px;
+    border-radius: 20px;
+  }
+
+  .booking-bar__actions {
+    margin-top: 12px;
+  }
+
+  .booking-bar__login-option {
+    width: 100%;
   }
   .hero__car {
     display: none;

@@ -115,6 +115,7 @@ button { cursor: pointer; }
   font-size: clamp(38px, 4.8vw, 68px);
   line-height: 0.98;
   letter-spacing: 0;
+  padding-bottom: 20%;
 }
 
 .preview-strip {
@@ -345,6 +346,10 @@ input:focus {
   font-size: 13px;
   line-height: 1.5;
   text-align: center;
+}
+
+.hidden {
+  display: none !important;
 }
 
 @media (max-width: 940px) {
