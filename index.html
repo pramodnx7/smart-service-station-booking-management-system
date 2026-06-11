@@ -31,8 +31,8 @@
 
       <nav class="navbar__nav" id="nav-menu" aria-label="Primary navigation">
         <a href="#hero" class="nav-link active">Home</a>
-        <a href="#services" class="nav-link">Services</a>
         <a href="#about" class="nav-link">About</a>
+        <a href="#services" class="nav-link">Services</a>
         <a href="#pricing" class="nav-link">Pricing</a>
         <a href="#work" class="nav-link">Work</a>
         <a href="#articles" class="nav-link">Blog</a>
@@ -89,41 +89,7 @@
       </div>
 
       <div class="container booking-shell hidden">
-        <form class="booking-bar" id="booking-form">
-          <div class="booking-bar__title">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M8 2v4M16 2v4M3 10h18"/></svg>
-            <span><strong>Book Your</strong> Service Now</span>
-          </div>
-          <label>
-            <span>Select Service</span>
-            <select required>
-              <option value="">Choose Service</option>
-              <option>Engine Repair</option>
-              <option>Oil Change</option>
-              <option>Brake Service</option>
-              <option>Tire Service</option>
-            </select>
-          </label>
-          <label>
-            <span>Select Vehicle</span>
-            <select required>
-              <option value="">Choose Vehicle</option>
-              <option>Sedan</option>
-              <option>SUV</option>
-              <option>Truck</option>
-              <option>Sports Car</option>
-            </select>
-          </label>
-          <label>
-            <span>Select Date</span>
-            <input type="date" required />
-          </label>
-          <label>
-            <span>Select Time</span>
-            <input type="time" required />
-          </label>
-          <button class="btn btn--yellow" type="submit" id="booking-submit">Book Now</button>
-        </form>
+       
         <div class="booking-bar__actions">
           <a class="btn btn--ghost booking-bar__login-option hidden" id="booking-login-option" href="login.html?role=customer&next=customer-dashboard.html%23bookings">Log in to continue your booking</a>
         </div>

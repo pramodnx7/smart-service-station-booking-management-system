@@ -374,6 +374,14 @@ async function cancelBooking(id, userId, enforceOwner = true) {
   return true;
 }
 
+async function deleteBooking(id, userId = null, enforceOwner = true) {
+  const current = await getById(collections.bookings, id);
+  if (!current) return false;
+  if (enforceOwner && userId && Number(current.userId) !== Number(userId)) return false;
+  await deleteDocument(collections.bookings, id);
+  return true;
+}
+
 async function advanceBooking(id) {
   const current = await getById(collections.bookings, id);
   if (!current) return null;
@@ -642,6 +650,7 @@ module.exports = {
   createUser,
   createVehicle,
   deleteVehicle,
+  deleteBooking,
   ensureSeedData,
   findUserByEmailRole,
   getAdminDashboard,

@@ -196,7 +196,7 @@ document.addEventListener('DOMContentLoaded', () => {
         <h3>${vehicle.make} ${vehicle.model}</h3>
         <p>${vehicle.plate}</p>
         <div class="card-meta"><span>${vehicle.year}</span><span>${vehicle.model}</span></div>
-        <div class="row-actions"><button class="mini-btn" type="button" data-action="edit-vehicle" data-id="${vehicle.id}">Edit</button><button class="mini-btn mini-btn--red" type="button" data-action="delete-vehicle" data-id="${vehicle.id}">Delete</button></div>
+        <div class="row-actions"><button class="mini-btn" type="button" data-action="new-booking-for-vehicle" data-id="${vehicle.id}">Book Service</button><button class="mini-btn" type="button" data-action="edit-vehicle" data-id="${vehicle.id}">Edit</button><button class="mini-btn mini-btn--red" type="button" data-action="delete-vehicle" data-id="${vehicle.id}">Delete</button></div>
       </article>
     `).join('') + `
       <article class="vehicle-card">
@@ -216,7 +216,7 @@ document.addEventListener('DOMContentLoaded', () => {
         <td>${booking.date}<span class="row-sub">${booking.time}</span></td>
         <td><span class="badge badge--${statusClass(booking.status)}">${booking.status}</span></td>
         <td>${booking.queue ? `#${booking.queue}` : '-'}</td>
-        <td><div class="row-actions"><button class="mini-btn" type="button" data-action="reschedule-booking" data-id="${booking.id}">Reschedule</button><button class="mini-btn mini-btn--red" type="button" data-action="cancel-booking" data-id="${booking.id}">Cancel</button></div></td>
+        <td><div class="row-actions"><button class="mini-btn" type="button" data-action="reschedule-booking" data-id="${booking.id}">Reschedule</button><button class="mini-btn mini-btn--red" type="button" data-action="cancel-booking" data-id="${booking.id}">Cancel</button><button class="mini-btn mini-btn--danger" type="button" data-action="delete-booking" data-id="${booking.id}">Delete</button></div></td>
       </tr>
     `).join('');
   }
@@ -405,6 +405,11 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       openModal('booking');
     }
+    if (action === 'new-booking-for-vehicle') {
+      const vehicle = state.vehicles.find((item) => item.id === numericId);
+      if (!vehicle) return;
+      openModal('booking', { vehicleId: vehicle.id });
+    }
     if (action === 'reschedule-booking') openModal('booking', state.bookings.find((item) => item.id === numericId));
     if (action === 'cancel-booking') {
       await window.AutoCareApi.request(`/api/customer/bookings/${numericId}/cancel`, { method: 'PUT' });
@@ -412,6 +417,13 @@ document.addEventListener('DOMContentLoaded', () => {
       saveState();
       renderAll();
       showToast('Booking cancelled.');
+    }
+    if (action === 'delete-booking') {
+      await window.AutoCareApi.request(`/api/customer/bookings/${numericId}`, { method: 'DELETE' });
+      state.bookings = state.bookings.filter((item) => item.id !== numericId);
+      saveState();
+      renderAll();
+      showToast('Booking deleted.');
     }
     if (action === 'new-emergency') openModal('emergency');
     if (action === 'download-invoice') await downloadInvoice(numericId);
