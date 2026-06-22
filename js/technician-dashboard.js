@@ -118,6 +118,8 @@ document.addEventListener('DOMContentLoaded', () => {
         <button class="mini-btn" type="button" data-action="replace-part" data-id="${job.id}">Replace</button>
         <button class="mini-btn" type="button" data-action="request-parts" data-id="${job.id}">Request</button>
         <button class="mini-btn" type="button" data-action="add-image" data-id="${job.id}">Image</button>
+        <button class="mini-btn" type="button" data-action="upload-photos" data-id="${job.id}">Photos</button>
+        <button class="mini-btn" type="button" data-action="upload-documents" data-id="${job.id}">Docs</button>
         <button class="mini-btn" type="button" data-action="complete-job" data-id="${job.id}">Complete</button>
       </div>
     `;
@@ -150,6 +152,9 @@ document.addEventListener('DOMContentLoaded', () => {
         <div class="progress-bar"><span style="width:${job.progress}%"></span></div>
         <small>${job.vehicleNumber} - ${job.status}</small>
       </div>
+    `).join('');
+    document.getElementById('file-jobs-body').innerHTML = state.jobs.map((job) => `
+      <tr><td><span class="row-title">#SJ-${job.id}</span></td><td>${job.vehicleNumber}</td><td>${job.serviceType}</td><td><span class="badge badge--${statusClass(job.status)}">${job.status}</span></td><td>${jobActions(job)}</td></tr>
     `).join('');
   }
 
@@ -214,7 +219,7 @@ document.addEventListener('DOMContentLoaded', () => {
       },
       part: {
         title: `Record Parts #SJ-${job.id}`,
-        body: field('partId', 'Spare Part', 'select', partOptions[0]?.value, partOptions) + field('quantity', 'Quantity', 'number', '1') + field('condition', 'Condition', 'select', 'Brand New', ['Brand New', 'Used', 'Refurbished', 'Reconditioned', 'Customer Supplied'].map((condition) => ({ value: condition, label: condition }))) + field('warrantyStartDate', 'Warranty Start', 'date', new Date().toISOString().slice(0, 10)) + field('warrantyExpiryDate', 'Warranty Expiry', 'date', new Date().toISOString().slice(0, 10)) + field('photoUrl', 'Part Photo URL', 'url', '') + field('note', 'Note', 'textarea', '')
+        body: field('partId', 'Spare Part', 'select', partOptions[0]?.value, partOptions) + field('quantity', 'Quantity', 'number', '1') + field('condition', 'Condition', 'select', 'Brand New', ['Brand New', 'Used', 'Refurbished', 'Reconditioned', 'Customer Supplied'].map((condition) => ({ value: condition, label: condition }))) + field('warrantyStartDate', 'Warranty Start', 'date', new Date().toISOString().slice(0, 10)) + field('warrantyExpiryDate', 'Warranty Expiry', 'date', new Date().toISOString().slice(0, 10)) + '<label class="full"><span>Part Photo</span><input name="partPhoto" type="file" accept=".jpg,.jpeg,.png" /></label><div class="full notification-list" id="file-preview"></div>' + field('note', 'Note', 'textarea', '')
       },
       returnPart: {
         title: `Return Parts #SJ-${job.id}`,
@@ -231,6 +236,14 @@ document.addEventListener('DOMContentLoaded', () => {
       image: {
         title: `Upload Image #SJ-${job.id}`,
         body: field('imageUrl', 'Image URL', 'url', '') + field('caption', 'Caption', 'text', '')
+      },
+      uploadPhotos: {
+        title: `Upload Photos #SJ-${job.id}`,
+        body: field('photoType', 'Photo Type', 'select', 'Before Service', ['Before Service', 'During Service', 'After Service', 'Replaced Part', 'Vehicle Inspection'].map((type) => ({ value: type, label: type }))) + field('description', 'Description', 'textarea', '') + '<label class="full"><span>Files</span><input name="files" type="file" accept=".jpg,.jpeg,.png,.pdf,.docx" multiple required /></label><div class="full notification-list" id="file-preview"></div>'
+      },
+      uploadDocuments: {
+        title: `Upload Documents #SJ-${job.id}`,
+        body: field('documentType', 'Document Type', 'select', 'Service Report', ['Service Report', 'Inspection Report', 'Warranty Document', 'Customer Attachment', 'Vehicle Registration Document', 'Insurance Document', 'Service Checklist', 'Invoice PDF'].map((type) => ({ value: type, label: type }))) + field('description', 'Description', 'textarea', '') + '<label class="full"><span>Files</span><input name="files" type="file" accept=".jpg,.jpeg,.png,.pdf,.docx" multiple required /></label><div class="full notification-list" id="file-preview"></div>'
       }
     };
 
@@ -260,9 +273,11 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     }
     if (mode === 'part') {
+      const photoInput = els.modalForm.querySelector('input[name="partPhoto"]');
+      const partPhoto = photoInput?.files?.[0] ? (await filesToPayload(photoInput.files))[0] : null;
       await window.AutoCareApi.request(`/api/technician/jobs/${id}/parts`, {
         method: 'POST',
-        body: JSON.stringify({ ...data, partId: Number(data.partId), quantity: Number(data.quantity) })
+        body: JSON.stringify({ ...data, partId: Number(data.partId), quantity: Number(data.quantity), partPhoto })
       });
     }
     if (mode === 'returnPart') {
@@ -289,6 +304,15 @@ document.addEventListener('DOMContentLoaded', () => {
         body: JSON.stringify(data)
       });
     }
+    if (mode === 'uploadPhotos' || mode === 'uploadDocuments') {
+      const files = await filesToPayload(els.modalForm.querySelector('input[type="file"]').files);
+      const path = mode === 'uploadPhotos' ? 'photos' : 'documents';
+      const typeKey = mode === 'uploadPhotos' ? 'photoType' : 'documentType';
+      await window.AutoCareApi.request(`/api/technician/jobs/${id}/${path}/upload`, {
+        method: 'POST',
+        body: JSON.stringify({ [typeKey]: data[typeKey], description: data.description, files })
+      });
+    }
 
     els.modal.close();
     await hydrateFromApi();
@@ -304,6 +328,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (action === 'replace-part') openModal('replacePart', job);
     if (action === 'request-parts') openModal('requestParts', job);
     if (action === 'add-image') openModal('image', job);
+    if (action === 'upload-photos') openModal('uploadPhotos', job);
+    if (action === 'upload-documents') openModal('uploadDocuments', job);
     if (action === 'complete-job') {
       await window.AutoCareApi.request(`/api/technician/jobs/${id}/complete`, { method: 'PUT' });
       await hydrateFromApi();
@@ -336,6 +362,36 @@ document.addEventListener('DOMContentLoaded', () => {
     els.modalForm.addEventListener('submit', (event) => {
       handleModalSubmit(event).catch((error) => showToast(error.message || 'Save failed.'));
     });
+    els.modalForm.addEventListener('change', (event) => {
+      if (event.target.type === 'file') {
+        renderFilePreview(event.target.files);
+      }
+    });
+  }
+
+  function readFileAsBase64(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result).split(',')[1]);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
+
+  async function filesToPayload(fileList) {
+    const files = Array.from(fileList || []);
+    return Promise.all(files.map(async (file) => ({
+      fileName: file.name,
+      mimeType: file.type,
+      contentBase64: await readFileAsBase64(file)
+    })));
+  }
+
+  function renderFilePreview(fileList) {
+    const preview = document.getElementById('file-preview');
+    if (!preview) return;
+    preview.innerHTML = Array.from(fileList || []).map((file) => `<article class="notification-item"><span data-icon="invoice"></span><div><strong>${file.name}</strong><p>${Math.round(file.size / 1024)} KB</p></div></article>`).join('');
+    injectIcons();
   }
 
   injectIcons();

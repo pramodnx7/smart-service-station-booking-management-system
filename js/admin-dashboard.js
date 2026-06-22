@@ -39,7 +39,7 @@ document.addEventListener('DOMContentLoaded', () => {
       { id: 3, customerId: 2, make: 'Suzuki Swift', model: 'RS', plate: 'DEF-0012', year: '2020', image: 'assets/images/service-wheel-closeup.png' }
     ],
     technicians: [
-      { id: 1, userId: 3, name: 'Kasun Technician', email: 'tech@autocare.lk', employeeNo: 'TECH-001', specialization: 'Engine Diagnostics', phone: '+94 77 222 3344', experienceYears: 4, status: 'Active' }
+      { id: 1, userId: 3, name: 'Kasun Technician', email: 'tech@autocare.lk', employeeNo: 'TECH-001', specialization: 'General Service', phone: '+94 77 222 3344', experienceYears: 4, status: 'Active' }
     ],
     bookings: [
       { id: 1, customerId: 1, vehicleId: 1, service: 'General Service', date: '2026-05-25', time: '10:00', status: 'Pending', queue: 3, progress: 20 },
@@ -51,7 +51,12 @@ document.addEventListener('DOMContentLoaded', () => {
       { id: 1, name: 'Oil Change', price: 6000, duration: '45 min', description: 'Engine oil, filter replacement and quick inspection.' },
       { id: 2, name: 'Brake Service', price: 7500, duration: '1 hr', description: 'Brake pads, fluid check and safety testing.' },
       { id: 3, name: 'Full Service', price: 18500, duration: '3 hr', description: 'Complete inspection, fluids, diagnostics and tune-up.' },
-      { id: 4, name: 'Engine Diagnostics', price: 12000, duration: '1.5 hr', description: 'Computer scan, issue report and repair estimate.' }
+      { id: 4, name: 'Engine Diagnostics', price: 12000, duration: '1.5 hr', description: 'Computer scan, issue report and repair estimate.' },
+      { id: 5, name: 'General Service', price: 8500, duration: '1 hr', description: 'Standard maintenance service and inspection.' },
+      { id: 6, name: 'Electrical Repair', price: 14000, duration: '2 hr', description: 'Electrical fault diagnosis and repair.' },
+      { id: 7, name: 'Engine Repair', price: 22000, duration: '3 hr', description: 'Engine repair, tuning and mechanical correction.' },
+      { id: 8, name: 'Suspension Repair', price: 16000, duration: '2 hr', description: 'Suspension inspection, repair and alignment checks.' },
+      { id: 9, name: 'Hybrid/EV Service', price: 26000, duration: '2 hr', description: 'Hybrid and electric vehicle safety inspection and service.' }
     ],
     invoices: [
       { id: 1001, customerId: 1, service: 'General Service', amount: 8500, payment: 'Unpaid', date: '2026-05-25' },
@@ -83,12 +88,15 @@ document.addEventListener('DOMContentLoaded', () => {
     inventoryReports: { lowStock: [], outOfStock: [], stockMovements: [], technicianUsage: [], inventoryValue: {} },
     stockMovements: [],
     partUsageHistory: [],
+    servicePhotos: [],
+    documents: [],
     technicianWorkload: [],
     technicianPerformance: []
   };
 
   let state = loadState();
   let activeBookingStatus = 'All';
+  const technicianSpecializations = ['General Service', 'Oil Change', 'Brake Service', 'Electrical Repair', 'Engine Repair', 'Suspension Repair', 'Hybrid/EV Service'];
 
   const selectors = {
     sidebar: document.getElementById('sidebar'),
@@ -387,6 +395,23 @@ document.addEventListener('DOMContentLoaded', () => {
     `).join('');
   }
 
+  function renderDocuments(filter = '') {
+    const files = [...(state.servicePhotos || []), ...(state.documents || [])];
+    const query = filter.toLowerCase();
+    document.getElementById('documents-body').innerHTML = files
+      .filter((file) => !query || `${file.fileName} ${file.photoType} ${file.documentType} ${file.serviceJobId} ${file.uploadedBy}`.toLowerCase().includes(query))
+      .map((file) => `
+        <tr>
+          <td><span class="row-title">${file.fileName}</span><span class="row-sub">${file.description || ''}</span></td>
+          <td>${file.photoType || file.documentType || file.kind}</td>
+          <td>${file.serviceJobId ? `#SJ-${file.serviceJobId}` : '-'}</td>
+          <td>${vehicleName(state.serviceJobs.find((job) => Number(job.id) === Number(file.serviceJobId))?.vehicleId)}</td>
+          <td>${file.uploadedBy || '-'}</td>
+          <td><div class="row-actions"><button class="mini-btn" type="button" data-action="download-file" data-kind="${file.kind}" data-id="${file.id}">Download</button><button class="mini-btn mini-btn--red" type="button" data-action="delete-file" data-kind="${file.kind}" data-id="${file.id}">Delete</button></div></td>
+        </tr>
+      `).join('');
+  }
+
   function renderPackages() {
     document.getElementById('package-grid').innerHTML = state.packages.map((item) => `
       <article class="package-card">
@@ -453,6 +478,7 @@ document.addEventListener('DOMContentLoaded', () => {
     renderServiceJobs();
     renderTechnicianReports();
     renderInventory();
+    renderDocuments();
     renderPackages();
     renderBilling();
     renderEmergency();
@@ -495,7 +521,7 @@ document.addEventListener('DOMContentLoaded', () => {
       },
       technician: {
         title: record.id ? 'Edit Technician' : 'Create Technician',
-        body: field('name', 'Full Name', 'text', record.name || '') + field('email', 'Email', 'email', record.email || '') + field('phone', 'Phone', 'tel', record.phone || '') + field('employeeNo', 'Employee No', 'text', record.employeeNo || '') + field('specialization', 'Specialization', 'text', record.specialization || '') + field('experienceYears', 'Experience Years', 'number', record.experienceYears || '0') + field('status', 'Status', 'select', record.status || 'Active', [{ value: 'Active', label: 'Active' }, { value: 'Inactive', label: 'Inactive' }])
+        body: field('name', 'Full Name', 'text', record.name || '') + field('email', 'Email', 'email', record.email || '') + field('phone', 'Phone', 'tel', record.phone || '') + field('employeeNo', 'Employee No', 'text', record.employeeNo || '') + field('specialization', 'Specialization', 'select', record.specialization || technicianSpecializations[0], technicianSpecializations.map((item) => ({ value: item, label: item }))) + field('experienceYears', 'Experience Years', 'number', record.experienceYears || '0') + field('status', 'Status', 'select', record.status || 'Active', [{ value: 'Active', label: 'Active' }, { value: 'Inactive', label: 'Inactive' }])
       },
       booking: {
         title: record.id ? 'Reschedule Booking' : 'Book Service Appointment',
@@ -682,6 +708,13 @@ document.addEventListener('DOMContentLoaded', () => {
     URL.revokeObjectURL(link.href);
   }
 
+  function downloadFile(kind, id) {
+    const link = document.createElement('a');
+    link.href = `/api/files/${kind}/${id}/download`;
+    link.download = '';
+    link.click();
+  }
+
   async function handleAction(action, id, element) {
     const numericId = Number(id);
     if (action === 'new-customer') openModal('customer');
@@ -761,6 +794,15 @@ document.addEventListener('DOMContentLoaded', () => {
       showToast('Payment marked as paid.');
     }
     if (action === 'download-invoice') await downloadInvoice(numericId);
+    if (action === 'download-file') downloadFile(element.dataset.kind, numericId);
+    if (action === 'delete-file') {
+      await window.AutoCareApi.request(`/api/admin/files/${element.dataset.kind}/${numericId}`, { method: 'DELETE' });
+      state.servicePhotos = (state.servicePhotos || []).filter((item) => !(item.kind === element.dataset.kind && item.id === numericId));
+      state.documents = (state.documents || []).filter((item) => !(item.kind === element.dataset.kind && item.id === numericId));
+      saveState();
+      renderAll();
+      showToast('File deleted.');
+    }
     if (action === 'new-emergency' || action === 'open-emergency') openModal('emergency');
     if (action === 'close-emergency') {
       await window.AutoCareApi.request(`/api/admin/emergencies/${numericId}/close`, { method: 'PUT' });
@@ -818,6 +860,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.getElementById('inventory-search')?.addEventListener('input', (event) => {
       renderInventory(event.target.value);
+    });
+    document.getElementById('document-search')?.addEventListener('input', (event) => {
+      renderDocuments(event.target.value);
     });
 
     document.getElementById('settings-form').addEventListener('submit', (event) => {

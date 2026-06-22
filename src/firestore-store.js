@@ -20,7 +20,9 @@ const collections = {
   inventorySuppliers: 'inventorySuppliers',
   inventoryMovements: 'inventoryMovements',
   replacedParts: 'replacedParts',
-  serviceImages: 'serviceImages'
+  serviceImages: 'servicePhotos',
+  documents: 'documents',
+  uploadAuditLogs: 'uploadAuditLogs'
 };
 
 const defaultImage = 'assets/images/hero-blue-workshop.png';
@@ -28,6 +30,27 @@ const serviceJobStatuses = ['Pending', 'Assigned', 'In Progress', 'Waiting For P
 const inventoryCategories = ['Engine Parts', 'Brake System', 'Electrical', 'Suspension', 'Cooling System', 'Filters', 'Fluids & Lubricants', 'Batteries', 'Tires & Wheels', 'Accessories'];
 const partConditions = ['Brand New', 'Used', 'Refurbished', 'Reconditioned', 'Customer Supplied'];
 const lowStockThreshold = 5;
+const photoTypes = ['Before Service', 'During Service', 'After Service', 'Replaced Part', 'Vehicle Inspection'];
+const documentTypes = ['Service Report', 'Inspection Report', 'Warranty Document', 'Customer Attachment', 'Vehicle Registration Document', 'Insurance Document', 'Service Checklist', 'Invoice PDF'];
+const allowedUploadExtensions = ['jpg', 'jpeg', 'png', 'pdf', 'docx'];
+const maxUploadBytes = 5 * 1024 * 1024;
+const serviceBayCount = Number(process.env.SERVICE_BAY_COUNT || 8);
+const serviceDayStartHour = Number(process.env.SERVICE_DAY_START_HOUR || 8);
+const serviceDayEndHour = Number(process.env.SERVICE_DAY_END_HOUR || 17);
+const serviceSlotMinutes = Number(process.env.SERVICE_SLOT_MINUTES || 60);
+const serviceSpecializations = [
+  'General Service',
+  'Oil Change',
+  'Brake Service',
+  'Electrical Repair',
+  'Engine Repair',
+  'Suspension Repair',
+  'Hybrid/EV Service'
+];
+const serviceAliases = {
+  'Full Service': 'General Service',
+  'Engine Diagnostics': 'Engine Repair'
+};
 
 function fieldValue() {
   return admin.firestore.FieldValue.serverTimestamp();
@@ -70,6 +93,44 @@ function sortDateDesc(items, dateField, timeField = '') {
     const right = `${a[dateField] || ''} ${a[timeField] || ''}`;
     return left.localeCompare(right);
   });
+}
+
+function pdfEscape(value) {
+  return String(value || '').replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)');
+}
+
+function createSimplePdfBuffer(lines) {
+  const content = [
+    'BT',
+    '/F1 11 Tf',
+    '44 780 Td',
+    '14 TL',
+    ...lines.flatMap((line, index) => [
+      index === 0 ? '' : 'T*',
+      `(${pdfEscape(line).slice(0, 110)}) Tj`
+    ]).filter(Boolean),
+    'ET'
+  ].join('\n');
+  const objects = [
+    '<< /Type /Catalog /Pages 2 0 R >>',
+    '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>',
+    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
+    `<< /Length ${Buffer.byteLength(content)} >>\nstream\n${content}\nendstream`
+  ];
+  let pdf = '%PDF-1.4\n';
+  const offsets = [0];
+  objects.forEach((object, index) => {
+    offsets.push(Buffer.byteLength(pdf));
+    pdf += `${index + 1} 0 obj\n${object}\nendobj\n`;
+  });
+  const xrefOffset = Buffer.byteLength(pdf);
+  pdf += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
+  offsets.slice(1).forEach((offset) => {
+    pdf += `${String(offset).padStart(10, '0')} 00000 n \n`;
+  });
+  pdf += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`;
+  return Buffer.from(pdf, 'utf8');
 }
 
 function docRef(collection, id) {
@@ -177,14 +238,15 @@ function customerView(user) {
 }
 
 function technicianView(technician, user) {
+  const profile = user || technician.user;
   return {
     id: technician.id,
     userId: technician.userId,
-    name: user?.name || technician.name || 'Unknown technician',
-    email: user?.email || technician.email || '',
+    name: profile?.name || technician.name || 'Unknown technician',
+    email: profile?.email || technician.email || '',
     employeeNo: technician.employeeNo,
     specialization: technician.specialization,
-    phone: technician.phone || user?.phone || '',
+    phone: technician.phone || profile?.phone || '',
     experienceYears: Number(technician.experienceYears || 0),
     status: titleCase(technician.status || 'active')
   };
@@ -252,7 +314,13 @@ function bookingView(booking, serviceById) {
     time: String(booking.bookingTime || '').slice(0, 5),
     status: booking.status,
     queue: booking.queuePosition || 0,
-    progress: booking.progress || 0
+    progress: booking.progress || 0,
+    assignedTechnicianId: booking.assignedTechnicianId || null,
+    serviceBayId: booking.serviceBayId || null,
+    serviceBayName: booking.serviceBayName || (booking.serviceBayId ? bayLabel(booking.serviceBayId) : ''),
+    durationMinutes: Number(booking.durationMinutes || parseDurationMinutes(service?.duration)),
+    startAt: booking.startAt || '',
+    endAt: booking.endAt || ''
   };
 }
 
@@ -285,6 +353,28 @@ function serviceJobView(job, context = {}) {
     customerPhone: customer?.phone || '',
     customerEmail: customer?.email || '',
     technicianName: technicianUser?.name || technician?.name || 'Unassigned'
+  };
+}
+
+function fileView(file, kind = 'photo') {
+  const id = Number(file.id);
+  return {
+    id,
+    kind,
+    serviceJobId: file.serviceJobId || null,
+    vehicleId: file.vehicleId || null,
+    customerId: file.customerId || null,
+    technicianId: file.technicianId || null,
+    photoType: file.photoType || '',
+    documentType: file.documentType || '',
+    fileName: file.fileName || '',
+    fileUrl: `/api/files/${kind}/${id}/download`,
+    previewUrl: `/api/files/${kind}/${id}/download`,
+    description: file.description || '',
+    uploadedBy: file.uploadedBy || '',
+    uploadedAt: formatDate(file.uploadedAt || file.createdAt),
+    mimeType: file.mimeType || '',
+    sizeBytes: Number(file.sizeBytes || 0)
   };
 }
 
@@ -464,7 +554,7 @@ async function createUser({ role, name, email, phone = '', passwordHash, status 
 }
 
 async function getCustomerDashboard(userId) {
-  const [user, vehicles, bookings, invoices, notifications, serviceMap, jobs, parts, usages, images] = await Promise.all([
+  const [user, vehicles, bookings, invoices, notifications, serviceMap, jobs, parts, usages, images, documents] = await Promise.all([
     getById(collections.users, userId),
     all(collections.vehicles),
     all(collections.bookings),
@@ -474,7 +564,8 @@ async function getCustomerDashboard(userId) {
     all(collections.serviceJobs),
     all(collections.inventoryParts),
     all(collections.serviceJobParts),
-    all(collections.serviceImages)
+    all(collections.serviceImages),
+    all(collections.documents)
   ]);
 
   const packages = Array.from(serviceMap.values())
@@ -499,7 +590,8 @@ async function getCustomerDashboard(userId) {
     invoices: sortDateDesc(invoices.filter((item) => item.userId === userId).map((item) => invoiceView(item, serviceMap)), 'date'),
     notifications: sortById(notifications.filter((item) => item.userId === userId)).reverse().map(({ id, type, message, unread }) => ({ id, type, message, unread })),
     usedParts: sortById(usages.filter((usage) => customerJobIds.has(Number(usage.serviceJobId)))).reverse().map((usage) => usageView(usage, context)),
-    serviceImages: sortById(images.filter((image) => customerJobIds.has(Number(image.serviceJobId)))).reverse(),
+    serviceImages: sortById(images.filter((image) => customerJobIds.has(Number(image.serviceJobId)))).reverse().map((image) => fileView(image, 'photo')),
+    documents: sortById(documents.filter((document) => Number(document.customerId) === Number(userId) || customerJobIds.has(Number(document.serviceJobId)))).reverse().map((document) => fileView(document, 'document')),
     packages
   };
 }
@@ -600,7 +692,10 @@ function usageView(usage, context = {}) {
     customerId: job?.customerId || null,
     customerName: customer?.name || '',
     note: usage.note || '',
-    photoUrl: usage.photoUrl || ''
+    photoUrl: usage.photoUrl || '',
+    photoFileName: usage.photoFileName || '',
+    photoMimeType: usage.photoMimeType || '',
+    photoSizeBytes: Number(usage.photoSizeBytes || 0)
   };
 }
 
@@ -630,7 +725,7 @@ function buildInventoryReports(parts, movements, usages, context = {}) {
 }
 
 async function getAdminDashboard() {
-  const [users, vehicles, bookings, packages, invoices, emergencies, notifications, feedback, technicians, serviceJobs, inventoryParts, suppliers, categories, movements, usages, serviceMap] = await Promise.all([
+  const [users, vehicles, bookings, packages, invoices, emergencies, notifications, feedback, technicians, serviceJobs, inventoryParts, suppliers, categories, movements, usages, photos, documents, serviceMap] = await Promise.all([
     all(collections.users),
     all(collections.vehicles),
     all(collections.bookings),
@@ -646,6 +741,8 @@ async function getAdminDashboard() {
     all(collections.inventoryCategories),
     all(collections.inventoryMovements),
     all(collections.serviceJobParts),
+    all(collections.serviceImages),
+    all(collections.documents),
     servicesById()
   ]);
 
@@ -671,6 +768,8 @@ async function getAdminDashboard() {
     inventoryCategories: sortById(categories),
     stockMovements: inventoryReports.stockMovements,
     partUsageHistory: inventoryReports.technicianUsage,
+    servicePhotos: sortById(photos).reverse().map((photo) => fileView(photo, 'photo')),
+    documents: sortById(documents).reverse().map((document) => fileView(document, 'document')),
     inventoryReports,
     technicianWorkload: buildTechnicianWorkload(technicians, jobViews, context.usersById),
     technicianPerformance: buildTechnicianPerformance(technicians, jobViews, context.usersById),
@@ -722,6 +821,232 @@ function bookingProgress(status) {
   return status === 'Completed' ? 100 : status === 'In Progress' ? 70 : status === 'Approved' ? 35 : status === 'Cancelled' ? 0 : 10;
 }
 
+function normalizeServiceType(value) {
+  const text = String(value || '').trim();
+  const known = serviceSpecializations.find((item) => item.toLowerCase() === text.toLowerCase());
+  if (known) return known;
+  const alias = Object.entries(serviceAliases).find(([name]) => name.toLowerCase() === text.toLowerCase());
+  return alias ? alias[1] : text;
+}
+
+function technicianSpecializations(technician) {
+  return String(technician.specialization || '')
+    .split(/[,/|]/)
+    .map((item) => normalizeServiceType(item))
+    .filter(Boolean);
+}
+
+function normalizeTechnicianSpecialization(value) {
+  const specializations = technicianSpecializations({ specialization: value });
+  const invalid = specializations.find((item) => !serviceSpecializations.includes(item));
+  if (!specializations.length || invalid) {
+    const error = new Error(`Technician specialization must be one of: ${serviceSpecializations.join(', ')}.`);
+    error.status = 400;
+    throw error;
+  }
+  return [...new Set(specializations)].join(', ');
+}
+
+function technicianCanDoService(technician, serviceName) {
+  const required = normalizeServiceType(serviceName);
+  const specializations = technicianSpecializations(technician);
+  return specializations.includes('General Service') || specializations.some((item) => item.toLowerCase() === required.toLowerCase());
+}
+
+function parseDurationMinutes(duration) {
+  const text = String(duration || '').toLowerCase();
+  const hours = Number(text.match(/(\d+(?:\.\d+)?)\s*(?:hr|hour)/)?.[1] || 0);
+  const minutes = Number(text.match(/(\d+(?:\.\d+)?)\s*(?:min|minute)/)?.[1] || 0);
+  if (hours || minutes) return Math.max(15, Math.round((hours * 60) + minutes));
+  const numeric = Number(text.match(/\d+(?:\.\d+)?/)?.[0] || 0);
+  return numeric > 0 ? Math.max(15, Math.round(numeric)) : 60;
+}
+
+function dateTimeMs(date, time) {
+  const cleanDate = formatDate(date);
+  const cleanTime = String(time || '').slice(0, 5);
+  const value = new Date(`${cleanDate}T${cleanTime || '00:00'}:00`);
+  return Number.isNaN(value.getTime()) ? null : value.getTime();
+}
+
+function localDateTimeString(ms) {
+  const date = new Date(ms);
+  const pad = (value) => String(value).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}:00`;
+}
+
+function bookingWindow(booking, serviceById) {
+  const start = booking.startAt ? dateTimeMs(formatDate(booking.startAt), String(booking.startAt).slice(11, 16)) : dateTimeMs(booking.bookingDate, booking.bookingTime);
+  const service = serviceById.get(Number(booking.servicePackageId));
+  const duration = Number(booking.durationMinutes || parseDurationMinutes(service?.duration));
+  if (!start) return null;
+  return { start, end: start + (duration * 60 * 1000), duration };
+}
+
+function overlaps(left, right) {
+  return left.start < right.end && right.start < left.end;
+}
+
+function bookingIsActive(booking) {
+  return !['Completed', 'Cancelled'].includes(booking.status);
+}
+
+function bayLabel(id) {
+  return `Bay ${String(id).padStart(2, '0')}`;
+}
+
+function availableBayIds(bookings, serviceById, requestedWindow, excludeBookingId) {
+  const occupied = new Set();
+  let legacyOccupiedCount = 0;
+
+  bookings.filter(bookingIsActive).forEach((booking) => {
+    if (Number(booking.id) === Number(excludeBookingId)) return;
+    const window = bookingWindow(booking, serviceById);
+    if (!window || !overlaps(requestedWindow, window)) return;
+    if (booking.serviceBayId) {
+      occupied.add(Number(booking.serviceBayId));
+    } else {
+      legacyOccupiedCount += 1;
+    }
+  });
+
+  const available = Array.from({ length: serviceBayCount }, (_, index) => index + 1)
+    .filter((id) => !occupied.has(id));
+  return available.slice(legacyOccupiedCount);
+}
+
+function availableTechnicians(technicians, bookings, serviceById, serviceName, requestedWindow, excludeBookingId) {
+  return technicians
+    .filter((technician) => String(technician.status || '').toLowerCase() === 'active')
+    .filter((technician) => technicianCanDoService(technician, serviceName))
+    .filter((technician) => !bookings.filter(bookingIsActive).some((booking) => {
+      if (Number(booking.id) === Number(excludeBookingId)) return false;
+      const assignedTechnicianId = Number(booking.assignedTechnicianId);
+      if (!assignedTechnicianId || assignedTechnicianId !== Number(technician.id)) return false;
+      const window = bookingWindow(booking, serviceById);
+      return window && overlaps(requestedWindow, window);
+    }));
+}
+
+async function bookingAvailability({ serviceName, date, time, excludeBookingId = null }) {
+  const service = await findServiceByName(serviceName, true);
+  if (!service) {
+    const error = new Error('Selected service package was not found.');
+    error.status = 400;
+    throw error;
+  }
+
+  const [bookings, technicians, users, serviceMap] = await Promise.all([
+    all(collections.bookings),
+    all(collections.technicians),
+    all(collections.users),
+    servicesById()
+  ]);
+  const usersById = new Map(users.map((user) => [Number(user.id), user]));
+  const durationMinutes = parseDurationMinutes(service.duration);
+  const start = dateTimeMs(date, time);
+  if (!start) {
+    const error = new Error('Booking date and time are invalid.');
+    error.status = 400;
+    throw error;
+  }
+
+  const requestedWindow = { start, end: start + (durationMinutes * 60 * 1000) };
+  const techniciansAvailable = availableTechnicians(technicians, bookings, serviceMap, service.name, requestedWindow, excludeBookingId);
+  const baysAvailable = availableBayIds(bookings, serviceMap, requestedWindow, excludeBookingId);
+  const maxCapacity = Math.min(
+    technicians.filter((technician) => String(technician.status || '').toLowerCase() === 'active' && technicianCanDoService(technician, service.name)).length,
+    serviceBayCount
+  );
+
+  return {
+    service,
+    durationMinutes,
+    requestedWindow,
+    maxCapacity,
+    remainingCapacity: Math.min(techniciansAvailable.length, baysAvailable.length),
+    availableTechnicians: techniciansAvailable.map((technician) => ({ ...technician, user: usersById.get(Number(technician.userId)) })),
+    availableBays: baysAvailable
+  };
+}
+
+function assertBookingCapacity(availability, data) {
+  if (!availability.availableTechnicians.length) {
+    const error = new Error('No qualified technician is available for this service time.');
+    error.status = 409;
+    throw error;
+  }
+  if (!availability.availableBays.length) {
+    const error = new Error('No service bay is available for this service time.');
+    error.status = 409;
+    throw error;
+  }
+  if (availability.remainingCapacity <= 0) {
+    const error = new Error('Service capacity is full for this time slot.');
+    error.status = 409;
+    throw error;
+  }
+
+  const requestedTechnicianId = data.technicianId || data.assignedTechnicianId;
+  const requestedBayId = data.serviceBayId;
+  if (requestedTechnicianId && !availability.availableTechnicians.some((technician) => Number(technician.id) === Number(requestedTechnicianId))) {
+    const error = new Error('Selected technician is not qualified or is already assigned during this period.');
+    error.status = 409;
+    throw error;
+  }
+  if (requestedBayId && !availability.availableBays.includes(Number(requestedBayId))) {
+    const error = new Error('Selected service bay is already occupied during this period.');
+    error.status = 409;
+    throw error;
+  }
+}
+
+function assignedBookingResources(availability, data = {}) {
+  const requestedTechnicianId = data.technicianId || data.assignedTechnicianId;
+  const requestedBayId = data.serviceBayId;
+  const technician = requestedTechnicianId
+    ? availability.availableTechnicians.find((item) => Number(item.id) === Number(requestedTechnicianId))
+    : availability.availableTechnicians[0];
+  const serviceBayId = requestedBayId ? Number(requestedBayId) : availability.availableBays[0];
+
+  return {
+    assignedTechnicianId: technician.id,
+    serviceBayId,
+    serviceBayName: bayLabel(serviceBayId),
+    durationMinutes: availability.durationMinutes,
+    startAt: localDateTimeString(availability.requestedWindow.start),
+    endAt: localDateTimeString(availability.requestedWindow.end)
+  };
+}
+
+async function getBookingSlots({ service, date, excludeBookingId = null }) {
+  const slots = [];
+  const dayStart = new Date(`${date}T${String(serviceDayStartHour).padStart(2, '0')}:00:00`);
+  const dayEnd = new Date(`${date}T${String(serviceDayEndHour).padStart(2, '0')}:00:00`);
+
+  for (let slot = new Date(dayStart); slot < dayEnd; slot = new Date(slot.getTime() + (serviceSlotMinutes * 60 * 1000))) {
+    const time = slot.toTimeString().slice(0, 5);
+    try {
+      const availability = await bookingAvailability({ serviceName: service, date, time, excludeBookingId });
+      if (slot.getTime() + (availability.durationMinutes * 60 * 1000) <= dayEnd.getTime()) {
+        slots.push({
+          time,
+          label: `${time} (${availability.remainingCapacity}/${availability.maxCapacity} Slots Available)`,
+          remainingCapacity: availability.remainingCapacity,
+          maxCapacity: availability.maxCapacity,
+          status: availability.remainingCapacity > 0 ? 'Available' : 'Full',
+          availableTechnicians: availability.availableTechnicians.map((technician) => technicianView(technician)),
+          availableBays: availability.availableBays.map((id) => ({ id, name: bayLabel(id) }))
+        });
+      }
+    } catch (error) {
+      slots.push({ time, label: `${time} (Unavailable)`, remainingCapacity: 0, maxCapacity: 0, status: 'Unavailable', availableTechnicians: [], availableBays: [] });
+    }
+  }
+
+  return slots;
+}
+
 async function createBooking(userId, data, status = 'Pending') {
   const service = await findServiceByName(data.service, true);
   if (!service) {
@@ -730,6 +1055,9 @@ async function createBooking(userId, data, status = 'Pending') {
     throw error;
   }
 
+  const availability = await bookingAvailability({ serviceName: data.service, date: data.date, time: data.time });
+  assertBookingCapacity(availability, data);
+  const resources = assignedBookingResources(availability, data);
   const bookings = await all(collections.bookings);
   const queuePosition = bookings.filter((booking) => (
     booking.bookingDate === data.date && !['Completed', 'Cancelled'].includes(booking.status)
@@ -743,7 +1071,8 @@ async function createBooking(userId, data, status = 'Pending') {
     bookingTime: data.time,
     status,
     queuePosition,
-    progress: bookingProgress(status)
+    progress: bookingProgress(status),
+    ...resources
   });
 
   return bookingView(booking, new Map([[service.id, service]]));
@@ -761,6 +1090,9 @@ async function updateBooking(id, userId, data, enforceOwner = true) {
   }
 
   const status = data.status || current.status;
+  const availability = await bookingAvailability({ serviceName: data.service, date: data.date, time: data.time, excludeBookingId: id });
+  assertBookingCapacity(availability, data);
+  const resources = assignedBookingResources(availability, data);
   const booking = await updateDocument(collections.bookings, id, {
     userId,
     vehicleId: asId(data.vehicleId),
@@ -768,7 +1100,8 @@ async function updateBooking(id, userId, data, enforceOwner = true) {
     bookingDate: data.date,
     bookingTime: data.time,
     status,
-    progress: bookingProgress(status)
+    progress: bookingProgress(status),
+    ...resources
   });
 
   return bookingView(booking, new Map([[service.id, service]]));
@@ -1057,7 +1390,7 @@ async function createTechnician(data, passwordHash) {
   const technician = await createDocument(collections.technicians, {
     userId: user.id,
     employeeNo: String(data.employeeNo).trim().toUpperCase(),
-    specialization: data.specialization.trim(),
+    specialization: normalizeTechnicianSpecialization(data.specialization),
     phone: String(data.phone || '').trim(),
     experienceYears: Number(data.experienceYears || 0),
     status: String(data.status || 'active').toLowerCase()
@@ -1090,7 +1423,7 @@ async function updateTechnician(id, data) {
 
   const technician = await updateDocument(collections.technicians, id, {
     employeeNo: String(data.employeeNo).trim().toUpperCase(),
-    specialization: data.specialization.trim(),
+    specialization: normalizeTechnicianSpecialization(data.specialization),
     phone: String(data.phone || '').trim(),
     experienceYears: Number(data.experienceYears || 0),
     status: String(data.status || 'active').toLowerCase()
@@ -1135,18 +1468,30 @@ async function createServiceJob(data) {
     throw error;
   }
 
-  if (data.assignedTechnicianId) {
-    await assertTechnician(data.assignedTechnicianId, true);
-  }
-
   const service = await findServiceByName(data.serviceType || booking.serviceName, false);
   const serviceType = data.serviceType || service?.name || 'General Service';
-  const status = data.assignedTechnicianId ? 'Assigned' : 'Pending';
+  const assignedTechnicianId = data.assignedTechnicianId || booking.assignedTechnicianId || null;
+  if (assignedTechnicianId) {
+    await assertTechnician(assignedTechnicianId, true);
+    const availability = await bookingAvailability({
+      serviceName: serviceType,
+      date: formatDate(booking.bookingDate),
+      time: booking.bookingTime,
+      excludeBookingId: booking.id
+    });
+    if (!availability.availableTechnicians.some((technician) => Number(technician.id) === Number(assignedTechnicianId))) {
+      const error = new Error('Selected technician is not qualified or is already assigned during this booking period.');
+      error.status = 409;
+      throw error;
+    }
+  }
+
+  const status = assignedTechnicianId ? 'Assigned' : 'Pending';
   const job = await createDocument(collections.serviceJobs, {
     bookingId: asId(data.bookingId),
     vehicleId: asId(data.vehicleId || booking.vehicleId),
     customerId: asId(data.customerId || booking.userId),
-    assignedTechnicianId: data.assignedTechnicianId ? asId(data.assignedTechnicianId) : null,
+    assignedTechnicianId: assignedTechnicianId ? asId(assignedTechnicianId) : null,
     serviceType,
     priority: data.priority || 'Normal',
     status,
@@ -1154,12 +1499,13 @@ async function createServiceJob(data) {
     startDate: data.startDate || today(),
     expectedCompletionDate: data.expectedCompletionDate || today(1),
     completionDate: '',
-    assignedDate: data.assignedTechnicianId ? today() : ''
+    assignedDate: assignedTechnicianId ? today() : ''
   });
 
   await updateDocument(collections.bookings, booking.id, {
     status: status === 'Assigned' ? 'Approved' : booking.status,
-    progress: status === 'Assigned' ? 35 : booking.progress
+    progress: status === 'Assigned' ? 35 : booking.progress,
+    ...(assignedTechnicianId ? { assignedTechnicianId: asId(assignedTechnicianId) } : {})
   });
 
   if (job.assignedTechnicianId) {
@@ -1187,6 +1533,22 @@ async function assignTechnician(serviceJobId, technicianId) {
     const error = new Error('This technician is already assigned to the service job.');
     error.status = 409;
     throw error;
+  }
+
+  const booking = job.bookingId ? await getById(collections.bookings, job.bookingId) : null;
+  if (booking) {
+    const availability = await bookingAvailability({
+      serviceName: job.serviceType,
+      date: formatDate(booking.bookingDate),
+      time: booking.bookingTime,
+      excludeBookingId: booking.id
+    });
+    if (!availability.availableTechnicians.some((item) => Number(item.id) === Number(technicianId))) {
+      const error = new Error('Selected technician is not qualified or is already assigned during this booking period.');
+      error.status = 409;
+      throw error;
+    }
+    await updateDocument(collections.bookings, booking.id, { assignedTechnicianId: asId(technicianId) });
   }
 
   const updated = await updateDocument(collections.serviceJobs, serviceJobId, {
@@ -1276,8 +1638,163 @@ async function getAssignedServiceJob(userId, jobId) {
     notes: sortById(notes.filter((note) => Number(note.serviceJobId) === Number(jobId))).reverse(),
     progressHistory: sortById(progressEntries.filter((entry) => Number(entry.serviceJobId) === Number(jobId))).reverse(),
     usedParts: sortById(partsUsed.filter((part) => Number(part.serviceJobId) === Number(jobId))).reverse(),
-    images: sortById(images.filter((image) => Number(image.serviceJobId) === Number(jobId))).reverse()
+    images: sortById(images.filter((image) => Number(image.serviceJobId) === Number(jobId))).reverse().map((image) => fileView(image, 'photo'))
   };
+}
+
+async function canAccessServiceJob(user, job) {
+  if (!job) return false;
+  if (user.role === 'admin') return true;
+  if (user.role === 'customer') return Number(job.customerId) === Number(user.id);
+  if (user.role === 'technician') {
+    const technician = await getTechnicianByUserId(user.id);
+    return technician && Number(job.assignedTechnicianId) === Number(technician.id);
+  }
+  return false;
+}
+
+function validateUploadFile(file) {
+  const fileName = String(file.fileName || '').trim();
+  const extension = fileName.split('.').pop().toLowerCase();
+  const content = String(file.contentBase64 || '').replace(/^data:[^;]+;base64,/, '');
+  const sizeBytes = Buffer.byteLength(content, 'base64');
+  if (!fileName || !allowedUploadExtensions.includes(extension)) {
+    const error = new Error('Unsupported file type. Allowed formats: JPG, PNG, PDF, DOCX.');
+    error.status = 400;
+    throw error;
+  }
+  if (!content || sizeBytes > maxUploadBytes) {
+    const error = new Error('File is required and must be 5MB or smaller.');
+    error.status = 400;
+    throw error;
+  }
+  return { fileName, extension, content, sizeBytes };
+}
+
+async function createUploadAudit(data) {
+  return createDocument(collections.uploadAuditLogs, data);
+}
+
+async function recordStoredPhoto(user, data, storedFile) {
+  const job = await getById(collections.serviceJobs, data.serviceJobId);
+  if (!await canAccessServiceJob(user, job)) {
+    const error = new Error('You cannot upload files for this service job.');
+    error.status = 403;
+    throw error;
+  }
+  if (!photoTypes.includes(data.photoType)) {
+    const error = new Error('Invalid photo type.');
+    error.status = 400;
+    throw error;
+  }
+  const duplicate = (await all(collections.serviceImages)).find((item) => (
+    Number(item.serviceJobId) === Number(data.serviceJobId)
+    && item.fileName === storedFile.originalName
+    && item.photoType === data.photoType
+  ));
+  if (duplicate) {
+    const error = new Error('This photo was already uploaded for the selected service job and type.');
+    error.status = 409;
+    throw error;
+  }
+  const technician = user.role === 'technician' ? await getTechnicianByUserId(user.id) : null;
+  const photo = await createDocument(collections.serviceImages, {
+    serviceJobId: asId(data.serviceJobId),
+    vehicleId: asId(data.vehicleId || job.vehicleId),
+    customerId: asId(job.customerId),
+    technicianId: technician?.id || data.technicianId || null,
+    photoType: data.photoType,
+    imageUrl: storedFile.relativePath,
+    filePath: storedFile.absolutePath,
+    fileName: storedFile.originalName,
+    mimeType: storedFile.mimeType,
+    sizeBytes: storedFile.sizeBytes,
+    description: String(data.description || '').trim(),
+    uploadedBy: user.role,
+    uploadedAt: fieldValue()
+  });
+  await createUploadAudit({ fileKind: 'photo', fileId: photo.id, action: 'Uploaded', userId: user.id, role: user.role });
+  await createUserNotification(job.customerId, 'Service Photo Uploaded', `${data.photoType} photo uploaded for service job #SJ-${job.id}.`);
+  return fileView(photo, 'photo');
+}
+
+async function recordStoredDocument(user, data, storedFile) {
+  const job = await getById(collections.serviceJobs, data.serviceJobId);
+  if (!await canAccessServiceJob(user, job)) {
+    const error = new Error('You cannot upload documents for this service job.');
+    error.status = 403;
+    throw error;
+  }
+  if (!documentTypes.includes(data.documentType)) {
+    const error = new Error('Invalid document type.');
+    error.status = 400;
+    throw error;
+  }
+  const duplicate = (await all(collections.documents)).find((item) => (
+    Number(item.serviceJobId) === Number(data.serviceJobId)
+    && item.fileName === storedFile.originalName
+    && item.documentType === data.documentType
+  ));
+  if (duplicate) {
+    const error = new Error('This document was already uploaded for the selected service job and type.');
+    error.status = 409;
+    throw error;
+  }
+  const document = await createDocument(collections.documents, {
+    serviceJobId: asId(data.serviceJobId),
+    vehicleId: asId(data.vehicleId || job.vehicleId),
+    customerId: asId(job.customerId),
+    documentType: data.documentType,
+    fileName: storedFile.originalName,
+    fileUrl: storedFile.relativePath,
+    filePath: storedFile.absolutePath,
+    mimeType: storedFile.mimeType,
+    sizeBytes: storedFile.sizeBytes,
+    uploadedBy: user.role,
+    uploadedAt: fieldValue(),
+    description: String(data.description || '').trim()
+  });
+  await createUploadAudit({ fileKind: 'document', fileId: document.id, action: 'Uploaded', userId: user.id, role: user.role });
+  if (data.documentType === 'Warranty Document') {
+    await createUserNotification(job.customerId, 'Warranty Document Available', `Warranty document uploaded for service job #SJ-${job.id}.`);
+  }
+  return fileView(document, 'document');
+}
+
+async function getFileForDownload(user, kind, id) {
+  const collection = kind === 'photo' ? collections.serviceImages : collections.documents;
+  const file = await getById(collection, id);
+  if (!file) return null;
+  const job = await getById(collections.serviceJobs, file.serviceJobId);
+  if (!await canAccessServiceJob(user, job)) return null;
+  await createUploadAudit({ fileKind: kind, fileId: Number(id), action: 'Downloaded', userId: user.id, role: user.role });
+  return file;
+}
+
+async function getPartUsagePhotoForDownload(user, id) {
+  const usage = await getById(collections.serviceJobParts, id);
+  if (!usage?.photoPath) return null;
+  const job = await getById(collections.serviceJobs, usage.serviceJobId);
+  if (!await canAccessServiceJob(user, job)) return null;
+  await createUploadAudit({ fileKind: 'partPhoto', fileId: Number(id), action: 'Downloaded', userId: user.id, role: user.role });
+  return {
+    filePath: usage.photoPath,
+    fileName: usage.photoFileName || `part-photo-${id}.jpg`
+  };
+}
+
+async function deleteStoredFile(user, kind, id) {
+  if (user.role !== 'admin') {
+    const error = new Error('Only admin can permanently delete files.');
+    error.status = 403;
+    throw error;
+  }
+  const collection = kind === 'photo' ? collections.serviceImages : collections.documents;
+  const file = await getById(collection, id);
+  if (!file) return null;
+  await deleteDocument(collection, id);
+  await createUploadAudit({ fileKind: kind, fileId: Number(id), action: 'Deleted', userId: user.id, role: user.role });
+  return file;
 }
 
 async function updateTechnicianProgress(userId, data) {
@@ -1395,6 +1912,8 @@ async function addUsedPart(userId, data) {
     const id = ids[collections.serviceJobParts][0];
     const movementId = ids[collections.inventoryMovements][0];
     const usageRef = docRef(collections.serviceJobParts, id);
+    const partPhoto = data.partPhoto || null;
+    const photoUrl = partPhoto ? `/api/part-usages/${id}/photo` : String(data.photoUrl || '').trim();
     const usageData = {
       id,
       serviceJobId: asId(data.serviceJobId),
@@ -1412,7 +1931,11 @@ async function addUsedPart(userId, data) {
       warrantyStartDate,
       warrantyExpiryDate,
       note: String(data.note || '').trim(),
-      photoUrl: String(data.photoUrl || '').trim(),
+      photoUrl,
+      photoPath: partPhoto?.absolutePath || '',
+      photoFileName: partPhoto?.originalName || '',
+      photoMimeType: partPhoto?.mimeType || '',
+      photoSizeBytes: Number(partPhoto?.sizeBytes || 0),
       createdAt: fieldValue()
     };
     transaction.set(usageRef, usageData);
@@ -1564,8 +2087,12 @@ async function uploadServiceImage(userId, data) {
 
   return createDocument(collections.serviceImages, {
     serviceJobId: asId(data.serviceJobId),
+    vehicleId: job.vehicleId,
+    customerId: job.customerId,
     technicianId: technician.id,
+    photoType: data.photoType || 'During Service',
     imageUrl: data.imageUrl.trim(),
+    fileName: data.imageUrl.trim().split('/').pop() || 'service-photo.jpg',
     caption: String(data.caption || '').trim()
   });
 }
@@ -1716,6 +2243,64 @@ async function getInvoiceText(id, requester) {
   ].join('\n');
 }
 
+async function getInvoicePdf(id, requester) {
+  const invoice = await getById(collections.invoices, id);
+  if (!invoice || (requester.role !== 'admin' && invoice.userId !== requester.id)) return null;
+
+  const [user, service, job, parts, vehicles, technicians, users] = await Promise.all([
+    getById(collections.users, invoice.userId),
+    getById(collections.servicePackages, invoice.servicePackageId),
+    invoice.serviceJobId ? getById(collections.serviceJobs, invoice.serviceJobId) : null,
+    all(collections.serviceJobParts),
+    all(collections.vehicles),
+    all(collections.technicians),
+    all(collections.users)
+  ]);
+  const vehicle = job ? vehicles.find((item) => Number(item.id) === Number(job.vehicleId)) : null;
+  const technician = job ? technicians.find((item) => Number(item.id) === Number(job.assignedTechnicianId)) : null;
+  const technicianUser = technician ? users.find((item) => Number(item.id) === Number(technician.userId)) : null;
+  const invoiceParts = parts.filter((part) => Number(part.serviceJobId) === Number(invoice.serviceJobId));
+
+  const lines = [
+    'AutoCare Service Station Invoice',
+    `Invoice Number: #INV-${invoice.id}`,
+    `Customer: ${user?.name || 'Unknown'} | ${user?.email || ''} | ${user?.phone || ''}`,
+    `Vehicle: ${vehicle ? `${vehicle.make} ${vehicle.model} - ${vehicle.plateNumber}` : 'N/A'}`,
+    `Technician: ${technicianUser?.name || 'Unassigned'}`,
+    `Service: ${service?.name || 'Unknown Service'}`,
+    `Date: ${formatDate(invoice.invoiceDate)}`,
+    'Parts Used:',
+    ...(invoiceParts.length ? invoiceParts.map((part) => (
+      `${part.partName} | ${part.brand || '-'} | ${part.condition || '-'} | Qty ${part.quantity} | Unit LKR ${Number(part.unitPrice || 0).toLocaleString('en-LK')} | Total LKR ${Number(part.totalPrice || 0).toLocaleString('en-LK')}`
+    )) : ['No parts recorded.']),
+    `Parts Total: LKR ${Number(invoice.partsTotal || 0).toLocaleString('en-LK')}`,
+    `Labor Charges: LKR ${Number(invoice.laborCost || 0).toLocaleString('en-LK')}`,
+    `Service Charges: LKR ${Number(invoice.serviceCharges || 0).toLocaleString('en-LK')}`,
+    `Tax: LKR ${Number(invoice.tax || 0).toLocaleString('en-LK')}`,
+    `Discount: LKR ${Number(invoice.discount || 0).toLocaleString('en-LK')}`,
+    `Grand Total: LKR ${Number(invoice.amount || 0).toLocaleString('en-LK')}`
+  ];
+  return createSimplePdfBuffer(lines);
+}
+
+async function markInvoiceEmailed(id, adminUserId) {
+  const invoice = await getById(collections.invoices, id);
+  if (!invoice) {
+    const error = new Error('Invoice not found.');
+    error.status = 404;
+    throw error;
+  }
+  await createDocument(collections.uploadAuditLogs, {
+    fileKind: 'invoice',
+    fileId: Number(id),
+    action: 'Email Requested',
+    userId: Number(adminUserId),
+    role: 'admin'
+  });
+  await createUserNotification(invoice.userId, 'Invoice Generated', `Invoice #INV-${id} is ready.`);
+  return true;
+}
+
 async function syncCounters() {
   const counterData = {};
   await Promise.all(Object.values(collections).map(async (collection) => {
@@ -1775,7 +2360,7 @@ async function ensureSeedData() {
   await writeIfMissing(collections.technicians, 1, {
     userId: technicianUser.id,
     employeeNo: 'TECH-001',
-    specialization: 'Engine Diagnostics',
+    specialization: 'General Service',
     phone: '+94 77 222 3344',
     experienceYears: 4,
     status: 'active'
@@ -1783,7 +2368,7 @@ async function ensureSeedData() {
   await updateDocument(collections.technicians, 1, {
     userId: technicianUser.id,
     employeeNo: 'TECH-001',
-    specialization: 'Engine Diagnostics',
+    specialization: 'General Service',
     phone: '+94 77 222 3344',
     experienceYears: 4,
     status: 'active'
@@ -1794,7 +2379,11 @@ async function ensureSeedData() {
     [2, 'Brake Service', 7500, '1 hr', 'Brake pads, fluid check and safety testing.'],
     [3, 'Full Service', 18500, '3 hr', 'Complete inspection, fluids, diagnostics and tune-up.'],
     [4, 'Engine Diagnostics', 12000, '1.5 hr', 'Computer scan, issue report and repair estimate.'],
-    [5, 'General Service', 8500, '1 hr', 'Standard maintenance service and inspection.']
+    [5, 'General Service', 8500, '1 hr', 'Standard maintenance service and inspection.'],
+    [6, 'Electrical Repair', 14000, '2 hr', 'Electrical fault diagnosis and repair.'],
+    [7, 'Engine Repair', 22000, '3 hr', 'Engine repair, tuning and mechanical correction.'],
+    [8, 'Suspension Repair', 16000, '2 hr', 'Suspension inspection, repair and alignment checks.'],
+    [9, 'Hybrid/EV Service', 26000, '2 hr', 'Hybrid and electric vehicle safety inspection and service.']
   ];
 
   await Promise.all(services.map(([id, name, price, duration, description]) => (
@@ -1960,15 +2549,23 @@ module.exports = {
   getAdminDashboard,
   getById,
   getCustomerDashboard,
+  getBookingSlots,
   getInventoryReports,
+  getFileForDownload,
   getInvoiceText,
+  getInvoicePdf,
+  getPartUsagePhotoForDownload,
   getTechnicianDashboard,
   getTechnicianPerformance,
   getTechnicianWorkload,
   publicUser,
   recordReplacedPart,
+  recordStoredDocument,
+  recordStoredPhoto,
   requestAdditionalParts,
   returnUnusedPart,
+  deleteStoredFile,
+  markInvoiceEmailed,
   completeTechnicianJob,
   updateBooking,
   updateCustomer,

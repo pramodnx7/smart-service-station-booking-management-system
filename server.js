@@ -1,6 +1,8 @@
 require('dotenv').config();
 
 const path = require('path');
+const fs = require('fs');
+const crypto = require('crypto');
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -14,7 +16,10 @@ const jwtSecret = process.env.JWT_SECRET || 'development-only-secret-change-me';
 
 app.use(helmet({ contentSecurityPolicy: false }));
 app.use(cors());
-app.use(express.json({ limit: '1mb' }));
+app.use(express.json({ limit: '12mb' }));
+
+const uploadRoot = path.join(__dirname, 'uploads', 'service-files');
+fs.mkdirSync(uploadRoot, { recursive: true });
 
 function parseCookies(req) {
   return String(req.headers.cookie || '')
@@ -136,6 +141,69 @@ function requireFields(body, fields) {
     const error = new Error(`Missing required fields: ${missing.join(', ')}`);
     error.status = 400;
     throw error;
+  }
+}
+
+function storeUploadedFile(file) {
+  const fileName = String(file.fileName || '').trim();
+  const extension = fileName.split('.').pop().toLowerCase();
+  const allowed = ['jpg', 'jpeg', 'png', 'pdf', 'docx'];
+  const content = String(file.contentBase64 || '').replace(/^data:[^;]+;base64,/, '');
+  const sizeBytes = Buffer.byteLength(content, 'base64');
+  if (!fileName || !allowed.includes(extension)) {
+    const error = new Error('Unsupported file type. Allowed formats: JPG, PNG, PDF, DOCX.');
+    error.status = 400;
+    throw error;
+  }
+  if (!content || sizeBytes > 5 * 1024 * 1024) {
+    const error = new Error('File is required and must be 5MB or smaller.');
+    error.status = 400;
+    throw error;
+  }
+  const safeName = `${Date.now()}-${crypto.randomBytes(8).toString('hex')}.${extension}`;
+  const absolutePath = path.join(uploadRoot, safeName);
+  fs.writeFileSync(absolutePath, Buffer.from(content, 'base64'));
+  return {
+    absolutePath,
+    relativePath: `uploads/service-files/${safeName}`,
+    originalName: fileName,
+    mimeType: file.mimeType || 'application/octet-stream',
+    sizeBytes: fs.statSync(absolutePath).size
+  };
+}
+
+function assertImageUpload(file, label = 'Image') {
+  const fileName = String(file?.fileName || '').trim();
+  const extension = fileName.split('.').pop().toLowerCase();
+  if (!['jpg', 'jpeg', 'png'].includes(extension)) {
+    const error = new Error(`${label} must be a JPG or PNG file.`);
+    error.status = 400;
+    throw error;
+  }
+}
+
+async function handleFileUpload(req, res, next, kind) {
+  try {
+    requireFields(req.body, ['serviceJobId']);
+    const files = Array.isArray(req.body.files) ? req.body.files : [req.body];
+    const saved = [];
+    for (const file of files) {
+      const storedFile = storeUploadedFile(file);
+      const payload = { ...req.body, ...file };
+      try {
+        saved.push(kind === 'photo'
+          ? await store.recordStoredPhoto(req.user, payload, storedFile)
+          : await store.recordStoredDocument(req.user, payload, storedFile));
+      } catch (error) {
+        if (storedFile.absolutePath && fs.existsSync(storedFile.absolutePath)) {
+          fs.unlinkSync(storedFile.absolutePath);
+        }
+        throw error;
+      }
+    }
+    res.status(201).json(saved);
+  } catch (error) {
+    next(error);
   }
 }
 
@@ -279,10 +347,18 @@ app.post('/api/technician/jobs/:id/notes', requireAuth('technician'), async (req
 });
 
 app.post('/api/technician/jobs/:id/parts', requireAuth('technician'), async (req, res, next) => {
+  let storedPartPhoto = null;
   try {
     requireFields(req.body, ['partId', 'quantity']);
-    res.status(201).json(await store.addUsedPart(req.user.id, { ...req.body, serviceJobId: req.params.id }));
+    if (req.body.partPhoto) {
+      assertImageUpload(req.body.partPhoto, 'Part photo');
+      storedPartPhoto = storeUploadedFile(req.body.partPhoto);
+    }
+    res.status(201).json(await store.addUsedPart(req.user.id, { ...req.body, partPhoto: storedPartPhoto, serviceJobId: req.params.id }));
   } catch (error) {
+    if (storedPartPhoto?.absolutePath && fs.existsSync(storedPartPhoto.absolutePath)) {
+      fs.unlinkSync(storedPartPhoto.absolutePath);
+    }
     next(error);
   }
 });
@@ -323,6 +399,16 @@ app.post('/api/technician/jobs/:id/images', requireAuth('technician'), async (re
   }
 });
 
+app.post('/api/technician/jobs/:id/photos/upload', requireAuth('technician'), async (req, res, next) => {
+  req.body.serviceJobId = req.params.id;
+  await handleFileUpload(req, res, next, 'photo');
+});
+
+app.post('/api/technician/jobs/:id/documents/upload', requireAuth('technician'), async (req, res, next) => {
+  req.body.serviceJobId = req.params.id;
+  await handleFileUpload(req, res, next, 'document');
+});
+
 app.put('/api/technician/jobs/:id/complete', requireAuth('technician'), async (req, res, next) => {
   try {
     res.json(await store.completeTechnicianJob(req.user.id, req.params.id));
@@ -355,6 +441,19 @@ app.delete('/api/customer/vehicles/:id', requireAuth('customer'), async (req, re
   try {
     await store.deleteVehicle(req.params.id, req.user.id, true);
     res.status(204).end();
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get('/api/customer/booking-slots', requireAuth('customer'), async (req, res, next) => {
+  try {
+    requireFields(req.query, ['service', 'date']);
+    res.json(await store.getBookingSlots({
+      service: req.query.service,
+      date: req.query.date,
+      excludeBookingId: req.query.excludeBookingId
+    }));
   } catch (error) {
     next(error);
   }
@@ -425,6 +524,47 @@ app.get('/api/invoices/:id/download', requireAuth(), async (req, res, next) => {
     const text = await store.getInvoiceText(req.params.id, req.user);
     if (!text) return res.status(404).send('Invoice not found.');
     res.type('text/plain').send(text);
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get('/api/invoices/:id/pdf', requireAuth(), async (req, res, next) => {
+  try {
+    const pdf = await store.getInvoicePdf(req.params.id, req.user);
+    if (!pdf) return res.status(404).send('Invoice not found.');
+    res.type('application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="invoice-${req.params.id}.pdf"`);
+    res.send(pdf);
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post('/api/invoices/:id/email', requireAuth('admin'), async (req, res, next) => {
+  try {
+    await store.markInvoiceEmailed(req.params.id, req.user.id);
+    res.json({ ok: true, message: 'Invoice email recorded for sending.' });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get('/api/files/:kind/:id/download', requireAuth(), async (req, res, next) => {
+  try {
+    const file = await store.getFileForDownload(req.user, req.params.kind, req.params.id);
+    if (!file || !file.filePath || !fs.existsSync(file.filePath)) return res.status(404).send('File not found.');
+    res.download(file.filePath, file.fileName || path.basename(file.filePath));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get('/api/part-usages/:id/photo', requireAuth(), async (req, res, next) => {
+  try {
+    const file = await store.getPartUsagePhotoForDownload(req.user, req.params.id);
+    if (!file || !file.filePath || !fs.existsSync(file.filePath)) return res.status(404).send('File not found.');
+    res.download(file.filePath, file.fileName || path.basename(file.filePath));
   } catch (error) {
     next(error);
   }
@@ -561,6 +701,29 @@ app.get('/api/admin/inventory/reports', requireAuth('admin'), async (req, res, n
   }
 });
 
+app.post('/api/admin/service-jobs/:id/photos/upload', requireAuth('admin'), async (req, res, next) => {
+  req.body.serviceJobId = req.params.id;
+  await handleFileUpload(req, res, next, 'photo');
+});
+
+app.post('/api/admin/service-jobs/:id/documents/upload', requireAuth('admin'), async (req, res, next) => {
+  req.body.serviceJobId = req.params.id;
+  await handleFileUpload(req, res, next, 'document');
+});
+
+app.delete('/api/admin/files/:kind/:id', requireAuth('admin'), async (req, res, next) => {
+  try {
+    const file = await store.deleteStoredFile(req.user, req.params.kind, req.params.id);
+    if (!file) return res.status(404).json({ message: 'File not found.' });
+    if (file.filePath && fs.existsSync(file.filePath)) {
+      fs.unlinkSync(file.filePath);
+    }
+    res.status(204).end();
+  } catch (error) {
+    next(error);
+  }
+});
+
 app.post('/api/admin/inventory/items', requireAuth('admin'), async (req, res, next) => {
   try {
     requireFields(req.body, ['itemCode', 'partName', 'category', 'brand', 'purchasePrice', 'sellingPrice', 'stockQuantity', 'minimumStockLevel']);
@@ -654,6 +817,19 @@ app.put('/api/admin/services/:id', requireAuth('admin'), async (req, res, next) 
     const service = await store.updateService(req.params.id, req.body);
     if (!service) return res.status(404).json({ message: 'Service package not found.' });
     res.json(service);
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get('/api/admin/booking-slots', requireAuth('admin'), async (req, res, next) => {
+  try {
+    requireFields(req.query, ['service', 'date']);
+    res.json(await store.getBookingSlots({
+      service: req.query.service,
+      date: req.query.date,
+      excludeBookingId: req.query.excludeBookingId
+    }));
   } catch (error) {
     next(error);
   }

@@ -29,6 +29,7 @@
         <button class="side-nav__item" type="button" data-view="workload"><span data-icon="tools"></span>Workload</button>
         <button class="side-nav__item" type="button" data-view="performance"><span data-icon="star"></span>Performance</button>
         <button class="side-nav__item" type="button" data-view="inventory"><span data-icon="invoice"></span>Inventory</button>
+        <button class="side-nav__item" type="button" data-view="documents"><span data-icon="calendar"></span>Photos & Docs</button>
         <button class="side-nav__item" type="button" data-view="services"><span data-icon="tools"></span>Services</button>
         <button class="side-nav__item" type="button" data-view="billing"><span data-icon="invoice"></span>Billing</button>
         <button class="side-nav__item" type="button" data-view="emergency"><span data-icon="alert"></span>Emergency</button>
@@ -197,6 +198,14 @@
           <div class="panel">
             <div class="panel__header"><div><h2>Parts Usage History</h2><p>Technician and vehicle part usage.</p></div></div>
             <div class="table-wrap"><table><thead><tr><th>Part</th><th>Vehicle</th><th>Technician</th><th>Condition</th><th>Quantity</th><th>Total</th></tr></thead><tbody id="parts-usage-body"></tbody></table></div>
+          </div>
+        </section>
+
+        <section class="view" data-view-panel="documents">
+          <div class="panel">
+            <div class="panel__header"><div><h2>Photo & Document Management</h2><p>Search, download, and delete service evidence files.</p></div></div>
+            <div class="table-tools"><input id="document-search" type="search" placeholder="Search files, vehicles, customers..." /></div>
+            <div class="table-wrap"><table><thead><tr><th>File</th><th>Type</th><th>Job</th><th>Vehicle</th><th>Uploaded By</th><th>Action</th></tr></thead><tbody id="documents-body"></tbody></table></div>
           </div>
         </section>
 

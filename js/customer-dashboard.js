@@ -46,12 +46,13 @@ document.addEventListener('DOMContentLoaded', () => {
     ],
     usedParts: [],
     serviceImages: [],
+    documents: [],
     notifications: [
       { id: 1, type: 'Booking Approved', message: 'Your General Service booking has been approved.', unread: true },
       { id: 2, type: 'Service Progress', message: 'Engine Diagnostics is now in final testing.', unread: true },
       { id: 3, type: 'Offer', message: 'Get 15% off on your next full service package.', unread: false }
     ],
-    packages: ['Oil Change', 'Brake Service', 'Full Service', 'Engine Diagnostics']
+    packages: ['Oil Change', 'Brake Service', 'Full Service', 'Engine Diagnostics', 'General Service', 'Electrical Repair', 'Engine Repair', 'Suspension Repair', 'Hybrid/EV Service']
   };
 
   let state = loadState();
@@ -248,7 +249,7 @@ document.addEventListener('DOMContentLoaded', () => {
         <td>${invoice.date}</td>
         <td>${formatMoney(invoice.amount)}</td>
         <td><span class="badge badge--${invoice.payment === 'Paid' ? 'completed' : 'pending'}">${invoice.payment}</span></td>
-        <td><button class="mini-btn" type="button" data-action="download-invoice" data-id="${invoice.id}">Download</button></td>
+        <td><div class="row-actions"><button class="mini-btn" type="button" data-action="download-invoice" data-id="${invoice.id}">TXT</button><button class="mini-btn" type="button" data-action="download-invoice-pdf" data-id="${invoice.id}">PDF</button></div></td>
       </tr>
     `).join('');
     document.getElementById('parts-body').innerHTML = (state.usedParts || []).map((part) => `
@@ -265,8 +266,18 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('service-photo-list').innerHTML = (state.serviceImages || []).map((image) => `
       <article class="notification-item">
         <span data-icon="tools"></span>
-        <div><strong>Service Job #SJ-${image.serviceJobId}</strong><p>${image.caption || image.imageUrl}</p></div>
+        <div><strong>${image.photoType || 'Service Photo'} #SJ-${image.serviceJobId}</strong><p>${image.description || image.fileName || image.imageUrl}</p></div>
       </article>
+    `).join('');
+    const files = [...(state.serviceImages || []), ...(state.documents || [])];
+    document.getElementById('documents-body').innerHTML = files.map((file) => `
+      <tr>
+        <td><span class="row-title">${file.fileName}</span><span class="row-sub">${file.description || ''}</span></td>
+        <td>${file.photoType || file.documentType || file.kind}</td>
+        <td>${file.serviceJobId ? `#SJ-${file.serviceJobId}` : '-'}</td>
+        <td>${file.uploadedAt || '-'}</td>
+        <td><button class="mini-btn" type="button" data-action="download-file" data-kind="${file.kind}" data-id="${file.id}">Download</button></td>
+      </tr>
     `).join('');
     injectIcons();
   }
@@ -333,6 +344,43 @@ document.addEventListener('DOMContentLoaded', () => {
     `;
   }
 
+  function bookingSlotPanel() {
+    return '<div class="full slot-panel" data-booking-slots></div>';
+  }
+
+  function slotLabel(slot) {
+    return slot.status === 'Full' ? `${slot.time} (Full)` : slot.label;
+  }
+
+  async function refreshBookingSlots() {
+    const panel = els.modalBody.querySelector('[data-booking-slots]');
+    const serviceInput = els.modalBody.querySelector('[name="service"]');
+    const dateInput = els.modalBody.querySelector('[name="date"]');
+    const timeInput = els.modalBody.querySelector('[name="time"]');
+    if (!panel || !serviceInput || !dateInput || !timeInput || !serviceInput.value || !dateInput.value) return;
+
+    panel.innerHTML = '<p>Loading available slots...</p>';
+    const id = els.modalForm.dataset.id;
+    const params = new URLSearchParams({ service: serviceInput.value, date: dateInput.value });
+    if (id) params.set('excludeBookingId', id);
+
+    try {
+      const slots = await window.AutoCareApi.request(`/api/customer/booking-slots?${params.toString()}`);
+      panel.innerHTML = slots.map((slot) => `
+        <button class="mini-btn ${slot.remainingCapacity <= 0 ? 'mini-btn--red' : ''}" type="button" data-slot-time="${slot.time}" ${slot.remainingCapacity <= 0 ? 'disabled' : ''}>
+          ${slotLabel(slot)}
+        </button>
+      `).join('') || '<p>No slots available.</p>';
+      if (timeInput.value && !slots.some((slot) => slot.time === timeInput.value && slot.remainingCapacity > 0)) {
+        timeInput.setCustomValidity('Selected time is full. Choose an available slot.');
+      } else {
+        timeInput.setCustomValidity('');
+      }
+    } catch (error) {
+      panel.innerHTML = `<p>${error.message || 'Could not load available slots.'}</p>`;
+    }
+  }
+
   function toggleNewVehicleFields() {
     const fields = els.modalBody.querySelector('[data-new-vehicle-fields]');
     const vehicleSelect = els.modalBody.querySelector('select[name="vehicleId"]');
@@ -357,7 +405,7 @@ document.addEventListener('DOMContentLoaded', () => {
       },
       booking: {
         title: record.id ? 'Reschedule Booking' : 'Book Service Appointment',
-        body: field('vehicleId', 'Vehicle', 'select', record.vehicleId || vehicleOptions[0]?.value, vehicleOptions) + field('service', 'Service', 'select', record.service || state.packages[0], state.packages.map((item) => ({ value: item, label: item }))) + field('date', 'Date', 'date', record.date || '') + field('time', 'Time', 'time', record.time || '') + newVehicleFields()
+        body: field('vehicleId', 'Vehicle', 'select', record.vehicleId || vehicleOptions[0]?.value, vehicleOptions) + field('service', 'Service', 'select', record.service || state.packages[0], state.packages.map((item) => ({ value: item, label: item }))) + field('date', 'Date', 'date', record.date || '') + field('time', 'Time', 'time', record.time || '') + bookingSlotPanel() + newVehicleFields()
       },
       emergency: {
         title: 'Emergency Service Request',
@@ -370,6 +418,7 @@ document.addEventListener('DOMContentLoaded', () => {
     els.modalTitle.textContent = config[mode].title;
     els.modalBody.innerHTML = config[mode].body;
     toggleNewVehicleFields();
+    if (mode === 'booking') refreshBookingSlots();
     els.modal.showModal();
   }
 
@@ -454,6 +503,20 @@ document.addEventListener('DOMContentLoaded', () => {
     URL.revokeObjectURL(link.href);
   }
 
+  function downloadInvoicePdf(id) {
+    const link = document.createElement('a');
+    link.href = `/api/invoices/${id}/pdf`;
+    link.download = `invoice-${id}.pdf`;
+    link.click();
+  }
+
+  function downloadFile(kind, id) {
+    const link = document.createElement('a');
+    link.href = `/api/files/${kind}/${id}/download`;
+    link.download = '';
+    link.click();
+  }
+
   function switchView(view, label) {
     document.querySelectorAll('.view').forEach((panel) => panel.classList.remove('is-active'));
     document.querySelector(`[data-view-panel="${view}"]`).classList.add('is-active');
@@ -462,7 +525,7 @@ document.addEventListener('DOMContentLoaded', () => {
     els.sidebar.classList.remove('is-open');
   }
 
-  async function handleAction(action, id) {
+  async function handleAction(action, id, element) {
     const numericId = Number(id);
     if (action === 'new-vehicle') openModal('vehicle');
     if (action === 'edit-vehicle') openModal('vehicle', state.vehicles.find((item) => item.id === numericId));
@@ -498,6 +561,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     if (action === 'new-emergency') openModal('emergency');
     if (action === 'download-invoice') await downloadInvoice(numericId);
+    if (action === 'download-invoice-pdf') downloadInvoicePdf(numericId);
+    if (action === 'download-file') downloadFile(element.dataset.kind, numericId);
     if (action === 'close-modal') els.modal.close();
     if (action === 'logout') {
       window.AutoCareApi.logout();
@@ -516,7 +581,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.addEventListener('click', (event) => {
       const button = event.target.closest('[data-action]');
       if (!button) return;
-      handleAction(button.dataset.action, button.dataset.id).catch((error) => showToast(error.message || 'Action failed.'));
+      handleAction(button.dataset.action, button.dataset.id, button).catch((error) => showToast(error.message || 'Action failed.'));
     });
 
     document.getElementById('mobile-menu').addEventListener('click', () => els.sidebar.classList.toggle('is-open'));
@@ -526,6 +591,21 @@ document.addEventListener('DOMContentLoaded', () => {
     els.modalForm.addEventListener('change', (event) => {
       if (event.target.name === 'vehicleId') {
         toggleNewVehicleFields();
+      }
+      if (['service', 'date'].includes(event.target.name)) {
+        refreshBookingSlots();
+      }
+      if (event.target.name === 'time') {
+        event.target.setCustomValidity('');
+      }
+    });
+    els.modalForm.addEventListener('click', (event) => {
+      const slotButton = event.target.closest('[data-slot-time]');
+      if (!slotButton) return;
+      const timeInput = els.modalBody.querySelector('[name="time"]');
+      if (timeInput) {
+        timeInput.value = slotButton.dataset.slotTime;
+        timeInput.setCustomValidity('');
       }
     });
 

@@ -24,6 +24,7 @@
         <button class="side-nav__item is-active" type="button" data-view="overview"><span data-icon="dashboard"></span>Dashboard</button>
         <button class="side-nav__item" type="button" data-view="assigned"><span data-icon="tools"></span>Assigned Jobs</button>
         <button class="side-nav__item" type="button" data-view="inventory"><span data-icon="invoice"></span>Inventory</button>
+        <button class="side-nav__item" type="button" data-view="files"><span data-icon="calendar"></span>Photos & Docs</button>
         <button class="side-nav__item" type="button" data-view="completed"><span data-icon="calendar"></span>Completed Jobs</button>
         <button class="side-nav__item" type="button" data-view="performance"><span data-icon="invoice"></span>Performance</button>
         <button class="side-nav__item" type="button" data-action="logout"><span data-icon="logout"></span>Logout</button>
@@ -84,6 +85,13 @@
           <div class="panel">
             <div class="panel__header"><div><h2>Completed Jobs</h2><p>Your completed service history.</p></div></div>
             <div class="table-wrap"><table><thead><tr><th>Job</th><th>Vehicle</th><th>Customer</th><th>Service</th><th>Completion Date</th></tr></thead><tbody id="completed-jobs-body"></tbody></table></div>
+          </div>
+        </section>
+
+        <section class="view" data-view-panel="files">
+          <div class="panel">
+            <div class="panel__header"><div><h2>Photo & Document Uploads</h2><p>Upload vehicle, service, replaced part and report files for assigned jobs.</p></div></div>
+            <div class="table-wrap"><table><thead><tr><th>Job</th><th>Vehicle</th><th>Service</th><th>Status</th><th>Actions</th></tr></thead><tbody id="file-jobs-body"></tbody></table></div>
           </div>
         </section>
 

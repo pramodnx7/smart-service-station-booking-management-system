@@ -26,6 +26,7 @@
         <button class="side-nav__item" type="button" data-view="vehicles"><span data-icon="car"></span>My Vehicles</button>
         <button class="side-nav__item" type="button" data-view="history"><span data-icon="tools"></span>Service History</button>
         <button class="side-nav__item" type="button" data-view="parts"><span data-icon="invoice"></span>Parts Used</button>
+        <button class="side-nav__item" type="button" data-view="documents"><span data-icon="calendar"></span>Photos & Docs</button>
         <button class="side-nav__item" type="button" data-view="billing"><span data-icon="invoice"></span>Payments & Invoices</button>
         <button class="side-nav__item" type="button" data-view="profile"><span data-icon="user"></span>Profile Settings</button>
         <button class="side-nav__item" type="button" data-view="notifications"><span data-icon="bell"></span>Notifications <b id="sidebar-alert-count">0</b></button>
@@ -137,6 +138,13 @@
           <div class="panel">
             <div class="panel__header"><div><h2>Service Photos</h2><p>Photos uploaded by technicians during service.</p></div></div>
             <div class="notification-list" id="service-photo-list"></div>
+          </div>
+        </section>
+
+        <section class="view" data-view-panel="documents">
+          <div class="panel">
+            <div class="panel__header"><div><h2>Service Evidence</h2><p>Vehicle photos, service photos, warranty documents and reports.</p></div></div>
+            <div class="table-wrap"><table><thead><tr><th>File</th><th>Type</th><th>Service Job</th><th>Uploaded</th><th>Action</th></tr></thead><tbody id="documents-body"></tbody></table></div>
           </div>
         </section>
 
