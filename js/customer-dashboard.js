@@ -44,6 +44,8 @@ document.addEventListener('DOMContentLoaded', () => {
       { id: 1002, service: 'Oil Change', date: '2026-05-18', amount: 6000, payment: 'Paid' },
       { id: 1003, service: 'Brake Service', date: '2026-05-10', amount: 7500, payment: 'Paid' }
     ],
+    usedParts: [],
+    serviceImages: [],
     notifications: [
       { id: 1, type: 'Booking Approved', message: 'Your General Service booking has been approved.', unread: true },
       { id: 2, type: 'Service Progress', message: 'Engine Diagnostics is now in final testing.', unread: true },
@@ -133,7 +135,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function vehicleName(id) {
     const vehicle = state.vehicles.find((item) => item.id === Number(id));
-    return vehicle ? `${vehicle.make} ${vehicle.model}` : 'Unknown vehicle';
+    return vehicle ? displayVehicleName(vehicle) : 'Unknown vehicle';
+  }
+
+  function displayVehicleName(vehicle) {
+    return vehicle.name || `${vehicle.make} ${vehicle.model}`.trim();
+  }
+
+  function splitVehicleName(name) {
+    const parts = String(name || '').trim().split(/\s+/).filter(Boolean);
+    return {
+      make: parts[0] || 'Custom',
+      model: parts.slice(1).join(' ') || 'Vehicle'
+    };
   }
 
   function statusClass(status) {
@@ -193,7 +207,7 @@ document.addEventListener('DOMContentLoaded', () => {
     return state.vehicles.slice(0, limit || state.vehicles.length).map((vehicle) => `
       <article class="vehicle-card">
         <img src="${vehicle.image}" alt="${vehicle.make} ${vehicle.model}" />
-        <h3>${vehicle.make} ${vehicle.model}</h3>
+        <h3>${displayVehicleName(vehicle)}</h3>
         <p>${vehicle.plate}</p>
         <div class="card-meta"><span>${vehicle.year}</span><span>${vehicle.model}</span></div>
         <div class="row-actions"><button class="mini-btn" type="button" data-action="edit-vehicle" data-id="${vehicle.id}">Edit</button><button class="mini-btn mini-btn--red" type="button" data-action="delete-vehicle" data-id="${vehicle.id}">Delete</button></div>
@@ -237,6 +251,24 @@ document.addEventListener('DOMContentLoaded', () => {
         <td><button class="mini-btn" type="button" data-action="download-invoice" data-id="${invoice.id}">Download</button></td>
       </tr>
     `).join('');
+    document.getElementById('parts-body').innerHTML = (state.usedParts || []).map((part) => `
+      <tr>
+        <td><span class="row-title">${part.partName}</span><span class="row-sub">${part.brand || '-'}</span></td>
+        <td>${part.vehicleNumber || '-'}</td>
+        <td>${part.condition}</td>
+        <td>${part.quantity}</td>
+        <td>${formatMoney(part.unitPrice)}</td>
+        <td>${formatMoney(part.totalPrice)}</td>
+        <td>${part.warrantyProvider || '-'}<span class="row-sub">${part.warrantyStartDate || '-'} to ${part.warrantyExpiryDate || '-'}</span></td>
+      </tr>
+    `).join('');
+    document.getElementById('service-photo-list').innerHTML = (state.serviceImages || []).map((image) => `
+      <article class="notification-item">
+        <span data-icon="tools"></span>
+        <div><strong>Service Job #SJ-${image.serviceJobId}</strong><p>${image.caption || image.imageUrl}</p></div>
+      </article>
+    `).join('');
+    injectIcons();
   }
 
   function renderProgress() {
@@ -280,26 +312,52 @@ document.addEventListener('DOMContentLoaded', () => {
     renderNotifications();
   }
 
-  function field(name, label, type = 'text', value = '', options = []) {
+  function field(name, label, type = 'text', value = '', options = [], required = true) {
+    const requiredAttribute = required ? ' required' : '';
     if (type === 'select') {
-      return `<label><span>${label}</span><select name="${name}" required>${options.map((option) => `<option value="${option.value}" ${String(option.value) === String(value) ? 'selected' : ''}>${option.label}</option>`).join('')}</select></label>`;
+      return `<label><span>${label}</span><select name="${name}"${requiredAttribute}>${options.map((option) => `<option value="${option.value}" ${String(option.value) === String(value) ? 'selected' : ''}>${option.label}</option>`).join('')}</select></label>`;
     }
     if (type === 'textarea') {
-      return `<label class="full"><span>${label}</span><textarea name="${name}" required>${value}</textarea></label>`;
+      return `<label class="full"><span>${label}</span><textarea name="${name}"${requiredAttribute}>${value}</textarea></label>`;
     }
-    return `<label><span>${label}</span><input name="${name}" type="${type}" value="${value}" required /></label>`;
+    return `<label><span>${label}</span><input name="${name}" type="${type}" value="${value}"${requiredAttribute} /></label>`;
+  }
+
+  function newVehicleFields() {
+    return `
+      <div class="new-vehicle-fields full" data-new-vehicle-fields hidden>
+        ${field('newVehicleName', 'New Vehicle Name', 'text', '', [], false)}
+        ${field('newVehiclePlate', 'Number Plate', 'text', '', [], false)}
+        ${field('newVehicleYear', 'Year', 'number', '2026', [], false)}
+      </div>
+    `;
+  }
+
+  function toggleNewVehicleFields() {
+    const fields = els.modalBody.querySelector('[data-new-vehicle-fields]');
+    const vehicleSelect = els.modalBody.querySelector('select[name="vehicleId"]');
+    if (!fields || !vehicleSelect) return;
+
+    const isNewVehicle = vehicleSelect.value === 'new';
+    fields.hidden = !isNewVehicle;
+    fields.querySelectorAll('input').forEach((input) => {
+      input.required = isNewVehicle;
+    });
   }
 
   function openModal(mode, record = {}) {
-    const vehicleOptions = state.vehicles.map((vehicle) => ({ value: vehicle.id, label: `${vehicle.make} ${vehicle.model} - ${vehicle.plate}` }));
+    const vehicleOptions = state.vehicles.map((vehicle) => ({ value: vehicle.id, label: `${displayVehicleName(vehicle)} - ${vehicle.plate}` }));
+    if (!record.id) {
+      vehicleOptions.push({ value: 'new', label: '+ Add New Vehicle' });
+    }
     const config = {
       vehicle: {
         title: record.id ? 'Edit Vehicle' : 'Add Vehicle',
-        body: field('make', 'Vehicle Make', 'text', record.make || '') + field('model', 'Model', 'text', record.model || '') + field('plate', 'Number Plate', 'text', record.plate || '') + field('year', 'Year', 'number', record.year || '2026')
+        body: field('name', 'Vehicle Name', 'text', record.name || `${record.make || ''} ${record.model || ''}`.trim()) + field('make', 'Vehicle Make', 'text', record.make || '') + field('model', 'Model', 'text', record.model || '') + field('plate', 'Number Plate', 'text', record.plate || '') + field('year', 'Year', 'number', record.year || '2026')
       },
       booking: {
         title: record.id ? 'Reschedule Booking' : 'Book Service Appointment',
-        body: field('vehicleId', 'Vehicle', 'select', record.vehicleId || vehicleOptions[0]?.value, vehicleOptions) + field('service', 'Service', 'select', record.service || state.packages[0], state.packages.map((item) => ({ value: item, label: item }))) + field('date', 'Date', 'date', record.date || '') + field('time', 'Time', 'time', record.time || '')
+        body: field('vehicleId', 'Vehicle', 'select', record.vehicleId || vehicleOptions[0]?.value, vehicleOptions) + field('service', 'Service', 'select', record.service || state.packages[0], state.packages.map((item) => ({ value: item, label: item }))) + field('date', 'Date', 'date', record.date || '') + field('time', 'Time', 'time', record.time || '') + newVehicleFields()
       },
       emergency: {
         title: 'Emergency Service Request',
@@ -311,6 +369,7 @@ document.addEventListener('DOMContentLoaded', () => {
     els.modalForm.dataset.id = record.id || '';
     els.modalTitle.textContent = config[mode].title;
     els.modalBody.innerHTML = config[mode].body;
+    toggleNewVehicleFields();
     els.modal.showModal();
   }
 
@@ -331,7 +390,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const id = Number(els.modalForm.dataset.id);
 
     if (mode === 'vehicle') {
-      const payload = { make: data.make, model: data.model, plate: data.plate, year: data.year };
+      const payload = { name: data.name, make: data.make, model: data.model, plate: data.plate, year: data.year };
       const savedVehicle = await window.AutoCareApi.request(id ? `/api/customer/vehicles/${id}` : '/api/customer/vehicles', {
         method: id ? 'PUT' : 'POST',
         body: JSON.stringify(payload)
@@ -341,7 +400,24 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     if (mode === 'booking') {
-      const payload = { vehicleId: Number(data.vehicleId), service: data.service, date: data.date, time: data.time };
+      let vehicleId = Number(data.vehicleId);
+      if (data.vehicleId === 'new') {
+        const vehicleParts = splitVehicleName(data.newVehicleName);
+        const savedVehicle = await window.AutoCareApi.request('/api/customer/vehicles', {
+          method: 'POST',
+          body: JSON.stringify({
+            name: data.newVehicleName,
+            make: vehicleParts.make,
+            model: vehicleParts.model,
+            plate: data.newVehiclePlate,
+            year: data.newVehicleYear
+          })
+        });
+        state.vehicles.push(savedVehicle);
+        vehicleId = savedVehicle.id;
+      }
+
+      const payload = { vehicleId, service: data.service, date: data.date, time: data.time };
       const savedBooking = await window.AutoCareApi.request(id ? `/api/customer/bookings/${id}` : '/api/customer/bookings', {
         method: id ? 'PUT' : 'POST',
         body: JSON.stringify(payload)
@@ -398,11 +474,6 @@ document.addEventListener('DOMContentLoaded', () => {
       showToast('Vehicle removed.');
     }
     if (action === 'new-booking') {
-      if (!state.vehicles.length) {
-        showToast('Please add a vehicle before booking a service.');
-        openModal('vehicle');
-        return;
-      }
       openModal('booking');
     }
     if (action === 'reschedule-booking') openModal('booking', state.bookings.find((item) => item.id === numericId));
@@ -439,6 +510,11 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('mobile-menu').addEventListener('click', () => els.sidebar.classList.toggle('is-open'));
     els.modalForm.addEventListener('submit', (event) => {
       handleModalSubmit(event).catch((error) => showToast(error.message || 'Save failed.'));
+    });
+    els.modalForm.addEventListener('change', (event) => {
+      if (event.target.name === 'vehicleId') {
+        toggleNewVehicleFields();
+      }
     });
 
     document.getElementById('profile-form').addEventListener('submit', async (event) => {

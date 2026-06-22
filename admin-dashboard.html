@@ -25,6 +25,10 @@
         <button class="side-nav__item" type="button" data-view="customers"><span data-icon="users"></span>Customers</button>
         <button class="side-nav__item" type="button" data-view="vehicles"><span data-icon="car"></span>Vehicles</button>
         <button class="side-nav__item" type="button" data-view="bookings"><span data-icon="calendar"></span>Bookings</button>
+        <button class="side-nav__item" type="button" data-view="technicians"><span data-icon="technician"></span>Technicians</button>
+        <button class="side-nav__item" type="button" data-view="workload"><span data-icon="tools"></span>Workload</button>
+        <button class="side-nav__item" type="button" data-view="performance"><span data-icon="star"></span>Performance</button>
+        <button class="side-nav__item" type="button" data-view="inventory"><span data-icon="invoice"></span>Inventory</button>
         <button class="side-nav__item" type="button" data-view="services"><span data-icon="tools"></span>Services</button>
         <button class="side-nav__item" type="button" data-view="billing"><span data-icon="invoice"></span>Billing</button>
         <button class="side-nav__item" type="button" data-view="emergency"><span data-icon="alert"></span>Emergency</button>
@@ -80,6 +84,9 @@
               <div class="panel__header"><h2>Quick Actions</h2></div>
               <button type="button" data-action="new-customer"><span data-icon="users"></span><strong>Register Customer</strong><small>Create account access</small></button>
               <button type="button" data-action="new-vehicle"><span data-icon="car"></span><strong>Add Vehicle</strong><small>Attach vehicle to customer</small></button>
+              <button type="button" data-action="new-technician"><span data-icon="technician"></span><strong>Add Technician</strong><small>Create technician access</small></button>
+              <button type="button" data-action="new-service-job"><span data-icon="tools"></span><strong>Create Service Job</strong><small>Assign workshop work</small></button>
+              <button type="button" data-action="new-inventory-item"><span data-icon="invoice"></span><strong>Add Part</strong><small>Manage stock</small></button>
               <button type="button" data-action="new-booking"><span data-icon="calendar"></span><strong>Book Service</strong><small>Schedule appointment</small></button>
               <button type="button" data-action="new-emergency"><span data-icon="alert"></span><strong>Emergency Request</strong><small>Breakdown assistance</small></button>
               <button type="button" data-action="new-invoice"><span data-icon="invoice"></span><strong>Create Invoice</strong><small>Billing and payment</small></button>
@@ -130,6 +137,66 @@
             </div>
             <div class="status-tabs" id="booking-tabs"></div>
             <div class="table-wrap"><table><thead><tr><th>Booking</th><th>Customer</th><th>Vehicle</th><th>Date & Time</th><th>Status</th><th>Queue</th><th>Actions</th></tr></thead><tbody id="bookings-body"></tbody></table></div>
+          </div>
+        </section>
+
+        <section class="view" data-view-panel="technicians">
+          <div class="panel">
+            <div class="panel__header">
+              <div><h2>Technician Management</h2><p>Create accounts, activate or deactivate technicians, and assign service jobs.</p></div>
+              <button class="btn btn--blue" type="button" data-action="new-technician">Add Technician</button>
+            </div>
+            <div class="table-wrap"><table><thead><tr><th>Technician</th><th>Employee No</th><th>Specialization</th><th>Experience</th><th>Status</th><th>Action</th></tr></thead><tbody id="technicians-body"></tbody></table></div>
+          </div>
+          <div class="panel">
+            <div class="panel__header">
+              <div><h2>Service Jobs</h2><p>Create jobs from approved bookings and assign technicians.</p></div>
+              <button class="btn btn--blue" type="button" data-action="new-service-job">Create Service Job</button>
+            </div>
+            <div class="table-wrap"><table><thead><tr><th>Job</th><th>Customer</th><th>Vehicle</th><th>Technician</th><th>Status</th><th>Action</th></tr></thead><tbody id="service-jobs-body"></tbody></table></div>
+          </div>
+        </section>
+
+        <section class="view" data-view-panel="workload">
+          <div class="panel">
+            <div class="panel__header"><div><h2>Technician Workload</h2><p>Monitor active assignments, pending jobs and jobs waiting for parts.</p></div></div>
+            <div class="table-wrap"><table><thead><tr><th>Technician</th><th>Specialization</th><th>Active</th><th>Pending</th><th>In Progress</th><th>Waiting Parts</th><th>Completed</th></tr></thead><tbody id="workload-body"></tbody></table></div>
+          </div>
+        </section>
+
+        <section class="view" data-view-panel="performance">
+          <div class="panel">
+            <div class="panel__header"><div><h2>Technician Performance</h2><p>Track completed jobs, active jobs, completion time and service totals.</p></div></div>
+            <div class="table-wrap"><table><thead><tr><th>Technician</th><th>Jobs Completed</th><th>Active Jobs</th><th>Avg Completion</th><th>Customer Rating</th><th>Total Services</th></tr></thead><tbody id="performance-body"></tbody></table></div>
+          </div>
+        </section>
+
+        <section class="view" data-view-panel="inventory">
+          <div class="panel">
+            <div class="panel__header">
+              <div><h2>Inventory & Spare Parts</h2><p>Manage parts, pricing, warranty, suppliers, stock levels and alerts.</p></div>
+              <button class="btn btn--blue" type="button" data-action="new-inventory-item">Add Item</button>
+            </div>
+            <div class="table-tools"><input id="inventory-search" type="search" placeholder="Search inventory..." /></div>
+            <div class="table-wrap"><table><thead><tr><th>Item</th><th>Category</th><th>Brand</th><th>Stock</th><th>Prices</th><th>Warranty</th><th>Action</th></tr></thead><tbody id="inventory-body"></tbody></table></div>
+          </div>
+          <div class="dashboard-grid dashboard-grid--even">
+            <article class="panel">
+              <div class="panel__header"><div><h2>Low Stock Alerts</h2><p>Items at or below minimum stock.</p></div></div>
+              <div class="table-wrap"><table><thead><tr><th>Item</th><th>Stock</th><th>Minimum</th><th>Status</th></tr></thead><tbody id="low-stock-body"></tbody></table></div>
+            </article>
+            <article class="panel">
+              <div class="panel__header"><div><h2>Inventory Value</h2><p>Purchase and retail value summary.</p></div></div>
+              <div id="inventory-value" class="progress-list"></div>
+            </article>
+          </div>
+          <div class="panel">
+            <div class="panel__header"><div><h2>Stock Movements</h2><p>Audit log for stock usage, returns and adjustments.</p></div></div>
+            <div class="table-wrap"><table><thead><tr><th>Part</th><th>Type</th><th>Quantity</th><th>Technician</th><th>Job</th><th>Total</th></tr></thead><tbody id="stock-movements-body"></tbody></table></div>
+          </div>
+          <div class="panel">
+            <div class="panel__header"><div><h2>Parts Usage History</h2><p>Technician and vehicle part usage.</p></div></div>
+            <div class="table-wrap"><table><thead><tr><th>Part</th><th>Vehicle</th><th>Technician</th><th>Condition</th><th>Quantity</th><th>Total</th></tr></thead><tbody id="parts-usage-body"></tbody></table></div>
           </div>
         </section>
 

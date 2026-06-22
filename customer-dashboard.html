@@ -25,6 +25,7 @@
         <button class="side-nav__item" type="button" data-view="bookings"><span data-icon="calendar"></span>My Bookings</button>
         <button class="side-nav__item" type="button" data-view="vehicles"><span data-icon="car"></span>My Vehicles</button>
         <button class="side-nav__item" type="button" data-view="history"><span data-icon="tools"></span>Service History</button>
+        <button class="side-nav__item" type="button" data-view="parts"><span data-icon="invoice"></span>Parts Used</button>
         <button class="side-nav__item" type="button" data-view="billing"><span data-icon="invoice"></span>Payments & Invoices</button>
         <button class="side-nav__item" type="button" data-view="profile"><span data-icon="user"></span>Profile Settings</button>
         <button class="side-nav__item" type="button" data-view="notifications"><span data-icon="bell"></span>Notifications <b id="sidebar-alert-count">0</b></button>
@@ -125,6 +126,17 @@
             <div class="panel__header"><div><h2>Service History & Progress</h2><p>Previous services, costs and live repair stages.</p></div></div>
             <div class="progress-list" id="progress-list"></div>
             <div class="table-wrap"><table><thead><tr><th>Service</th><th>Vehicle</th><th>Date</th><th>Cost</th><th>Status</th></tr></thead><tbody id="history-body"></tbody></table></div>
+          </div>
+        </section>
+
+        <section class="view" data-view-panel="parts">
+          <div class="panel">
+            <div class="panel__header"><div><h2>Parts Used In Services</h2><p>Part details, warranty, pricing and service photos.</p></div></div>
+            <div class="table-wrap"><table><thead><tr><th>Part</th><th>Vehicle</th><th>Condition</th><th>Quantity</th><th>Unit Price</th><th>Total</th><th>Warranty</th></tr></thead><tbody id="parts-body"></tbody></table></div>
+          </div>
+          <div class="panel">
+            <div class="panel__header"><div><h2>Service Photos</h2><p>Photos uploaded by technicians during service.</p></div></div>
+            <div class="notification-list" id="service-photo-list"></div>
           </div>
         </section>
 

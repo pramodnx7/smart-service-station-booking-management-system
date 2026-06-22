@@ -2,7 +2,7 @@ create extension if not exists pgcrypto;
 
 create table if not exists users (
   id bigserial primary key,
-  role text not null check (role in ('admin', 'customer')),
+  role text not null check (role in ('admin', 'customer', 'technician')),
   name text not null,
   email text not null unique,
   phone text,

@@ -453,6 +453,7 @@ td {
 .badge--pending { color: #966b00; background: #fff5d6; }
 .badge--approved { color: #204fc9; background: #edf3ff; }
 .badge--progress { color: #9a5200; background: #fff0dc; }
+.badge--parts { color: #7c4d00; background: #fff4d8; }
 .badge--completed { color: #14864a; background: #e9f9f0; }
 .badge--cancelled { color: #bb2d2e; background: #fff0f0; }
 

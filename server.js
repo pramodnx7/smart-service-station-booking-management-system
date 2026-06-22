@@ -15,7 +15,75 @@ const jwtSecret = process.env.JWT_SECRET || 'development-only-secret-change-me';
 app.use(helmet({ contentSecurityPolicy: false }));
 app.use(cors());
 app.use(express.json({ limit: '1mb' }));
-app.use(express.static(path.join(__dirname)));
+
+function parseCookies(req) {
+  return String(req.headers.cookie || '')
+    .split(';')
+    .map((pair) => pair.trim())
+    .filter(Boolean)
+    .reduce((cookies, pair) => {
+      const separatorIndex = pair.indexOf('=');
+      if (separatorIndex === -1) {
+        return cookies;
+      }
+
+      const key = pair.slice(0, separatorIndex).trim();
+      const value = decodeURIComponent(pair.slice(separatorIndex + 1).trim());
+      cookies[key] = value;
+      return cookies;
+    }, {});
+}
+
+function getTokenFromRequest(req) {
+  const header = req.headers.authorization || '';
+  if (header.startsWith('Bearer ')) {
+    return header.slice(7);
+  }
+
+  const cookies = parseCookies(req);
+  return cookies['autocare-token'] || '';
+}
+
+function buildAuthCookie(token) {
+  const maxAge = 8 * 60 * 60;
+  const parts = [
+    `autocare-token=${encodeURIComponent(token)}`,
+    'Path=/',
+    `Max-Age=${maxAge}`,
+    'SameSite=Lax'
+  ];
+
+  if (process.env.NODE_ENV === 'production') {
+    parts.push('Secure');
+  }
+
+  parts.push('HttpOnly');
+  return parts.join('; ');
+}
+
+function clearAuthCookie() {
+  const parts = [
+    'autocare-token=',
+    'Path=/',
+    'Max-Age=0',
+    'SameSite=Lax',
+    'HttpOnly'
+  ];
+
+  if (process.env.NODE_ENV === 'production') {
+    parts.push('Secure');
+  }
+
+  return parts.join('; ');
+}
+
+function sendAuthCookie(res, token) {
+  res.setHeader('Set-Cookie', buildAuthCookie(token));
+}
+
+function clearSessionCookie(res) {
+  res.setHeader('Set-Cookie', clearAuthCookie());
+}
 
 function signUser(user) {
   return jwt.sign({ id: user.id, role: user.role, email: user.email, name: user.name }, jwtSecret, { expiresIn: '8h' });
@@ -23,8 +91,7 @@ function signUser(user) {
 
 function requireAuth(role) {
   return (req, res, next) => {
-    const header = req.headers.authorization || '';
-    const token = header.startsWith('Bearer ') ? header.slice(7) : '';
+    const token = getTokenFromRequest(req);
 
     if (!token) {
       return res.status(401).json({ message: 'Authentication required.' });
@@ -38,6 +105,27 @@ function requireAuth(role) {
       return next();
     } catch (error) {
       return res.status(401).json({ message: 'Invalid or expired session.' });
+    }
+  };
+}
+
+function requireDashboardAccess(role) {
+  return (req, res, next) => {
+    const token = getTokenFromRequest(req);
+
+    if (!token) {
+      return res.redirect('/index.html');
+    }
+
+    try {
+      const session = jwt.verify(token, jwtSecret);
+      if (session.role !== role) {
+        return res.redirect('/index.html');
+      }
+
+      return next();
+    } catch (error) {
+      return res.redirect('/index.html');
     }
   };
 }
@@ -64,13 +152,15 @@ app.post('/api/auth/register', async (req, res, next) => {
     const { role = 'customer', name, email, password, phone = '' } = req.body;
     requireFields(req.body, ['name', 'email', 'password']);
 
-    if (!['admin', 'customer'].includes(role)) {
-      return res.status(400).json({ message: 'Invalid user role.' });
+    if (role !== 'customer') {
+      return res.status(400).json({ message: 'Public registration is available for customers only.' });
     }
 
     const passwordHash = await bcrypt.hash(password, 12);
     const user = await store.createUser({ role, name, email, phone, passwordHash });
-    res.status(201).json({ user, token: signUser(user) });
+    const token = signUser(user);
+    sendAuthCookie(res, token);
+    res.status(201).json({ user, token });
   } catch (error) {
     next(error);
   }
@@ -89,11 +179,36 @@ app.post('/api/auth/login', async (req, res, next) => {
     }
 
     const user = store.publicUser(userRecord);
-    res.json({ user, token: signUser(user) });
+    const token = signUser(user);
+    sendAuthCookie(res, token);
+    res.json({ user, token });
   } catch (error) {
     next(error);
   }
 });
+
+app.post('/api/auth/logout', (req, res) => {
+  clearSessionCookie(res);
+  res.json({ ok: true });
+});
+
+app.get('/api/auth/session', requireAuth(), (req, res) => {
+  res.json({ user: req.user, token: getTokenFromRequest(req) });
+});
+
+app.get('/admin-dashboard.html', requireDashboardAccess('admin'), (req, res) => {
+  res.sendFile(path.join(__dirname, 'admin-dashboard.html'));
+});
+
+app.get('/customer-dashboard.html', requireDashboardAccess('customer'), (req, res) => {
+  res.sendFile(path.join(__dirname, 'customer-dashboard.html'));
+});
+
+app.get('/technician-dashboard.html', requireDashboardAccess('technician'), (req, res) => {
+  res.sendFile(path.join(__dirname, 'technician-dashboard.html'));
+});
+
+app.use(express.static(path.join(__dirname)));
 
 app.get('/api/customer/dashboard', requireAuth('customer'), async (req, res, next) => {
   try {
@@ -106,6 +221,111 @@ app.get('/api/customer/dashboard', requireAuth('customer'), async (req, res, nex
 app.get('/api/admin/dashboard', requireAuth('admin'), async (req, res, next) => {
   try {
     res.json(await store.getAdminDashboard());
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get('/api/technician/dashboard', requireAuth('technician'), async (req, res, next) => {
+  try {
+    res.json(await store.getTechnicianDashboard(req.user.id));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get('/api/technician/jobs', requireAuth('technician'), async (req, res, next) => {
+  try {
+    res.json((await store.getTechnicianDashboard(req.user.id)).jobs);
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get('/api/technician/inventory', requireAuth('technician'), async (req, res, next) => {
+  try {
+    res.json((await store.getTechnicianDashboard(req.user.id)).inventoryParts);
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get('/api/technician/jobs/:id', requireAuth('technician'), async (req, res, next) => {
+  try {
+    const job = await store.getAssignedServiceJob(req.user.id, req.params.id);
+    if (!job) return res.status(404).json({ message: 'Assigned service job not found.' });
+    res.json(job);
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post('/api/technician/jobs/:id/progress', requireAuth('technician'), async (req, res, next) => {
+  try {
+    requireFields(req.body, ['progressPercentage', 'status']);
+    res.status(201).json(await store.updateTechnicianProgress(req.user.id, { ...req.body, serviceJobId: req.params.id }));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post('/api/technician/jobs/:id/notes', requireAuth('technician'), async (req, res, next) => {
+  try {
+    requireFields(req.body, ['note']);
+    res.status(201).json(await store.addTechnicianNote(req.user.id, { ...req.body, serviceJobId: req.params.id }));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post('/api/technician/jobs/:id/parts', requireAuth('technician'), async (req, res, next) => {
+  try {
+    requireFields(req.body, ['partId', 'quantity']);
+    res.status(201).json(await store.addUsedPart(req.user.id, { ...req.body, serviceJobId: req.params.id }));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post('/api/technician/jobs/:id/parts/request', requireAuth('technician'), async (req, res, next) => {
+  try {
+    requireFields(req.body, ['request']);
+    res.status(201).json(await store.requestAdditionalParts(req.user.id, { ...req.body, serviceJobId: req.params.id }));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post('/api/technician/jobs/:id/parts/return', requireAuth('technician'), async (req, res, next) => {
+  try {
+    requireFields(req.body, ['partId', 'quantity']);
+    res.status(201).json(await store.returnUnusedPart(req.user.id, { ...req.body, serviceJobId: req.params.id }));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post('/api/technician/jobs/:id/replaced-parts', requireAuth('technician'), async (req, res, next) => {
+  try {
+    requireFields(req.body, ['removedPartName', 'condition', 'replacementReason']);
+    res.status(201).json(await store.recordReplacedPart(req.user.id, { ...req.body, serviceJobId: req.params.id }));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post('/api/technician/jobs/:id/images', requireAuth('technician'), async (req, res, next) => {
+  try {
+    requireFields(req.body, ['imageUrl']);
+    res.status(201).json(await store.uploadServiceImage(req.user.id, { ...req.body, serviceJobId: req.params.id }));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.put('/api/technician/jobs/:id/complete', requireAuth('technician'), async (req, res, next) => {
+  try {
+    res.json(await store.completeTechnicianJob(req.user.id, req.params.id));
   } catch (error) {
     next(error);
   }
@@ -266,6 +486,110 @@ app.put('/api/admin/customers/:id', requireAuth('admin'), async (req, res, next)
   }
 });
 
+app.post('/api/admin/technicians', requireAuth('admin'), async (req, res, next) => {
+  try {
+    requireFields(req.body, ['name', 'email', 'phone', 'employeeNo', 'specialization', 'experienceYears']);
+    const passwordHash = await bcrypt.hash(req.body.password || 'tech123', 12);
+    res.status(201).json(await store.createTechnician(req.body, passwordHash));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.put('/api/admin/technicians/:id', requireAuth('admin'), async (req, res, next) => {
+  try {
+    requireFields(req.body, ['name', 'email', 'phone', 'employeeNo', 'specialization', 'experienceYears', 'status']);
+    const technician = await store.updateTechnician(req.params.id, req.body);
+    if (!technician) return res.status(404).json({ message: 'Technician not found.' });
+    res.json(technician);
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.delete('/api/admin/technicians/:id', requireAuth('admin'), async (req, res, next) => {
+  try {
+    const deleted = await store.deleteTechnician(req.params.id);
+    if (!deleted) return res.status(404).json({ message: 'Technician not found.' });
+    res.status(204).end();
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get('/api/admin/technicians/workload', requireAuth('admin'), async (req, res, next) => {
+  try {
+    res.json(await store.getTechnicianWorkload());
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get('/api/admin/technicians/performance', requireAuth('admin'), async (req, res, next) => {
+  try {
+    res.json(await store.getTechnicianPerformance());
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get('/api/admin/inventory/reports', requireAuth('admin'), async (req, res, next) => {
+  try {
+    res.json(await store.getInventoryReports());
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post('/api/admin/inventory/items', requireAuth('admin'), async (req, res, next) => {
+  try {
+    requireFields(req.body, ['itemCode', 'partName', 'category', 'brand', 'purchasePrice', 'sellingPrice', 'stockQuantity', 'minimumStockLevel']);
+    res.status(201).json(await store.createInventoryItem(req.body));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.put('/api/admin/inventory/items/:id', requireAuth('admin'), async (req, res, next) => {
+  try {
+    requireFields(req.body, ['itemCode', 'partName', 'category', 'brand', 'purchasePrice', 'sellingPrice', 'stockQuantity', 'minimumStockLevel']);
+    const item = await store.updateInventoryItem(req.params.id, req.body);
+    if (!item) return res.status(404).json({ message: 'Inventory item not found.' });
+    res.json(item);
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.delete('/api/admin/inventory/items/:id', requireAuth('admin'), async (req, res, next) => {
+  try {
+    await store.deleteInventoryItem(req.params.id);
+    res.status(204).end();
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post('/api/admin/inventory/suppliers', requireAuth('admin'), async (req, res, next) => {
+  try {
+    requireFields(req.body, ['name']);
+    res.status(201).json(await store.createInventorySupplier(req.body));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.put('/api/admin/inventory/suppliers/:id', requireAuth('admin'), async (req, res, next) => {
+  try {
+    requireFields(req.body, ['name']);
+    const supplier = await store.updateInventorySupplier(req.params.id, req.body);
+    if (!supplier) return res.status(404).json({ message: 'Supplier not found.' });
+    res.json(supplier);
+  } catch (error) {
+    next(error);
+  }
+});
+
 app.post('/api/admin/vehicles', requireAuth('admin'), async (req, res, next) => {
   try {
     requireFields(req.body, ['customerId', 'make', 'model', 'plate', 'year']);
@@ -330,6 +654,24 @@ app.put('/api/admin/bookings/:id', requireAuth('admin'), async (req, res, next) 
     const booking = await store.updateBooking(req.params.id, Number(req.body.customerId), req.body, false);
     if (!booking) return res.status(404).json({ message: 'Booking not found.' });
     res.json(booking);
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post('/api/admin/service-jobs', requireAuth('admin'), async (req, res, next) => {
+  try {
+    requireFields(req.body, ['bookingId', 'serviceType', 'priority', 'expectedCompletionDate']);
+    res.status(201).json(await store.createServiceJob(req.body));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.put('/api/admin/service-jobs/:id/assign', requireAuth('admin'), async (req, res, next) => {
+  try {
+    requireFields(req.body, ['technicianId']);
+    res.json(await store.assignTechnician(req.params.id, req.body.technicianId));
   } catch (error) {
     next(error);
   }

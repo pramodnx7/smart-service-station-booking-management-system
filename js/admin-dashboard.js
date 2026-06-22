@@ -12,6 +12,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const icons = {
     dashboard: '<svg viewBox="0 0 24 24"><path d="M3 13h8V3H3v10Zm10 8h8V11h-8v10ZM3 21h8v-6H3v6Zm10-12h8V3h-8v6Z"/></svg>',
     users: '<svg viewBox="0 0 24 24"><path d="M17 21a5 5 0 0 0-10 0"/><circle cx="12" cy="8" r="4"/><path d="M3 21a4 4 0 0 1 4-4M21 21a4 4 0 0 0-4-4"/></svg>',
+    technician: '<svg viewBox="0 0 24 24"><path d="M12 14a5 5 0 0 0-5 5v2h10v-2a5 5 0 0 0-5-5Z"/><circle cx="12" cy="7" r="4"/><path d="m18 3 3 3-4 4-3-3 4-4Z"/></svg>',
     car: '<svg viewBox="0 0 24 24"><path d="m3 13 2-5a3 3 0 0 1 3-2h8a3 3 0 0 1 3 2l2 5"/><path d="M5 13h14v5H5z"/><circle cx="7.5" cy="18" r="1.5"/><circle cx="16.5" cy="18" r="1.5"/></svg>',
     calendar: '<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M8 2v4M16 2v4M3 10h18"/></svg>',
     tools: '<svg viewBox="0 0 24 24"><path d="m14.7 6.3 3-3a4 4 0 0 1-5 5l-7 7a2 2 0 1 0 3 3l7-7a4 4 0 0 1 5-5l-3 3"/></svg>',
@@ -36,6 +37,9 @@ document.addEventListener('DOMContentLoaded', () => {
       { id: 1, customerId: 1, make: 'Toyota Corolla', model: 'Axio', plate: 'ABC-854', year: '2019', image: 'assets/images/newsletter-red-sports-car.png' },
       { id: 2, customerId: 1, make: 'Honda Civic', model: 'EX', plate: 'XZ-5676', year: '2019', image: 'assets/images/hero-blue-workshop.png' },
       { id: 3, customerId: 2, make: 'Suzuki Swift', model: 'RS', plate: 'DEF-0012', year: '2020', image: 'assets/images/service-wheel-closeup.png' }
+    ],
+    technicians: [
+      { id: 1, userId: 3, name: 'Kasun Technician', email: 'tech@autocare.lk', employeeNo: 'TECH-001', specialization: 'Engine Diagnostics', phone: '+94 77 222 3344', experienceYears: 4, status: 'Active' }
     ],
     bookings: [
       { id: 1, customerId: 1, vehicleId: 1, service: 'General Service', date: '2026-05-25', time: '10:00', status: 'Pending', queue: 3, progress: 20 },
@@ -67,7 +71,20 @@ document.addEventListener('DOMContentLoaded', () => {
       { id: 1, customerId: 1, rating: 5, comment: 'Friendly team and clear service updates.' },
       { id: 2, customerId: 2, rating: 4, comment: 'Quick oil change and fair pricing.' },
       { id: 3, customerId: 3, rating: 5, comment: 'Emergency support reached me fast.' }
-    ]
+    ],
+    serviceJobs: [
+      { id: 1, bookingId: 1, customerId: 1, vehicleId: 1, assignedTechnicianId: 1, serviceType: 'General Service', priority: 'Normal', status: 'Assigned', progress: 35, assignedDate: '2026-05-24', technicianName: 'Kasun Technician', customerName: 'Seril Suten', vehicleNumber: 'ABC-854', vehicleName: 'Toyota Corolla Axio' }
+    ],
+    inventoryParts: [
+      { id: 1, name: 'Engine Oil 5W-30', stock: 24, unitPrice: 6000 },
+      { id: 2, name: 'Brake Pad Set', stock: 12, unitPrice: 7500 }
+    ],
+    inventorySuppliers: [],
+    inventoryReports: { lowStock: [], outOfStock: [], stockMovements: [], technicianUsage: [], inventoryValue: {} },
+    stockMovements: [],
+    partUsageHistory: [],
+    technicianWorkload: [],
+    technicianPerformance: []
   };
 
   let state = loadState();
@@ -137,12 +154,20 @@ document.addEventListener('DOMContentLoaded', () => {
     return vehicle ? `${vehicle.make} ${vehicle.model}` : 'Unknown vehicle';
   }
 
+  function technicianName(id) {
+    return state.technicians.find((item) => item.id === Number(id))?.name || 'Unassigned';
+  }
+
   function formatMoney(amount) {
     return `LKR ${Number(amount).toLocaleString('en-LK')}`;
   }
 
   function statusClass(status) {
-    return status.toLowerCase().replace(/\s+/g, '-') === 'in-progress' ? 'progress' : status.toLowerCase();
+    const value = status.toLowerCase().replace(/\s+/g, '-');
+    if (value === 'in-progress') return 'progress';
+    if (value === 'waiting-for-parts') return 'parts';
+    if (value === 'quality-check') return 'approved';
+    return value;
   }
 
   function injectIcons() {
@@ -261,6 +286,106 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('bookings-body').innerHTML = bookingRows(bookings);
   }
 
+  function renderTechnicians() {
+    document.getElementById('technicians-body').innerHTML = state.technicians.map((technician) => `
+      <tr>
+        <td><span class="row-title">${technician.name}</span><span class="row-sub">${technician.email}</span></td>
+        <td>${technician.employeeNo}</td>
+        <td>${technician.specialization}</td>
+        <td>${technician.experienceYears} yrs</td>
+        <td><span class="badge badge--${technician.status === 'Active' ? 'completed' : 'cancelled'}">${technician.status}</span></td>
+        <td><div class="row-actions"><button class="mini-btn" type="button" data-action="edit-technician" data-id="${technician.id}">Edit</button><button class="mini-btn mini-btn--red" type="button" data-action="delete-technician" data-id="${technician.id}">Delete</button></div></td>
+      </tr>
+    `).join('');
+  }
+
+  function renderServiceJobs() {
+    document.getElementById('service-jobs-body').innerHTML = state.serviceJobs.map((job) => `
+      <tr>
+        <td><span class="row-title">#SJ-${job.id}</span><span class="row-sub">${job.serviceType} - ${job.priority}</span></td>
+        <td>${job.customerName || customerName(job.customerId)}</td>
+        <td>${job.vehicleNumber || vehicleName(job.vehicleId)}</td>
+        <td>${job.technicianName || technicianName(job.assignedTechnicianId)}</td>
+        <td><span class="badge badge--${statusClass(job.status)}">${job.status}</span></td>
+        <td><div class="row-actions"><button class="mini-btn" type="button" data-action="assign-technician" data-id="${job.id}">Assign</button></div></td>
+      </tr>
+    `).join('');
+  }
+
+  function renderTechnicianReports() {
+    const workload = state.technicianWorkload.length ? state.technicianWorkload : state.technicians.map((technician) => {
+      const jobs = state.serviceJobs.filter((job) => Number(job.assignedTechnicianId) === Number(technician.id));
+      return {
+        technicianId: technician.id,
+        name: technician.name,
+        specialization: technician.specialization,
+        activeJobs: jobs.filter((job) => !['Completed', 'Cancelled'].includes(job.status)).length,
+        pendingJobs: jobs.filter((job) => ['Pending', 'Assigned'].includes(job.status)).length,
+        inProgressJobs: jobs.filter((job) => job.status === 'In Progress').length,
+        waitingForParts: jobs.filter((job) => job.status === 'Waiting For Parts').length,
+        completedJobs: jobs.filter((job) => job.status === 'Completed').length
+      };
+    });
+
+    document.getElementById('workload-body').innerHTML = workload.map((item) => `
+      <tr><td><span class="row-title">${item.name}</span></td><td>${item.specialization}</td><td>${item.activeJobs}</td><td>${item.pendingJobs}</td><td>${item.inProgressJobs}</td><td>${item.waitingForParts}</td><td>${item.completedJobs}</td></tr>
+    `).join('');
+
+    const performance = state.technicianPerformance.length ? state.technicianPerformance : state.technicians.map((technician) => ({
+      name: technician.name,
+      jobsCompleted: state.serviceJobs.filter((job) => Number(job.assignedTechnicianId) === Number(technician.id) && job.status === 'Completed').length,
+      activeJobs: state.serviceJobs.filter((job) => Number(job.assignedTechnicianId) === Number(technician.id) && !['Completed', 'Cancelled'].includes(job.status)).length,
+      averageCompletionDays: 0,
+      customerRating: 0,
+      totalServicesCompleted: 0
+    }));
+
+    document.getElementById('performance-body').innerHTML = performance.map((item) => `
+      <tr><td><span class="row-title">${item.name}</span></td><td>${item.jobsCompleted}</td><td>${item.activeJobs}</td><td>${item.averageCompletionDays} days</td><td>${item.customerRating || '-'}</td><td>${item.totalServicesCompleted}</td></tr>
+    `).join('');
+  }
+
+  function renderInventory(filter = '') {
+    const query = filter.toLowerCase();
+    const items = state.inventoryParts.filter((part) => {
+      const text = `${part.itemCode || part.sku || ''} ${part.partName || part.name || ''} ${part.category || ''} ${part.brand || ''}`.toLowerCase();
+      return !query || text.includes(query);
+    });
+
+    document.getElementById('inventory-body').innerHTML = items.map((part) => `
+      <tr>
+        <td><span class="row-title">${part.partName || part.name}</span><span class="row-sub">${part.itemCode || part.sku || ''}</span></td>
+        <td>${part.category || '-'}</td>
+        <td>${part.brand || '-'}</td>
+        <td><span class="badge badge--${part.status === 'Out of Stock' ? 'cancelled' : part.status === 'Low Stock' ? 'parts' : 'completed'}">${part.stock ?? part.stockQuantity}</span><span class="row-sub">Min ${part.minimumStockLevel || 0}</span></td>
+        <td><span class="row-title">${formatMoney(part.sellingPrice || part.unitPrice || 0)}</span><span class="row-sub">Cost ${formatMoney(part.purchasePrice || 0)}</span></td>
+        <td>${part.warrantyPeriod || '-'}</td>
+        <td><div class="row-actions"><button class="mini-btn" type="button" data-action="edit-inventory-item" data-id="${part.id}">Edit</button><button class="mini-btn mini-btn--red" type="button" data-action="delete-inventory-item" data-id="${part.id}">Delete</button></div></td>
+      </tr>
+    `).join('');
+
+    const lowStock = state.inventoryReports?.lowStock || state.inventoryParts.filter((part) => Number(part.stock || 0) > 0 && Number(part.stock || 0) <= 5);
+    document.getElementById('low-stock-body').innerHTML = lowStock.map((part) => `
+      <tr><td><span class="row-title">${part.partName || part.name}</span><span class="row-sub">${part.itemCode || ''}</span></td><td>${part.stock}</td><td>${part.minimumStockLevel}</td><td><span class="badge badge--parts">${part.status}</span></td></tr>
+    `).join('');
+
+    const value = state.inventoryReports?.inventoryValue || {};
+    document.getElementById('inventory-value').innerHTML = [
+      ['Purchase Value', formatMoney(value.totalPurchaseValue || 0)],
+      ['Retail Value', formatMoney(value.totalRetailValue || 0)],
+      ['Items', value.itemCount || state.inventoryParts.length],
+      ['Units In Stock', value.stockUnits || 0]
+    ].map(([label, amount]) => `<div class="progress-item"><header><strong>${label}</strong><span>${amount}</span></header></div>`).join('');
+
+    document.getElementById('stock-movements-body').innerHTML = (state.stockMovements || []).slice(0, 20).map((item) => `
+      <tr><td>${item.partName}</td><td>${item.type}</td><td>${item.quantity}</td><td>${item.technicianName || '-'}</td><td>${item.serviceJobId ? `#SJ-${item.serviceJobId}` : '-'}</td><td>${formatMoney(item.totalPrice || 0)}</td></tr>
+    `).join('');
+
+    document.getElementById('parts-usage-body').innerHTML = (state.partUsageHistory || []).slice(0, 20).map((item) => `
+      <tr><td>${item.partName}<span class="row-sub">${item.brand || '-'}</span></td><td>${item.vehicleNumber || '-'}</td><td>${item.technicianName || '-'}</td><td>${item.condition}</td><td>${item.quantity}</td><td>${formatMoney(item.totalPrice || 0)}</td></tr>
+    `).join('');
+  }
+
   function renderPackages() {
     document.getElementById('package-grid').innerHTML = state.packages.map((item) => `
       <article class="package-card">
@@ -323,6 +448,10 @@ document.addEventListener('DOMContentLoaded', () => {
     renderCustomers();
     renderVehicles();
     renderBookings();
+    renderTechnicians();
+    renderServiceJobs();
+    renderTechnicianReports();
+    renderInventory();
     renderPackages();
     renderBilling();
     renderEmergency();
@@ -343,6 +472,15 @@ document.addEventListener('DOMContentLoaded', () => {
   function openModal(mode, record = {}) {
     const customerOptions = state.customers.map((customer) => ({ value: customer.id, label: customer.name }));
     const vehicleOptions = state.vehicles.map((vehicle) => ({ value: vehicle.id, label: `${vehicle.make} ${vehicle.model} - ${vehicle.plate}` }));
+    const technicianOptions = state.technicians
+      .filter((technician) => technician.status === 'Active' || Number(technician.id) === Number(record.assignedTechnicianId))
+      .map((technician) => ({ value: technician.id, label: `${technician.name} - ${technician.specialization}` }));
+    const bookingOptions = state.bookings.map((booking) => ({ value: booking.id, label: `#BK-${booking.id} - ${customerName(booking.customerId)} - ${booking.service}` }));
+    const completedJobOptions = state.serviceJobs
+      .filter((job) => job.status === 'Completed')
+      .map((job) => ({ value: job.id, label: `#SJ-${job.id} - ${job.serviceType} - ${job.customerName || customerName(job.customerId)}` }));
+    const categoryOptions = ['Engine Parts', 'Brake System', 'Electrical', 'Suspension', 'Cooling System', 'Filters', 'Fluids & Lubricants', 'Batteries', 'Tires & Wheels', 'Accessories'].map((category) => ({ value: category, label: category }));
+    const supplierOptions = (state.inventorySuppliers || []).map((supplier) => ({ value: supplier.id, label: supplier.name }));
     const statusOptions = statusLabels.slice(1).map((status) => ({ value: status, label: status }));
     const paymentOptions = ['Unpaid', 'Paid'].map((payment) => ({ value: payment, label: payment }));
     const config = {
@@ -354,9 +492,25 @@ document.addEventListener('DOMContentLoaded', () => {
         title: record.id ? 'Edit Vehicle' : 'Add Vehicle',
         body: field('customerId', 'Customer', 'select', record.customerId || customerOptions[0]?.value, customerOptions) + field('make', 'Vehicle Make', 'text', record.make || '') + field('model', 'Model', 'text', record.model || '') + field('plate', 'Number Plate', 'text', record.plate || '') + field('year', 'Year', 'number', record.year || '2026')
       },
+      technician: {
+        title: record.id ? 'Edit Technician' : 'Create Technician',
+        body: field('name', 'Full Name', 'text', record.name || '') + field('email', 'Email', 'email', record.email || '') + field('phone', 'Phone', 'tel', record.phone || '') + field('employeeNo', 'Employee No', 'text', record.employeeNo || '') + field('specialization', 'Specialization', 'text', record.specialization || '') + field('experienceYears', 'Experience Years', 'number', record.experienceYears || '0') + field('status', 'Status', 'select', record.status || 'Active', [{ value: 'Active', label: 'Active' }, { value: 'Inactive', label: 'Inactive' }])
+      },
       booking: {
         title: record.id ? 'Reschedule Booking' : 'Book Service Appointment',
         body: field('customerId', 'Customer', 'select', record.customerId || customerOptions[0]?.value, customerOptions) + field('vehicleId', 'Vehicle', 'select', record.vehicleId || vehicleOptions[0]?.value, vehicleOptions) + field('service', 'Service', 'select', record.service || state.packages[0]?.name, state.packages.map((item) => ({ value: item.name, label: item.name }))) + field('date', 'Date', 'date', record.date || '') + field('time', 'Time', 'time', record.time || '') + field('status', 'Status', 'select', record.status || 'Pending', statusOptions)
+      },
+      serviceJob: {
+        title: 'Create Service Job',
+        body: field('bookingId', 'Booking', 'select', record.bookingId || bookingOptions[0]?.value, bookingOptions) + field('serviceType', 'Service Type', 'select', record.serviceType || state.packages[0]?.name, state.packages.map((item) => ({ value: item.name, label: item.name }))) + field('assignedTechnicianId', 'Technician', 'select', record.assignedTechnicianId || technicianOptions[0]?.value, technicianOptions) + field('priority', 'Priority', 'select', record.priority || 'Normal', ['Low', 'Normal', 'High', 'Urgent'].map((priority) => ({ value: priority, label: priority }))) + field('startDate', 'Start Date', 'date', record.startDate || new Date().toISOString().slice(0, 10)) + field('expectedCompletionDate', 'Expected Completion', 'date', record.expectedCompletionDate || new Date().toISOString().slice(0, 10))
+      },
+      assignTechnician: {
+        title: 'Assign Technician',
+        body: field('technicianId', 'Technician', 'select', record.assignedTechnicianId || technicianOptions[0]?.value, technicianOptions)
+      },
+      inventoryItem: {
+        title: record.id ? 'Edit Inventory Item' : 'Add Inventory Item',
+        body: field('itemCode', 'Item Code', 'text', record.itemCode || record.sku || '') + field('partName', 'Part Name', 'text', record.partName || record.name || '') + field('category', 'Category', 'select', record.category || categoryOptions[0]?.value, categoryOptions) + field('brand', 'Brand', 'text', record.brand || '') + field('manufacturer', 'Manufacturer', 'text', record.manufacturer || '') + field('supplierId', 'Supplier', 'select', record.supplierId || supplierOptions[0]?.value, supplierOptions) + field('purchasePrice', 'Purchase Price', 'number', record.purchasePrice || '0') + field('sellingPrice', 'Selling Price', 'number', record.sellingPrice || record.unitPrice || '0') + field('stockQuantity', 'Stock Quantity', 'number', record.stock ?? record.stockQuantity ?? '0') + field('minimumStockLevel', 'Minimum Stock Level', 'number', record.minimumStockLevel || '0') + field('location', 'Location', 'text', record.location || '') + field('warrantyPeriod', 'Warranty Period', 'text', record.warrantyPeriod || '') + field('description', 'Description', 'textarea', record.description || '')
       },
       service: {
         title: record.id ? 'Edit Service Package' : 'Add Service Package',
@@ -364,7 +518,7 @@ document.addEventListener('DOMContentLoaded', () => {
       },
       invoice: {
         title: 'Create Invoice',
-        body: field('customerId', 'Customer', 'select', record.customerId || customerOptions[0]?.value, customerOptions) + field('service', 'Service', 'select', record.service || state.packages[0]?.name, state.packages.map((item) => ({ value: item.name, label: item.name }))) + field('amount', 'Amount', 'number', record.amount || '') + field('payment', 'Payment Status', 'select', record.payment || 'Unpaid', paymentOptions) + field('date', 'Date', 'date', record.date || new Date().toISOString().slice(0, 10))
+        body: field('serviceJobId', 'Completed Service Job', 'select', record.serviceJobId || completedJobOptions[0]?.value, completedJobOptions) + field('customerId', 'Customer', 'select', record.customerId || customerOptions[0]?.value, customerOptions) + field('service', 'Service', 'select', record.service || state.packages[0]?.name, state.packages.map((item) => ({ value: item.name, label: item.name }))) + field('laborCost', 'Labor Cost', 'number', record.laborCost || '') + field('serviceCharges', 'Service Charges', 'number', record.serviceCharges || '0') + field('tax', 'Tax', 'number', record.tax || '0') + field('discount', 'Discount', 'number', record.discount || '0') + field('payment', 'Payment Status', 'select', record.payment || 'Unpaid', paymentOptions) + field('date', 'Date', 'date', record.date || new Date().toISOString().slice(0, 10))
       },
       emergency: {
         title: 'Emergency Service Request',
@@ -407,6 +561,15 @@ document.addEventListener('DOMContentLoaded', () => {
       id ? Object.assign(state.vehicles.find((item) => item.id === id), savedVehicle) : state.vehicles.push(savedVehicle);
     }
 
+    if (mode === 'technician') {
+      const payload = { ...data, experienceYears: Number(data.experienceYears) };
+      const savedTechnician = await window.AutoCareApi.request(id ? `/api/admin/technicians/${id}` : '/api/admin/technicians', {
+        method: id ? 'PUT' : 'POST',
+        body: JSON.stringify(payload)
+      });
+      id ? Object.assign(state.technicians.find((item) => item.id === id), savedTechnician) : state.technicians.push(savedTechnician);
+    }
+
     if (mode === 'booking') {
       const payload = { ...data, customerId: Number(data.customerId), vehicleId: Number(data.vehicleId), queue: id ? state.bookings.find((item) => item.id === id).queue : state.bookings.length + 1, progress: data.status === 'Completed' ? 100 : 10 };
       const savedBooking = await window.AutoCareApi.request(id ? `/api/admin/bookings/${id}` : '/api/admin/bookings', {
@@ -414,6 +577,47 @@ document.addEventListener('DOMContentLoaded', () => {
         body: JSON.stringify(payload)
       });
       id ? Object.assign(state.bookings.find((item) => item.id === id), savedBooking) : state.bookings.push(savedBooking);
+    }
+
+    if (mode === 'serviceJob') {
+      const booking = state.bookings.find((item) => item.id === Number(data.bookingId));
+      const savedJob = await window.AutoCareApi.request('/api/admin/service-jobs', {
+        method: 'POST',
+        body: JSON.stringify({
+          ...data,
+          bookingId: Number(data.bookingId),
+          customerId: booking?.customerId,
+          vehicleId: booking?.vehicleId,
+          assignedTechnicianId: Number(data.assignedTechnicianId)
+        })
+      });
+      state.serviceJobs.push(savedJob);
+    }
+
+    if (mode === 'assignTechnician') {
+      const savedJob = await window.AutoCareApi.request(`/api/admin/service-jobs/${id}/assign`, {
+        method: 'PUT',
+        body: JSON.stringify({ technicianId: Number(data.technicianId) })
+      });
+      Object.assign(state.serviceJobs.find((item) => item.id === id), savedJob);
+    }
+
+    if (mode === 'inventoryItem') {
+      const supplier = (state.inventorySuppliers || []).find((item) => Number(item.id) === Number(data.supplierId));
+      const payload = {
+        ...data,
+        supplierId: Number(data.supplierId),
+        supplier: supplier?.name || '',
+        purchasePrice: Number(data.purchasePrice),
+        sellingPrice: Number(data.sellingPrice),
+        stockQuantity: Number(data.stockQuantity),
+        minimumStockLevel: Number(data.minimumStockLevel)
+      };
+      const savedItem = await window.AutoCareApi.request(id ? `/api/admin/inventory/items/${id}` : '/api/admin/inventory/items', {
+        method: id ? 'PUT' : 'POST',
+        body: JSON.stringify(payload)
+      });
+      id ? Object.assign(state.inventoryParts.find((item) => item.id === id), savedItem) : state.inventoryParts.push(savedItem);
     }
 
     if (mode === 'service') {
@@ -428,7 +632,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (mode === 'invoice') {
       const savedInvoice = await window.AutoCareApi.request('/api/admin/invoices', {
         method: 'POST',
-        body: JSON.stringify({ ...data, customerId: Number(data.customerId), amount: Number(data.amount) })
+        body: JSON.stringify({ ...data, serviceJobId: Number(data.serviceJobId), customerId: Number(data.customerId), amount: Number(data.laborCost || 0), laborCost: Number(data.laborCost || 0), serviceCharges: Number(data.serviceCharges || 0), tax: Number(data.tax || 0), discount: Number(data.discount || 0) })
       });
       state.invoices.push(savedInvoice);
     }
@@ -484,6 +688,15 @@ document.addEventListener('DOMContentLoaded', () => {
     if (action === 'reset-password') showToast(`Password reset link prepared for ${customerName(numericId)}.`);
     if (action === 'new-vehicle') openModal('vehicle');
     if (action === 'edit-vehicle') openModal('vehicle', state.vehicles.find((item) => item.id === numericId));
+    if (action === 'new-technician') openModal('technician');
+    if (action === 'edit-technician') openModal('technician', state.technicians.find((item) => item.id === numericId));
+    if (action === 'delete-technician') {
+      await window.AutoCareApi.request(`/api/admin/technicians/${numericId}`, { method: 'DELETE' });
+      state.technicians = state.technicians.filter((item) => item.id !== numericId);
+      saveState();
+      renderAll();
+      showToast('Technician deleted.');
+    }
     if (action === 'new-booking-for-vehicle') {
       const vehicle = state.vehicles.find((item) => item.id === numericId);
       if (!vehicle) return;
@@ -512,9 +725,26 @@ document.addEventListener('DOMContentLoaded', () => {
       activeBookingStatus = element.dataset.status;
       renderBookings();
     }
+    if (action === 'new-service-job') openModal('serviceJob');
+    if (action === 'assign-technician') openModal('assignTechnician', state.serviceJobs.find((item) => item.id === numericId));
+    if (action === 'new-inventory-item') openModal('inventoryItem');
+    if (action === 'edit-inventory-item') openModal('inventoryItem', state.inventoryParts.find((item) => item.id === numericId));
+    if (action === 'delete-inventory-item') {
+      await window.AutoCareApi.request(`/api/admin/inventory/items/${numericId}`, { method: 'DELETE' });
+      state.inventoryParts = state.inventoryParts.filter((item) => item.id !== numericId);
+      saveState();
+      renderAll();
+      showToast('Inventory item deleted.');
+    }
     if (action === 'new-service') openModal('service');
     if (action === 'edit-service') openModal('service', state.packages.find((item) => item.id === numericId));
-    if (action === 'new-invoice') openModal('invoice');
+    if (action === 'new-invoice') {
+      if (!state.serviceJobs.some((job) => job.status === 'Completed')) {
+        showToast('Complete a service job before generating billing.');
+        return;
+      }
+      openModal('invoice');
+    }
     if (action === 'mark-paid') {
       await window.AutoCareApi.request(`/api/admin/invoices/${numericId}/pay`, { method: 'PUT' });
       state.invoices.find((item) => item.id === numericId).payment = 'Paid';
@@ -576,6 +806,10 @@ document.addEventListener('DOMContentLoaded', () => {
       document.querySelectorAll('tbody tr, .vehicle-card, .package-card, .emergency-card, .feedback-card').forEach((item) => {
         item.style.display = item.textContent.toLowerCase().includes(value) || !value ? '' : 'none';
       });
+    });
+
+    document.getElementById('inventory-search')?.addEventListener('input', (event) => {
+      renderInventory(event.target.value);
     });
 
     document.getElementById('settings-form').addEventListener('submit', (event) => {

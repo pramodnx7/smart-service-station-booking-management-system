@@ -22,6 +22,7 @@
 
     const response = await fetch(path, {
       ...options,
+      credentials: options.credentials || 'same-origin',
       headers
     });
 
@@ -52,8 +53,14 @@
       });
     },
     logout() {
-      localStorage.removeItem(sessionKey);
-      window.location.href = 'index.html';
+      fetch('/api/auth/logout', {
+        method: 'POST',
+        credentials: 'same-origin',
+        keepalive: true
+      }).finally(() => {
+        localStorage.removeItem(sessionKey);
+        window.location.href = 'index.html';
+      });
     }
   };
 })();

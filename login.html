@@ -45,6 +45,10 @@
             <span>Customer</span>
             <small>Service dashboard</small>
           </button>
+          <button type="button" data-role="technician" role="tab" aria-selected="false">
+            <span>Technician</span>
+            <small>Assigned jobs</small>
+          </button>
         </div>
 
         <form id="login-form" novalidate>
@@ -54,7 +58,10 @@
           </label>
           <label>
             <span>Password</span>
-            <input id="password" name="password" type="password" autocomplete="current-password" placeholder="Enter password" required />
+            <div class="password-field">
+              <input id="password" name="password" type="password" autocomplete="current-password" placeholder="Enter password" required />
+              <button class="password-toggle" type="button" id="toggle-login-password" aria-pressed="false">Show</button>
+            </div>
           </label>
 
           <div class="form-row">
@@ -82,7 +89,10 @@
             </label>
             <label>
               <span>Password</span>
-              <input id="signup-password" name="password" type="password" autocomplete="new-password" placeholder="Create a password" required />
+              <div class="password-field">
+                <input id="signup-password" name="password" type="password" autocomplete="new-password" placeholder="Create a password" required />
+                <button class="password-toggle" type="button" id="toggle-signup-password" aria-pressed="false">Show</button>
+              </div>
             </label>
             <button class="btn btn--yellow" id="signup-submit" type="submit">Create Account</button>
           </form>

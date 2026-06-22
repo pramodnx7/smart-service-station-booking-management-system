@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="AutoCare technician dashboard for assigned service jobs, progress updates, notes and spare parts usage." />
+  <title>AutoCare | Technician Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/customer-dashboard.css" />
+</head>
+<body>
+  <div class="customer-shell">
+    <aside class="customer-sidebar" id="technician-sidebar">
+      <a class="brand" href="technician-dashboard.html" aria-label="AutoCare technician dashboard">
+        <span class="brand__mark">
+          <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16 2 28 7v8c0 7.5-4.7 12.6-12 15C8.7 27.6 4 22.5 4 15V7l12-5Z"/><path d="m10 17 4 4 8-10"/></svg>
+        </span>
+        <span><strong>Auto <b>Care</b></strong><small>Technician Console</small></span>
+      </a>
+
+      <nav class="side-nav" aria-label="Technician navigation">
+        <button class="side-nav__item is-active" type="button" data-view="overview"><span data-icon="dashboard"></span>Dashboard</button>
+        <button class="side-nav__item" type="button" data-view="assigned"><span data-icon="tools"></span>Assigned Jobs</button>
+        <button class="side-nav__item" type="button" data-view="inventory"><span data-icon="invoice"></span>Inventory</button>
+        <button class="side-nav__item" type="button" data-view="completed"><span data-icon="calendar"></span>Completed Jobs</button>
+        <button class="side-nav__item" type="button" data-view="performance"><span data-icon="invoice"></span>Performance</button>
+        <button class="side-nav__item" type="button" data-action="logout"><span data-icon="logout"></span>Logout</button>
+      </nav>
+
+      <div class="help-card">
+        <span>Signed in as</span>
+        <strong id="sidebar-name">Technician</strong>
+        <small id="sidebar-specialization">Workshop team</small>
+      </div>
+    </aside>
+
+    <div class="workspace">
+      <header class="topbar">
+        <button class="icon-btn mobile-menu" type="button" id="mobile-menu" aria-label="Open menu"><span data-icon="menu"></span></button>
+        <div>
+          <p class="eyebrow">Technician Action</p>
+          <h1 id="page-title">Dashboard</h1>
+        </div>
+        <button class="icon-btn" type="button" aria-label="Notifications"><span data-icon="bell"></span><b id="notification-count">0</b></button>
+        <div class="profile-pill">
+          <span id="profile-initials">TC</span>
+          <div><strong id="profile-name">Technician</strong><small id="profile-email">tech@autocare.lk</small></div>
+        </div>
+      </header>
+
+      <main class="content">
+        <section class="view is-active" data-view-panel="overview">
+          <div class="metric-grid" id="metric-grid"></div>
+          <div class="dashboard-grid dashboard-grid--even">
+            <article class="panel">
+              <div class="panel__header"><div><h2>Today's Jobs</h2><p>Assigned work scheduled for today.</p></div></div>
+              <div class="table-wrap"><table><thead><tr><th>Job ID</th><th>Vehicle Number</th><th>Customer</th><th>Service</th><th>Status</th><th>Assigned Date</th><th>Action</th></tr></thead><tbody id="today-jobs-body"></tbody></table></div>
+            </article>
+            <article class="panel">
+              <div class="panel__header"><div><h2>Recent Assignments</h2><p>Latest assigned service jobs.</p></div></div>
+              <div id="recent-assignments" class="progress-list"></div>
+            </article>
+          </div>
+        </section>
+
+        <section class="view" data-view-panel="assigned">
+          <div class="panel">
+            <div class="panel__header"><div><h2>Assigned Jobs</h2><p>Only jobs assigned to your technician account are shown.</p></div></div>
+            <div class="table-wrap"><table><thead><tr><th>Job ID</th><th>Vehicle Number</th><th>Customer</th><th>Service</th><th>Status</th><th>Assigned Date</th><th>Action</th></tr></thead><tbody id="assigned-jobs-body"></tbody></table></div>
+          </div>
+        </section>
+
+        <section class="view" data-view-panel="inventory">
+          <div class="panel">
+            <div class="panel__header"><div><h2>Available Inventory</h2><p>Search parts, stock availability, pricing and warranty.</p></div></div>
+            <div class="table-tools"><input id="inventory-search" type="search" placeholder="Search parts..." /></div>
+            <div class="table-wrap"><table><thead><tr><th>Item</th><th>Category</th><th>Brand</th><th>Stock</th><th>Price</th><th>Warranty</th></tr></thead><tbody id="inventory-body"></tbody></table></div>
+          </div>
+        </section>
+
+        <section class="view" data-view-panel="completed">
+          <div class="panel">
+            <div class="panel__header"><div><h2>Completed Jobs</h2><p>Your completed service history.</p></div></div>
+            <div class="table-wrap"><table><thead><tr><th>Job</th><th>Vehicle</th><th>Customer</th><th>Service</th><th>Completion Date</th></tr></thead><tbody id="completed-jobs-body"></tbody></table></div>
+          </div>
+        </section>
+
+        <section class="view" data-view-panel="performance">
+          <div class="panel">
+            <div class="panel__header"><div><h2>Performance Metrics</h2><p>Jobs completed, active work and completion timing.</p></div></div>
+            <div class="table-wrap"><table><thead><tr><th>Jobs Completed</th><th>Average Completion</th><th>Active Jobs</th><th>Customer Ratings</th><th>Total Services</th></tr></thead><tbody id="performance-body"></tbody></table></div>
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <dialog class="modal" id="technician-modal">
+    <form method="dialog" class="modal__card" id="modal-form">
+      <div class="modal__header">
+        <div><p class="eyebrow" id="modal-kicker">Technician Action</p><h2 id="modal-title">Job</h2></div>
+        <button class="icon-btn" type="button" data-action="close-modal" aria-label="Close dialog"><span data-icon="x"></span></button>
+      </div>
+      <div class="modal__body" id="modal-body"></div>
+      <div class="modal__actions">
+        <button class="btn btn--ghost" type="button" data-action="close-modal">Cancel</button>
+        <button class="btn btn--blue" type="submit">Save</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <script src="js/api.js"></script>
+  <script src="js/technician-dashboard.js"></script>
+</body>
+</html>
