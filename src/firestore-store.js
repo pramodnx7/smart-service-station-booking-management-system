@@ -105,6 +105,33 @@ async function nextId(transaction, collection) {
   return id;
 }
 
+async function nextIds(transaction, collection, count) {
+  const counterRef = db.collection('meta').doc('counters');
+  const snapshot = await transaction.get(counterRef);
+  const counters = snapshot.exists ? snapshot.data() : {};
+  const start = Number(counters[collection] || 0) + 1;
+  const ids = Array.from({ length: count }, (_, index) => start + index);
+  transaction.set(counterRef, { [collection]: start + count - 1 }, { merge: true });
+  return ids;
+}
+
+async function nextIdsForCollections(transaction, requests) {
+  const counterRef = db.collection('meta').doc('counters');
+  const snapshot = await transaction.get(counterRef);
+  const counters = snapshot.exists ? snapshot.data() : {};
+  const updates = {};
+  const idsByCollection = {};
+
+  Object.entries(requests).forEach(([collection, count]) => {
+    const start = Number(counters[collection] || 0) + 1;
+    idsByCollection[collection] = Array.from({ length: count }, (_, index) => start + index);
+    updates[collection] = start + count - 1;
+  });
+
+  transaction.set(counterRef, updates, { merge: true });
+  return idsByCollection;
+}
+
 async function createDocument(collection, data) {
   assertFirebaseConfigured();
   return db.runTransaction(async (transaction) => {
@@ -1361,7 +1388,12 @@ async function addUsedPart(userId, data) {
     const unitPrice = Number(data.unitPrice || part.sellingPrice || part.unitPrice || 0);
     const warrantyStartDate = data.warrantyStartDate || today();
     const warrantyExpiryDate = data.warrantyExpiryDate || warrantyStartDate;
-    const id = await nextId(transaction, collections.serviceJobParts);
+    const ids = await nextIdsForCollections(transaction, {
+      [collections.serviceJobParts]: 1,
+      [collections.inventoryMovements]: 1
+    });
+    const id = ids[collections.serviceJobParts][0];
+    const movementId = ids[collections.inventoryMovements][0];
     const usageRef = docRef(collections.serviceJobParts, id);
     const usageData = {
       id,
@@ -1395,7 +1427,6 @@ async function addUsedPart(userId, data) {
       }, { merge: true });
     }
 
-    const movementId = await nextId(transaction, collections.inventoryMovements);
     transaction.set(docRef(collections.inventoryMovements, movementId), {
       id: movementId,
       partId: asId(data.partId),
@@ -1469,6 +1500,7 @@ async function returnUnusedPart(userId, data) {
     }
     const part = { id: Number(partSnapshot.id), ...partSnapshot.data() };
     const stock = Number(part.stock || 0) + quantity;
+    const movementId = await nextId(transaction, collections.inventoryMovements);
     transaction.set(partRef, {
       stock,
       stockQuantity: stock,
@@ -1476,7 +1508,6 @@ async function returnUnusedPart(userId, data) {
       updatedAt: fieldValue()
     }, { merge: true });
 
-    const movementId = await nextId(transaction, collections.inventoryMovements);
     const movement = {
       id: movementId,
       partId: asId(data.partId),
