@@ -1,0 +1,39 @@
+Error: Missing required fields: email, password
+    at requireFields (C:\Users\VICTUS\Desktop\RAD Project\smart-service-station-booking-management-system\server.js:48:19)
+    at C:\Users\VICTUS\Desktop\RAD Project\smart-service-station-booking-management-system\server.js:82:5
+    at Layer.handle [as handle_request] (C:\Users\VICTUS\Desktop\RAD Project\smart-service-station-booking-management-system\node_modules\express\lib\router\layer.js:95:5)
+    at next (C:\Users\VICTUS\Desktop\RAD Project\smart-service-station-booking-management-system\node_modules\express\lib\router\route.js:149:13)
+    at Route.dispatch (C:\Users\VICTUS\Desktop\RAD Project\smart-service-station-booking-management-system\node_modules\express\lib\router\route.js:119:3)
+    at Layer.handle [as handle_request] (C:\Users\VICTUS\Desktop\RAD Project\smart-service-station-booking-management-system\node_modules\express\lib\router\layer.js:95:5)
+    at C:\Users\VICTUS\Desktop\RAD Project\smart-service-station-booking-management-system\node_modules\express\lib\router\index.js:284:15
+    at router.process_params (C:\Users\VICTUS\Desktop\RAD Project\smart-service-station-booking-management-system\node_modules\express\lib\router\index.js:346:12)
+    at next (C:\Users\VICTUS\Desktop\RAD Project\smart-service-station-booking-management-system\node_modules\express\lib\router\index.js:280:10)
+    at serveStatic (C:\Users\VICTUS\Desktop\RAD Project\smart-service-station-booking-management-system\node_modules\serve-static\index.js:75:16) {
+  status: 400
+}
+Error: Missing required fields: password
+    at requireFields (C:\Users\VICTUS\Desktop\RAD Project\smart-service-station-booking-management-system\server.js:48:19)
+    at C:\Users\VICTUS\Desktop\RAD Project\smart-service-station-booking-management-system\server.js:82:5
+    at Layer.handle [as handle_request] (C:\Users\VICTUS\Desktop\RAD Project\smart-service-station-booking-management-system\node_modules\express\lib\router\layer.js:95:5)
+    at next (C:\Users\VICTUS\Desktop\RAD Project\smart-service-station-booking-management-system\node_modules\express\lib\router\route.js:149:13)
+    at Route.dispatch (C:\Users\VICTUS\Desktop\RAD Project\smart-service-station-booking-management-system\node_modules\express\lib\router\route.js:119:3)
+    at Layer.handle [as handle_request] (C:\Users\VICTUS\Desktop\RAD Project\smart-service-station-booking-management-system\node_modules\express\lib\router\layer.js:95:5)
+    at C:\Users\VICTUS\Desktop\RAD Project\smart-service-station-booking-management-system\node_modules\express\lib\router\index.js:284:15
+    at router.process_params (C:\Users\VICTUS\Desktop\RAD Project\smart-service-station-booking-management-system\node_modules\express\lib\router\index.js:346:12)
+    at next (C:\Users\VICTUS\Desktop\RAD Project\smart-service-station-booking-management-system\node_modules\express\lib\router\index.js:280:10)
+    at serveStatic (C:\Users\VICTUS\Desktop\RAD Project\smart-service-station-booking-management-system\node_modules\serve-static\index.js:75:16) {
+  status: 400
+}
+Error: Missing required fields: password
+    at requireFields (C:\Users\VICTUS\Desktop\RAD Project\smart-service-station-booking-management-system\server.js:48:19)
+    at C:\Users\VICTUS\Desktop\RAD Project\smart-service-station-booking-management-system\server.js:82:5
+    at Layer.handle [as handle_request] (C:\Users\VICTUS\Desktop\RAD Project\smart-service-station-booking-management-system\node_modules\express\lib\router\layer.js:95:5)
+    at next (C:\Users\VICTUS\Desktop\RAD Project\smart-service-station-booking-management-system\node_modules\express\lib\router\route.js:149:13)
+    at Route.dispatch (C:\Users\VICTUS\Desktop\RAD Project\smart-service-station-booking-management-system\node_modules\express\lib\router\route.js:119:3)
+    at Layer.handle [as handle_request] (C:\Users\VICTUS\Desktop\RAD Project\smart-service-station-booking-management-system\node_modules\express\lib\router\layer.js:95:5)
+    at C:\Users\VICTUS\Desktop\RAD Project\smart-service-station-booking-management-system\node_modules\express\lib\router\index.js:284:15
+    at router.process_params (C:\Users\VICTUS\Desktop\RAD Project\smart-service-station-booking-management-system\node_modules\express\lib\router\index.js:346:12)
+    at next (C:\Users\VICTUS\Desktop\RAD Project\smart-service-station-booking-management-system\node_modules\express\lib\router\index.js:280:10)
+    at serveStatic (C:\Users\VICTUS\Desktop\RAD Project\smart-service-station-booking-management-system\node_modules\serve-static\index.js:75:16) {
+  status: 400
+}
