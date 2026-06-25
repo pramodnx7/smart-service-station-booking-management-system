@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="css/customer-dashboard.css?v=technician-actions-2" />
+  <link rel="stylesheet" href="css/customer-dashboard.css?v=technician-files-1" />
 </head>
 <body>
   <div class="customer-shell">
@@ -90,8 +90,8 @@
 
         <section class="view" data-view-panel="files">
           <div class="panel">
-            <div class="panel__header"><div><h2>Photo & Document Uploads</h2><p>Upload vehicle, service, replaced part and report files for assigned jobs.</p></div></div>
-            <div class="table-wrap"><table><thead><tr><th>Job</th><th>Vehicle</th><th>Service</th><th>Status</th><th>Actions</th></tr></thead><tbody id="file-jobs-body"></tbody></table></div>
+            <div class="panel__header"><div><h2>Uploaded Photos & Documents</h2><p>Only files already uploaded by technicians for assigned jobs are shown here.</p></div></div>
+            <div class="table-wrap"><table><thead><tr><th>File</th><th>Type</th><th>Job</th><th>Vehicle</th><th>Uploaded Date</th><th>Action</th></tr></thead><tbody id="file-jobs-body"></tbody></table></div>
           </div>
         </section>
 
@@ -121,6 +121,6 @@
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
   <script src="js/api.js"></script>
-  <script src="js/technician-dashboard.js?v=technician-actions-2"></script>
+  <script src="js/technician-dashboard.js?v=technician-files-1"></script>
 </body>
 </html>

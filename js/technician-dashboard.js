@@ -28,6 +28,8 @@ document.addEventListener('DOMContentLoaded', () => {
     activeJobs: 0,
     performance: {},
     inventoryParts: [],
+    servicePhotos: [],
+    documents: [],
     notifications: []
   };
 
@@ -151,6 +153,45 @@ document.addEventListener('DOMContentLoaded', () => {
     `).join('');
   }
 
+  function formatFileSize(bytes) {
+    const size = Number(bytes || 0);
+    if (!size) return '';
+    if (size < 1024 * 1024) return `${Math.ceil(size / 1024)} KB`;
+    return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+  }
+
+  function renderUploadedFiles() {
+    const jobsById = new Map(state.jobs.map((job) => [Number(job.id), job]));
+    const uploads = [
+      ...(state.servicePhotos || []).map((file) => ({ ...file, label: file.photoType || 'Service Photo' })),
+      ...(state.documents || []).map((file) => ({ ...file, label: file.documentType || 'Service Document' }))
+    ].sort((a, b) => Number(b.id) - Number(a.id));
+
+    document.getElementById('file-jobs-body').innerHTML = uploads.length ? uploads.map((file) => {
+      const job = jobsById.get(Number(file.serviceJobId)) || {};
+      const fileSize = formatFileSize(file.sizeBytes);
+      return `
+        <tr>
+          <td><span class="row-title">${file.fileName}</span><span class="row-sub">${file.description || fileSize || 'Uploaded file'}</span></td>
+          <td><span class="badge badge--${file.kind === 'photo' ? 'approved' : 'progress'}">${file.label}</span></td>
+          <td><span class="row-title">#SJ-${file.serviceJobId || '-'}</span><span class="row-sub">${job.customerName || ''}</span></td>
+          <td>${job.vehicleNumber || '-'}<span class="row-sub">${job.vehicleName || ''}</span></td>
+          <td>${file.uploadedAt || '-'}</td>
+          <td><a class="mini-btn mini-btn--files" href="${file.fileUrl}" target="_blank" rel="noopener">Open</a></td>
+        </tr>
+      `;
+    }).join('') : `
+      <tr>
+        <td colspan="6">
+          <div class="empty-state">
+            <strong>No uploaded photos or documents yet.</strong>
+            <p>Files uploaded from assigned jobs will appear here automatically.</p>
+          </div>
+        </td>
+      </tr>
+    `;
+  }
+
   function renderJobs() {
     document.getElementById('today-jobs-body').innerHTML = jobRows(state.todayJobs);
     document.getElementById('assigned-jobs-body').innerHTML = jobRows(state.jobs.filter((job) => job.status !== 'Completed'));
@@ -165,9 +206,7 @@ document.addEventListener('DOMContentLoaded', () => {
         <small>${job.vehicleNumber} - ${job.status}</small>
       </div>
     `).join('');
-    document.getElementById('file-jobs-body').innerHTML = state.jobs.map((job) => `
-      <tr><td><span class="row-title">#SJ-${job.id}</span></td><td>${job.vehicleNumber}</td><td>${job.serviceType}</td><td><span class="badge badge--${statusClass(job.status)}">${job.status}</span></td><td>${jobActions(job)}</td></tr>
-    `).join('');
+    renderUploadedFiles();
   }
 
   function renderInventory(filter = '') {

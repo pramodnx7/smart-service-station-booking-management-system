@@ -623,6 +623,23 @@ td {
   margin-bottom: 18px;
 }
 
+.empty-state {
+  padding: 28px;
+  text-align: center;
+  color: var(--muted);
+}
+
+.empty-state strong {
+  display: block;
+  color: var(--ink);
+  font-size: 1rem;
+  margin-bottom: 6px;
+}
+
+.empty-state p {
+  margin: 0;
+}
+
 .progress-item {
   display: grid;
   gap: 10px;

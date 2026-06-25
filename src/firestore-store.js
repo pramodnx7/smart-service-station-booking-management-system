@@ -1686,19 +1686,22 @@ async function getTechnicianDashboard(userId) {
     throw error;
   }
 
-  const [jobs, notes, progressEntries, partsUsed, inventoryParts, notifications, context] = await Promise.all([
+  const [jobs, notes, progressEntries, partsUsed, inventoryParts, notifications, photos, documents, context] = await Promise.all([
     all(collections.serviceJobs),
     all(collections.technicianNotes),
     all(collections.technicianProgress),
     all(collections.serviceJobParts),
     all(collections.inventoryParts),
     all(collections.notifications),
+    all(collections.serviceImages),
+    all(collections.documents),
     dashboardContext()
   ]);
 
   const assignedJobs = jobs
     .filter((job) => Number(job.assignedTechnicianId) === Number(technician.id))
     .map((job) => serviceJobView(job, context));
+  const assignedJobIds = new Set(assignedJobs.map((job) => Number(job.id)));
   const todayText = today();
 
   return {
@@ -1714,6 +1717,8 @@ async function getTechnicianDashboard(userId) {
     progress: progressEntries.filter((entry) => Number(entry.technicianId) === Number(technician.id)),
     partsUsed: partsUsed.filter((part) => Number(part.usedByTechnician) === Number(technician.id)),
     inventoryParts: inventoryParts.map(partView),
+    servicePhotos: sortById(photos.filter((photo) => assignedJobIds.has(Number(photo.serviceJobId)))).reverse().map((photo) => fileView(photo, 'photo')),
+    documents: sortById(documents.filter((document) => assignedJobIds.has(Number(document.serviceJobId)))).reverse().map((document) => fileView(document, 'document')),
     notifications: sortById(notifications.filter((item) => item.userId === userId)).reverse().map(({ id, type, message, unread }) => ({ id, type, message, unread }))
   };
 }
