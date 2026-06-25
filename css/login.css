@@ -291,6 +291,25 @@ input:focus {
   outline-offset: 2px;
 }
 
+.verification-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 132px;
+  gap: 10px;
+  align-items: end;
+}
+
+.verification-note {
+  margin: -6px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.5;
+}
+
+.verification-note.is-success {
+  color: var(--green);
+}
+
 .form-row {
   display: flex;
   align-items: center;
@@ -415,5 +434,9 @@ input:focus {
   .form-row {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .verification-row {
+    grid-template-columns: 1fr;
   }
 }

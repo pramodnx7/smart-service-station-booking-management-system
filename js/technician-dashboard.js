@@ -110,17 +110,29 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function jobActions(job) {
     return `
-      <div class="row-actions">
-        <button class="mini-btn" type="button" data-action="update-progress" data-id="${job.id}">Progress</button>
-        <button class="mini-btn" type="button" data-action="add-note" data-id="${job.id}">Note</button>
-        <button class="mini-btn" type="button" data-action="add-part" data-id="${job.id}">Parts</button>
-        <button class="mini-btn" type="button" data-action="return-part" data-id="${job.id}">Return</button>
-        <button class="mini-btn" type="button" data-action="replace-part" data-id="${job.id}">Replace</button>
-        <button class="mini-btn" type="button" data-action="request-parts" data-id="${job.id}">Request</button>
-        <button class="mini-btn" type="button" data-action="add-image" data-id="${job.id}">Image</button>
-        <button class="mini-btn" type="button" data-action="upload-photos" data-id="${job.id}">Photos</button>
-        <button class="mini-btn" type="button" data-action="upload-documents" data-id="${job.id}">Docs</button>
-        <button class="mini-btn" type="button" data-action="complete-job" data-id="${job.id}">Complete</button>
+      <div class="technician-actions" aria-label="Job actions for #SJ-${job.id}">
+        <div class="technician-actions__group">
+          <span>Work</span>
+          <button class="mini-btn mini-btn--work" type="button" data-action="update-progress" data-id="${job.id}">Update Progress</button>
+          <button class="mini-btn mini-btn--work" type="button" data-action="add-note" data-id="${job.id}">Add Note</button>
+        </div>
+        <div class="technician-actions__group">
+          <span>Parts</span>
+          <button class="mini-btn mini-btn--parts" type="button" data-action="add-part" data-id="${job.id}">Use Part</button>
+          <button class="mini-btn mini-btn--parts" type="button" data-action="return-part" data-id="${job.id}">Return Part</button>
+          <button class="mini-btn mini-btn--parts" type="button" data-action="replace-part" data-id="${job.id}">Replace Part</button>
+          <button class="mini-btn mini-btn--parts" type="button" data-action="request-parts" data-id="${job.id}">Request Part</button>
+        </div>
+        <div class="technician-actions__group">
+          <span>Files</span>
+          <button class="mini-btn mini-btn--files" type="button" data-action="add-image" data-id="${job.id}">Image Link</button>
+          <button class="mini-btn mini-btn--files" type="button" data-action="upload-photos" data-id="${job.id}">Upload Photos</button>
+          <button class="mini-btn mini-btn--files" type="button" data-action="upload-documents" data-id="${job.id}">Upload Docs</button>
+        </div>
+        <div class="technician-actions__group technician-actions__group--finish">
+          <span>Finish</span>
+          <button class="mini-btn mini-btn--complete" type="button" data-action="complete-job" data-id="${job.id}">Complete Job</button>
+        </div>
       </div>
     `;
   }
@@ -205,52 +217,82 @@ document.addEventListener('DOMContentLoaded', () => {
     return `<label><span>${label}</span><input name="${name}" type="${type}" value="${value}" required /></label>`;
   }
 
+  function jobSummary(job) {
+    return `
+      <div class="job-action-summary full">
+        <span>#SJ-${job.id}</span>
+        <strong>${job.vehicleNumber || 'Vehicle'} - ${job.serviceType || 'Service Job'}</strong>
+        <small>${job.customerName || 'Customer'} / ${job.status || 'Pending'}</small>
+      </div>
+    `;
+  }
+
   function openModal(mode, job = {}) {
+    if (!job?.id) {
+      showToast('Job details are still loading. Try again in a moment.');
+      return;
+    }
     const statusOptions = ['Assigned', 'In Progress', 'Waiting For Parts', 'Quality Check', 'Completed'].map((status) => ({ value: status, label: status }));
     const partOptions = state.inventoryParts.map((part) => ({ value: part.id, label: `${part.name} (${part.stock} available)` }));
     const config = {
       progress: {
         title: `Update #SJ-${job.id}`,
-        body: field('progressPercentage', 'Progress Percentage', 'number', job.progress || 0) + field('status', 'Status', 'select', job.status || 'In Progress', statusOptions) + field('remarks', 'Remarks', 'textarea', '')
+        submitLabel: 'Update Progress',
+        body: field('progressPercentage', 'Progress Percentage', 'number', job.progress || 0) + field('status', 'Status', 'select', job.status || 'In Progress', statusOptions) + field('remarks', 'Work Details / Remarks', 'textarea', '')
       },
       note: {
         title: `Add Note #SJ-${job.id}`,
+        submitLabel: 'Save Note',
         body: field('note', 'Service / Repair Note', 'textarea', '')
       },
       part: {
         title: `Record Parts #SJ-${job.id}`,
-        body: field('partId', 'Spare Part', 'select', partOptions[0]?.value, partOptions) + field('quantity', 'Quantity', 'number', '1') + field('condition', 'Condition', 'select', 'Brand New', ['Brand New', 'Used', 'Refurbished', 'Reconditioned', 'Customer Supplied'].map((condition) => ({ value: condition, label: condition }))) + field('warrantyStartDate', 'Warranty Start', 'date', new Date().toISOString().slice(0, 10)) + field('warrantyExpiryDate', 'Warranty Expiry', 'date', new Date().toISOString().slice(0, 10)) + '<label class="full"><span>Part Photo</span><input name="partPhoto" type="file" accept=".jpg,.jpeg,.png" /></label><div class="full notification-list" id="file-preview"></div>' + field('note', 'Note', 'textarea', '')
+        submitLabel: 'Save Used Part',
+        body: field('partId', 'Spare Part', 'select', partOptions[0]?.value, partOptions) + field('quantity', 'Quantity Used', 'number', '1') + field('condition', 'Part Condition', 'select', 'Brand New', ['Brand New', 'Used', 'Refurbished', 'Reconditioned', 'Customer Supplied'].map((condition) => ({ value: condition, label: condition }))) + field('warrantyStartDate', 'Warranty Start', 'date', new Date().toISOString().slice(0, 10)) + field('warrantyExpiryDate', 'Warranty Expiry', 'date', new Date().toISOString().slice(0, 10)) + '<label class="full"><span>Part Photo</span><input name="partPhoto" type="file" accept=".jpg,.jpeg,.png" /></label><div class="full notification-list" id="file-preview"></div>' + field('note', 'Part Usage Note', 'textarea', '')
       },
       returnPart: {
         title: `Return Parts #SJ-${job.id}`,
-        body: field('partId', 'Spare Part', 'select', partOptions[0]?.value, partOptions) + field('quantity', 'Quantity', 'number', '1') + field('condition', 'Condition', 'select', 'Brand New', ['Brand New', 'Used', 'Refurbished', 'Reconditioned'].map((condition) => ({ value: condition, label: condition }))) + field('note', 'Note', 'textarea', '')
+        submitLabel: 'Save Return',
+        body: field('partId', 'Spare Part', 'select', partOptions[0]?.value, partOptions) + field('quantity', 'Quantity Returned', 'number', '1') + field('condition', 'Return Condition', 'select', 'Brand New', ['Brand New', 'Used', 'Refurbished', 'Reconditioned'].map((condition) => ({ value: condition, label: condition }))) + field('note', 'Return Note', 'textarea', '')
       },
       replacePart: {
         title: `Record Replaced Part #SJ-${job.id}`,
-        body: field('removedPartName', 'Removed Part Name', 'text', '') + field('condition', 'Condition', 'text', '') + field('replacementReason', 'Replacement Reason', 'textarea', '') + field('photoEvidence', 'Photo Evidence URL', 'url', '')
+        submitLabel: 'Save Replacement',
+        body: field('removedPartName', 'Removed Part Name', 'text', '') + field('condition', 'Removed Part Condition', 'text', '') + field('replacementReason', 'Replacement Reason', 'textarea', '') + field('photoEvidence', 'Photo Evidence URL', 'url', '')
       },
       requestParts: {
         title: `Request Parts #SJ-${job.id}`,
-        body: field('request', 'Required Parts', 'textarea', '')
+        submitLabel: 'Send Request',
+        body: field('request', 'Required Parts Details', 'textarea', '')
       },
       image: {
         title: `Upload Image #SJ-${job.id}`,
-        body: field('imageUrl', 'Image URL', 'url', '') + field('caption', 'Caption', 'text', '')
+        submitLabel: 'Save Image Link',
+        body: field('imageUrl', 'Image URL', 'url', '') + field('caption', 'Image Caption', 'text', '')
       },
       uploadPhotos: {
         title: `Upload Photos #SJ-${job.id}`,
-        body: field('photoType', 'Photo Type', 'select', 'Before Service', ['Before Service', 'During Service', 'After Service', 'Replaced Part', 'Vehicle Inspection'].map((type) => ({ value: type, label: type }))) + field('description', 'Description', 'textarea', '') + '<label class="full"><span>Files</span><input name="files" type="file" accept=".jpg,.jpeg,.png,.pdf,.docx" multiple required /></label><div class="full notification-list" id="file-preview"></div>'
+        submitLabel: 'Upload Photos',
+        body: field('photoType', 'Photo Type', 'select', 'Before Service', ['Before Service', 'During Service', 'After Service', 'Replaced Part', 'Vehicle Inspection'].map((type) => ({ value: type, label: type }))) + '<label class="full"><span>Select Photo Files</span><input name="files" type="file" accept=".jpg,.jpeg,.png" multiple required /></label><div class="full notification-list" id="file-preview"></div>' + field('description', 'Photo Description', 'textarea', '')
       },
       uploadDocuments: {
         title: `Upload Documents #SJ-${job.id}`,
-        body: field('documentType', 'Document Type', 'select', 'Service Report', ['Service Report', 'Inspection Report', 'Warranty Document', 'Customer Attachment', 'Vehicle Registration Document', 'Insurance Document', 'Service Checklist', 'Invoice PDF'].map((type) => ({ value: type, label: type }))) + field('description', 'Description', 'textarea', '') + '<label class="full"><span>Files</span><input name="files" type="file" accept=".jpg,.jpeg,.png,.pdf,.docx" multiple required /></label><div class="full notification-list" id="file-preview"></div>'
+        submitLabel: 'Upload Documents',
+        body: field('documentType', 'Document Type', 'select', 'Service Report', ['Service Report', 'Inspection Report', 'Warranty Document', 'Customer Attachment', 'Vehicle Registration Document', 'Insurance Document', 'Service Checklist', 'Invoice PDF'].map((type) => ({ value: type, label: type }))) + '<label class="full"><span>Select Document Files</span><input name="files" type="file" accept=".jpg,.jpeg,.png,.pdf,.docx" multiple required /></label><div class="full notification-list" id="file-preview"></div>' + field('description', 'Document Description', 'textarea', '')
+      },
+      complete: {
+        title: `Complete #SJ-${job.id}`,
+        submitLabel: 'Complete Job',
+        body: field('remarks', 'Final Work Summary', 'textarea', '')
       }
     };
 
+    const selected = config[mode];
     els.modalForm.dataset.mode = mode;
     els.modalForm.dataset.id = job.id;
-    els.modalTitle.textContent = config[mode].title;
-    els.modalBody.innerHTML = config[mode].body;
+    els.modalTitle.textContent = selected.title;
+    els.modalBody.innerHTML = jobSummary(job) + selected.body;
+    els.modalForm.querySelector('button[type="submit"]').textContent = selected.submitLabel || 'Save';
     els.modal.showModal();
   }
 
@@ -313,10 +355,17 @@ document.addEventListener('DOMContentLoaded', () => {
         body: JSON.stringify({ [typeKey]: data[typeKey], description: data.description, files })
       });
     }
+    if (mode === 'complete') {
+      await window.AutoCareApi.request(`/api/technician/jobs/${id}/progress`, {
+        method: 'POST',
+        body: JSON.stringify({ progressPercentage: 100, status: 'Quality Check', remarks: data.remarks })
+      });
+      await window.AutoCareApi.request(`/api/technician/jobs/${id}/complete`, { method: 'PUT' });
+    }
 
     els.modal.close();
     await hydrateFromApi();
-    showToast('Job update saved.');
+    showToast(mode === 'complete' ? 'Job completed successfully.' : 'Job update saved.');
   }
 
   async function handleAction(action, id) {
@@ -330,12 +379,11 @@ document.addEventListener('DOMContentLoaded', () => {
     if (action === 'add-image') openModal('image', job);
     if (action === 'upload-photos') openModal('uploadPhotos', job);
     if (action === 'upload-documents') openModal('uploadDocuments', job);
-    if (action === 'complete-job') {
-      await window.AutoCareApi.request(`/api/technician/jobs/${id}/complete`, { method: 'PUT' });
-      await hydrateFromApi();
-      showToast('Job marked completed.');
+    if (action === 'complete-job') openModal('complete', job);
+    if (action === 'close-modal') {
+      els.modal.close();
+      els.modalForm.querySelector('button[type="submit"]').textContent = 'Save';
     }
-    if (action === 'close-modal') els.modal.close();
     if (action === 'logout') window.AutoCareApi.logout();
   }
 

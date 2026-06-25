@@ -434,6 +434,32 @@ async function createUserNotification(userId, type, message) {
   });
 }
 
+function vehicleNotificationLabel(vehicle) {
+  return [vehicle?.year, vehicle?.make, vehicle?.model]
+    .filter(Boolean)
+    .join(' ')
+    .trim() || vehicle?.name || 'vehicle';
+}
+
+function bookingNotificationMessage(action, booking, service, vehicle) {
+  const vehicleText = vehicle ? `${vehicleNotificationLabel(vehicle)} (${vehicle.plateNumber})` : 'your vehicle';
+  const serviceText = service?.name || 'service';
+  return `${action}: ${serviceText} for ${vehicleText} on ${booking.bookingDate} at ${booking.bookingTime}.`;
+}
+
+async function markCustomerNotificationRead(userId, notificationId) {
+  const notification = await getById(collections.notifications, notificationId);
+  if (!notification || Number(notification.userId) !== Number(userId)) return null;
+  return updateDocument(collections.notifications, notificationId, { unread: false });
+}
+
+async function markAllCustomerNotificationsRead(userId) {
+  const notifications = await all(collections.notifications);
+  const owned = notifications.filter((item) => Number(item.userId) === Number(userId) && item.unread);
+  await Promise.all(owned.map((item) => updateDocument(collections.notifications, item.id, { unread: false })));
+  return { updated: owned.length };
+}
+
 async function notifyAdmins(type, message) {
   const admins = await adminUsers();
   await Promise.all(admins.map((user) => createUserNotification(user.id, type, message)));
@@ -781,6 +807,50 @@ async function getAdminDashboard() {
   };
 }
 
+async function getAdminServiceJobDetails(serviceJobId) {
+  const [job, context, notes, progress, usages, replacedParts, photos, documents] = await Promise.all([
+    getById(collections.serviceJobs, serviceJobId),
+    dashboardContext(),
+    all(collections.technicianNotes),
+    all(collections.technicianProgress),
+    all(collections.serviceJobParts),
+    all(collections.replacedParts),
+    all(collections.serviceImages),
+    all(collections.documents)
+  ]);
+
+  if (!job) return null;
+
+  const id = Number(serviceJobId);
+  return {
+    job: serviceJobView(job, context),
+    progress: sortById(progress.filter((item) => Number(item.serviceJobId) === id)).reverse().map((item) => ({
+      id: item.id,
+      progressPercentage: Number(item.progressPercentage || 0),
+      status: item.status || '',
+      remarks: item.remarks || '',
+      createdAt: formatDate(item.createdAt)
+    })),
+    notes: sortById(notes.filter((item) => Number(item.serviceJobId) === id)).reverse().map((item) => ({
+      id: item.id,
+      note: item.note || '',
+      createdAt: formatDate(item.createdAt)
+    })),
+    usedParts: sortById(usages.filter((item) => Number(item.serviceJobId) === id)).reverse().map((item) => usageView(item, context)),
+    replacedParts: sortById(replacedParts.filter((item) => Number(item.serviceJobId) === id)).reverse().map((item) => ({
+      id: item.id,
+      removedPartName: item.removedPartName || '',
+      condition: item.condition || '',
+      replacementReason: item.replacementReason || '',
+      photoEvidence: item.photoEvidence || '',
+      note: item.note || '',
+      createdAt: formatDate(item.createdAt)
+    })),
+    photos: sortById(photos.filter((item) => Number(item.serviceJobId) === id)).reverse().map((item) => fileView(item, 'photo')),
+    documents: sortById(documents.filter((item) => Number(item.serviceJobId) === id)).reverse().map((item) => fileView(item, 'document'))
+  };
+}
+
 async function createVehicle(userId, data) {
   const vehicle = await createDocument(collections.vehicles, {
     userId,
@@ -789,8 +859,13 @@ async function createVehicle(userId, data) {
     model: data.model.trim(),
     plateNumber: data.plate.trim().toUpperCase(),
     year: String(data.year).trim(),
-    imageUrl: data.image || defaultImage
+    imageUrl: String(data.image || defaultImage).trim()
   });
+  await createUserNotification(
+    userId,
+    'Vehicle Added',
+    `${vehicleNotificationLabel(vehicle)} (${vehicle.plateNumber}) was added to your account.`
+  );
   return vehicleView(vehicle);
 }
 
@@ -804,8 +879,15 @@ async function updateVehicle(id, userId, data, enforceOwner = true) {
     make: data.make.trim(),
     model: data.model.trim(),
     plateNumber: data.plate.trim().toUpperCase(),
-    year: String(data.year).trim()
+    year: String(data.year).trim(),
+    imageUrl: String(data.image || current.imageUrl || defaultImage).trim()
   });
+
+  await createUserNotification(
+    userId,
+    'Vehicle Updated',
+    `${vehicleNotificationLabel(vehicle)} (${vehicle.plateNumber}) details were updated.`
+  );
 
   return vehicleView(vehicle);
 }
@@ -1075,6 +1157,9 @@ async function createBooking(userId, data, status = 'Pending') {
     ...resources
   });
 
+  const vehicle = await getById(collections.vehicles, data.vehicleId);
+  await createUserNotification(userId, 'Booking Created', bookingNotificationMessage('Booking created', booking, service, vehicle));
+
   return bookingView(booking, new Map([[service.id, service]]));
 }
 
@@ -1104,13 +1189,21 @@ async function updateBooking(id, userId, data, enforceOwner = true) {
     ...resources
   });
 
+  const vehicle = await getById(collections.vehicles, data.vehicleId);
+  await createUserNotification(userId, 'Booking Updated', bookingNotificationMessage('Booking updated', booking, service, vehicle));
+
   return bookingView(booking, new Map([[service.id, service]]));
 }
 
 async function cancelBooking(id, userId, enforceOwner = true) {
   const current = await getById(collections.bookings, id);
   if (!current || (enforceOwner && current.userId !== userId)) return false;
-  await updateDocument(collections.bookings, id, { status: 'Cancelled', progress: 0 });
+  const booking = await updateDocument(collections.bookings, id, { status: 'Cancelled', progress: 0 });
+  const [service, vehicle] = await Promise.all([
+    getById(collections.servicePackages, current.servicePackageId),
+    getById(collections.vehicles, current.vehicleId)
+  ]);
+  await createUserNotification(userId, 'Booking Cancelled', bookingNotificationMessage('Booking cancelled', booking, service, vehicle));
   return true;
 }
 
@@ -1137,12 +1230,14 @@ async function advanceBooking(id) {
 }
 
 async function createEmergency(userId, data) {
-  return createDocument(collections.emergencyRequests, {
+  const emergency = await createDocument(collections.emergencyRequests, {
     userId,
     location: data.location.trim(),
     problem: data.problem.trim(),
     status: 'Open'
   });
+  await createUserNotification(userId, 'Emergency Request Sent', `Emergency request sent from ${emergency.location}: ${emergency.problem}.`);
+  return emergency;
 }
 
 async function createFeedback(userId, data) {
@@ -1151,6 +1246,7 @@ async function createFeedback(userId, data) {
     rating: Number(data.rating),
     comment: data.feedback.trim()
   });
+  await createUserNotification(userId, 'Feedback Submitted', `Thank you. Your ${Number(data.rating)} star feedback was submitted.`);
 }
 
 async function updateProfile(userId, data) {
@@ -2547,6 +2643,7 @@ module.exports = {
   ensureSeedData,
   findUserByEmailRole,
   getAdminDashboard,
+  getAdminServiceJobDetails,
   getById,
   getCustomerDashboard,
   getBookingSlots,
@@ -2566,6 +2663,8 @@ module.exports = {
   returnUnusedPart,
   deleteStoredFile,
   markInvoiceEmailed,
+  markAllCustomerNotificationsRead,
+  markCustomerNotificationRead,
   completeTechnicianJob,
   updateBooking,
   updateCustomer,

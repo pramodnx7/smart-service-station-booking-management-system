@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="css/customer-dashboard.css" />
+  <link rel="stylesheet" href="css/customer-dashboard.css?v=live-notifications-2" />
 </head>
 <body>
   <div class="customer-shell">
@@ -171,7 +171,18 @@
 
         <section class="view" data-view-panel="notifications">
           <div class="panel">
-            <div class="panel__header"><div><h2>Notifications & Offers</h2><p>Booking updates, completion alerts, payment notifications and promotions.</p></div></div>
+            <div class="panel__header">
+              <div><h2>Notifications & Offers</h2><p id="notification-summary">Booking updates, completion alerts, payment notifications and promotions.</p></div>
+              <button class="btn btn--ghost" type="button" data-action="mark-all-notifications-read">Mark All Read</button>
+            </div>
+            <div class="notification-toolbar">
+              <div class="status-tabs" id="notification-tabs">
+                <button class="is-active" type="button" data-action="filter-notifications" data-filter="all">All</button>
+                <button type="button" data-action="filter-notifications" data-filter="unread">Unread</button>
+                <button type="button" data-action="filter-notifications" data-filter="read">Read</button>
+              </div>
+              <span id="notification-live-status">Live updates on</span>
+            </div>
             <div class="notification-list" id="notification-list"></div>
           </div>
         </section>
@@ -213,6 +224,6 @@
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
   <script src="js/api.js"></script>
-  <script src="js/customer-dashboard.js"></script>
+  <script src="js/customer-dashboard.js?v=live-notifications-2"></script>
 </body>
 </html>

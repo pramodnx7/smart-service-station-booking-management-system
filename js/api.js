@@ -1,5 +1,6 @@
 (function () {
   const sessionKey = 'autocare-session';
+  const apiBase = window.location.protocol === 'file:' ? 'http://localhost:3000' : '';
 
   function getSession() {
     try {
@@ -20,11 +21,16 @@
       headers.Authorization = `Bearer ${session.token}`;
     }
 
-    const response = await fetch(path, {
-      ...options,
-      credentials: options.credentials || 'same-origin',
-      headers
-    });
+    let response;
+    try {
+      response = await fetch(`${apiBase}${path}`, {
+        ...options,
+        credentials: options.credentials || 'same-origin',
+        headers
+      });
+    } catch (error) {
+      throw new Error('Cannot connect to the AutoCare server. Open http://localhost:3000/login.html and make sure the server is running.');
+    }
 
     const contentType = response.headers.get('content-type') || '';
     const payload = contentType.includes('application/json') ? await response.json() : await response.text();
@@ -44,6 +50,12 @@
       return request('/api/auth/login', {
         method: 'POST',
         body: JSON.stringify(credentials)
+      });
+    },
+    requestRegistrationCode(data) {
+      return request('/api/auth/register/request-code', {
+        method: 'POST',
+        body: JSON.stringify(data)
       });
     },
     register(data) {

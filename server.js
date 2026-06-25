@@ -8,6 +8,7 @@ const cors = require('cors');
 const helmet = require('helmet');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const nodemailer = require('nodemailer');
 const store = require('./src/firestore-store');
 
 const app = express();
@@ -20,6 +21,94 @@ app.use(express.json({ limit: '12mb' }));
 
 const uploadRoot = path.join(__dirname, 'uploads', 'service-files');
 fs.mkdirSync(uploadRoot, { recursive: true });
+
+const registrationCodes = new Map();
+const registrationCodeTtlMs = 10 * 60 * 1000;
+
+function hasSmtpConfig() {
+  return Boolean(
+    process.env.SMTP_HOST
+    && process.env.SMTP_USER
+    && process.env.SMTP_PASS
+    && !String(process.env.SMTP_USER).includes('your-gmail-address')
+    && !String(process.env.SMTP_PASS).includes('your-gmail-app-password')
+  );
+}
+
+function smtpTransport() {
+  return nodemailer.createTransport({
+    host: process.env.SMTP_HOST,
+    port: Number(process.env.SMTP_PORT || 587),
+    secure: String(process.env.SMTP_SECURE || '').toLowerCase() === 'true',
+    auth: {
+      user: process.env.SMTP_USER,
+      pass: process.env.SMTP_PASS
+    }
+  });
+}
+
+async function sendRegistrationCodeEmail(email, code) {
+  if (!hasSmtpConfig()) {
+    const error = new Error('Email sending is not configured. Add SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, and SMTP_FROM to .env, then restart the server.');
+    error.status = 500;
+    throw error;
+  }
+
+  const from = process.env.SMTP_FROM || process.env.SMTP_USER;
+  await smtpTransport().sendMail({
+    from,
+    to: email,
+    subject: 'AutoCare customer registration code',
+    text: `Your AutoCare customer registration code is ${code}. It expires in 10 minutes.`,
+    html: `
+      <div style="font-family:Arial,sans-serif;line-height:1.5;color:#183656">
+        <h2>AutoCare Email Verification</h2>
+        <p>Your customer registration code is:</p>
+        <p style="font-size:28px;font-weight:700;letter-spacing:4px">${code}</p>
+        <p>This code expires in 10 minutes. If you did not request this, you can ignore this email.</p>
+      </div>
+    `
+  });
+}
+
+function emailKey(email) {
+  return String(email || '').trim().toLowerCase();
+}
+
+function hashRegistrationCode(code) {
+  return crypto.createHash('sha256').update(`${jwtSecret}:${code}`).digest('hex');
+}
+
+function createRegistrationCode(email) {
+  const code = String(crypto.randomInt(100000, 1000000));
+  const verificationId = crypto.randomBytes(16).toString('hex');
+  registrationCodes.set(verificationId, {
+    email: emailKey(email),
+    codeHash: hashRegistrationCode(code),
+    expiresAt: Date.now() + registrationCodeTtlMs,
+    attempts: 0
+  });
+  return { verificationId, code };
+}
+
+function verifyRegistrationCode({ verificationId, email, code }) {
+  const record = registrationCodes.get(String(verificationId || ''));
+  if (!record || record.email !== emailKey(email) || record.expiresAt < Date.now()) {
+    return false;
+  }
+
+  record.attempts += 1;
+  if (record.attempts > 5) {
+    registrationCodes.delete(verificationId);
+    return false;
+  }
+
+  const isValid = record.codeHash === hashRegistrationCode(String(code || '').trim());
+  if (isValid) {
+    registrationCodes.delete(verificationId);
+  }
+  return isValid;
+}
 
 function parseCookies(req) {
   return String(req.headers.cookie || '')
@@ -215,13 +304,38 @@ app.get('/api/health', async (req, res, next) => {
   }
 });
 
+app.post('/api/auth/register/request-code', async (req, res, next) => {
+  try {
+    requireFields(req.body, ['email']);
+    const email = emailKey(req.body.email);
+    const existing = await store.findUserByEmailRole(email, 'customer');
+    if (existing) {
+      return res.status(409).json({ message: 'A customer account with this email already exists.' });
+    }
+
+    const { verificationId, code } = createRegistrationCode(email);
+    await sendRegistrationCodeEmail(email, code);
+    res.json({
+      verificationId,
+      expiresInSeconds: Math.floor(registrationCodeTtlMs / 1000),
+      message: 'Verification code sent to the customer email.'
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 app.post('/api/auth/register', async (req, res, next) => {
   try {
-    const { role = 'customer', name, email, password, phone = '' } = req.body;
-    requireFields(req.body, ['name', 'email', 'password']);
+    const { role = 'customer', name, email, password, phone = '', verificationId, verificationCode } = req.body;
+    requireFields(req.body, ['name', 'email', 'password', 'verificationId', 'verificationCode']);
 
     if (role !== 'customer') {
       return res.status(400).json({ message: 'Public registration is available for customers only.' });
+    }
+
+    if (!verifyRegistrationCode({ verificationId, email, code: verificationCode })) {
+      return res.status(400).json({ message: 'Invalid or expired verification code.' });
     }
 
     const passwordHash = await bcrypt.hash(password, 12);
@@ -281,6 +395,24 @@ app.use(express.static(path.join(__dirname)));
 app.get('/api/customer/dashboard', requireAuth('customer'), async (req, res, next) => {
   try {
     res.json(await store.getCustomerDashboard(req.user.id));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.put('/api/customer/notifications/:id/read', requireAuth('customer'), async (req, res, next) => {
+  try {
+    const notification = await store.markCustomerNotificationRead(req.user.id, req.params.id);
+    if (!notification) return res.status(404).json({ message: 'Notification not found.' });
+    res.json({ ok: true });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.put('/api/customer/notifications/read-all', requireAuth('customer'), async (req, res, next) => {
+  try {
+    res.json(await store.markAllCustomerNotificationsRead(req.user.id));
   } catch (error) {
     next(error);
   }
@@ -418,21 +550,43 @@ app.put('/api/technician/jobs/:id/complete', requireAuth('technician'), async (r
 });
 
 app.post('/api/customer/vehicles', requireAuth('customer'), async (req, res, next) => {
+  let storedVehicleImage = null;
   try {
     requireFields(req.body, ['make', 'model', 'plate', 'year']);
-    res.status(201).json(await store.createVehicle(req.user.id, req.body));
+    if (req.body.vehicleImage) {
+      assertImageUpload(req.body.vehicleImage, 'Vehicle image');
+      storedVehicleImage = storeUploadedFile(req.body.vehicleImage);
+    }
+    res.status(201).json(await store.createVehicle(req.user.id, {
+      ...req.body,
+      image: storedVehicleImage?.relativePath || req.body.image
+    }));
   } catch (error) {
+    if (storedVehicleImage?.absolutePath && fs.existsSync(storedVehicleImage.absolutePath)) {
+      fs.unlinkSync(storedVehicleImage.absolutePath);
+    }
     next(error);
   }
 });
 
 app.put('/api/customer/vehicles/:id', requireAuth('customer'), async (req, res, next) => {
+  let storedVehicleImage = null;
   try {
     requireFields(req.body, ['make', 'model', 'plate', 'year']);
-    const vehicle = await store.updateVehicle(req.params.id, req.user.id, req.body, true);
+    if (req.body.vehicleImage) {
+      assertImageUpload(req.body.vehicleImage, 'Vehicle image');
+      storedVehicleImage = storeUploadedFile(req.body.vehicleImage);
+    }
+    const vehicle = await store.updateVehicle(req.params.id, req.user.id, {
+      ...req.body,
+      image: storedVehicleImage?.relativePath || req.body.image
+    }, true);
     if (!vehicle) return res.status(404).json({ message: 'Vehicle not found.' });
     res.json(vehicle);
   } catch (error) {
+    if (storedVehicleImage?.absolutePath && fs.existsSync(storedVehicleImage.absolutePath)) {
+      fs.unlinkSync(storedVehicleImage.absolutePath);
+    }
     next(error);
   }
 });
@@ -774,21 +928,43 @@ app.put('/api/admin/inventory/suppliers/:id', requireAuth('admin'), async (req, 
 });
 
 app.post('/api/admin/vehicles', requireAuth('admin'), async (req, res, next) => {
+  let storedVehicleImage = null;
   try {
     requireFields(req.body, ['customerId', 'make', 'model', 'plate', 'year']);
-    res.status(201).json(await store.createVehicle(Number(req.body.customerId), req.body));
+    if (req.body.vehicleImage) {
+      assertImageUpload(req.body.vehicleImage, 'Vehicle image');
+      storedVehicleImage = storeUploadedFile(req.body.vehicleImage);
+    }
+    res.status(201).json(await store.createVehicle(Number(req.body.customerId), {
+      ...req.body,
+      image: storedVehicleImage?.relativePath || req.body.image
+    }));
   } catch (error) {
+    if (storedVehicleImage?.absolutePath && fs.existsSync(storedVehicleImage.absolutePath)) {
+      fs.unlinkSync(storedVehicleImage.absolutePath);
+    }
     next(error);
   }
 });
 
 app.put('/api/admin/vehicles/:id', requireAuth('admin'), async (req, res, next) => {
+  let storedVehicleImage = null;
   try {
     requireFields(req.body, ['customerId', 'make', 'model', 'plate', 'year']);
-    const vehicle = await store.updateVehicle(req.params.id, Number(req.body.customerId), req.body, false);
+    if (req.body.vehicleImage) {
+      assertImageUpload(req.body.vehicleImage, 'Vehicle image');
+      storedVehicleImage = storeUploadedFile(req.body.vehicleImage);
+    }
+    const vehicle = await store.updateVehicle(req.params.id, Number(req.body.customerId), {
+      ...req.body,
+      image: storedVehicleImage?.relativePath || req.body.image
+    }, false);
     if (!vehicle) return res.status(404).json({ message: 'Vehicle not found.' });
     res.json(vehicle);
   } catch (error) {
+    if (storedVehicleImage?.absolutePath && fs.existsSync(storedVehicleImage.absolutePath)) {
+      fs.unlinkSync(storedVehicleImage.absolutePath);
+    }
     next(error);
   }
 });
@@ -868,6 +1044,16 @@ app.put('/api/admin/service-jobs/:id/assign', requireAuth('admin'), async (req, 
   try {
     requireFields(req.body, ['technicianId']);
     res.json(await store.assignTechnician(req.params.id, req.body.technicianId));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get('/api/admin/service-jobs/:id/details', requireAuth('admin'), async (req, res, next) => {
+  try {
+    const details = await store.getAdminServiceJobDetails(req.params.id);
+    if (!details) return res.status(404).json({ message: 'Service job not found.' });
+    res.json(details);
   } catch (error) {
     next(error);
   }

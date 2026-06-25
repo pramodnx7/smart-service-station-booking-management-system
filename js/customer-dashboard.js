@@ -56,6 +56,8 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   let state = loadState();
+  let activeNotificationFilter = 'all';
+  let notificationRefreshTimer = null;
 
   const els = {
     sidebar: document.getElementById('customer-sidebar'),
@@ -101,7 +103,7 @@ document.addEventListener('DOMContentLoaded', () => {
     localStorage.setItem(storageKey, JSON.stringify(state));
   }
 
-  async function hydrateFromApi() {
+  async function hydrateFromApi({ silent = false } = {}) {
     try {
       const data = await window.AutoCareApi.request('/api/customer/dashboard');
       state = {
@@ -112,7 +114,7 @@ document.addEventListener('DOMContentLoaded', () => {
       saveState();
       renderAll();
     } catch (error) {
-      showToast(error.message || 'Could not load database data.');
+      if (!silent) showToast(error.message || 'Could not load database data.');
     }
   }
 
@@ -128,10 +130,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function formatMoney(amount) {
     return `LKR ${Number(amount).toLocaleString('en-LK')}`;
-  }
-
-  function nextId(collection) {
-    return Math.max(0, ...collection.map((item) => Number(item.id))) + 1;
   }
 
   function vehicleName(id) {
@@ -207,7 +205,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function vehicleCards(limit) {
     return state.vehicles.slice(0, limit || state.vehicles.length).map((vehicle) => `
       <article class="vehicle-card">
-        <img src="${vehicle.image}" alt="${vehicle.make} ${vehicle.model}" />
+        <img src="${vehicle.image || 'assets/images/hero-blue-workshop.png'}" alt="${vehicle.make} ${vehicle.model}" />
         <h3>${displayVehicleName(vehicle)}</h3>
         <p>${vehicle.plate}</p>
         <div class="card-meta"><span>${vehicle.year}</span><span>${vehicle.model}</span></div>
@@ -304,12 +302,28 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function renderNotifications() {
-    document.getElementById('notification-list').innerHTML = state.notifications.map((item) => `
-      <article class="notification-item">
+    const unread = state.notifications.filter((item) => item.unread).length;
+    const visible = state.notifications.filter((item) => (
+      activeNotificationFilter === 'all'
+      || (activeNotificationFilter === 'unread' && item.unread)
+      || (activeNotificationFilter === 'read' && !item.unread)
+    ));
+    document.getElementById('notification-summary').textContent = `${unread} unread updates. Latest booking, service, billing and offer messages appear here automatically.`;
+    document.getElementById('notification-live-status').textContent = `Live updates on / ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+    document.querySelectorAll('#notification-tabs button').forEach((button) => {
+      button.classList.toggle('is-active', button.dataset.filter === activeNotificationFilter);
+    });
+    document.getElementById('notification-list').innerHTML = visible.length ? visible.map((item) => `
+      <article class="notification-item notification-item--${item.unread ? 'unread' : 'read'}">
         <span data-icon="bell"></span>
-        <div><strong>${item.type}</strong><p>${item.message}</p></div>
+        <div>
+          <strong>${item.type}</strong>
+          <p>${item.message}</p>
+          <small>${item.unread ? 'New update' : 'Read'}</small>
+        </div>
+        ${item.unread ? `<button class="mini-btn" type="button" data-action="mark-notification-read" data-id="${item.id}">Mark Read</button>` : ''}
       </article>
-    `).join('');
+    `).join('') : '<article class="notification-empty"><strong>No notifications here.</strong><p>New updates will appear automatically.</p></article>';
     injectIcons();
   }
 
@@ -340,6 +354,8 @@ document.addEventListener('DOMContentLoaded', () => {
         ${field('newVehicleName', 'New Vehicle Name', 'text', '', [], false)}
         ${field('newVehiclePlate', 'Number Plate', 'text', '', [], false)}
         ${field('newVehicleYear', 'Year', 'number', '2026', [], false)}
+        <label class="full"><span>Customer Car Image</span><input name="newVehicleImage" type="file" accept=".jpg,.jpeg,.png,image/jpeg,image/png" /></label>
+        <div class="full vehicle-image-preview" data-file-preview="newVehicleImage"></div>
       </div>
     `;
   }
@@ -401,7 +417,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const config = {
       vehicle: {
         title: record.id ? 'Edit Vehicle' : 'Add Vehicle',
-        body: field('name', 'Vehicle Name', 'text', record.name || `${record.make || ''} ${record.model || ''}`.trim()) + field('make', 'Vehicle Make', 'text', record.make || '') + field('model', 'Model', 'text', record.model || '') + field('plate', 'Number Plate', 'text', record.plate || '') + field('year', 'Year', 'number', record.year || '2026')
+        body: field('name', 'Vehicle Name', 'text', record.name || `${record.make || ''} ${record.model || ''}`.trim()) + field('make', 'Vehicle Make', 'text', record.make || '') + field('model', 'Model', 'text', record.model || '') + field('plate', 'Number Plate', 'text', record.plate || '') + field('year', 'Year', 'number', record.year || '2026') + '<label class="full"><span>Customer Car Image</span><input name="vehicleImage" type="file" accept=".jpg,.jpeg,.png,image/jpeg,image/png" /></label>' + vehicleImagePreview(record.image, 'vehicleImage')
       },
       booking: {
         title: record.id ? 'Reschedule Booking' : 'Book Service Appointment',
@@ -434,12 +450,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
   async function handleModalSubmit(event) {
     event.preventDefault();
-    const data = Object.fromEntries(new FormData(els.modalForm).entries());
+    const formData = new FormData(els.modalForm);
+    const data = Object.fromEntries(formData.entries());
     const mode = els.modalForm.dataset.mode;
     const id = Number(els.modalForm.dataset.id);
 
     if (mode === 'vehicle') {
       const payload = { name: data.name, make: data.make, model: data.model, plate: data.plate, year: data.year };
+      const vehicleImage = await fileInputToPayload('vehicleImage');
+      if (vehicleImage) payload.vehicleImage = vehicleImage;
       const savedVehicle = await window.AutoCareApi.request(id ? `/api/customer/vehicles/${id}` : '/api/customer/vehicles', {
         method: id ? 'PUT' : 'POST',
         body: JSON.stringify(payload)
@@ -459,7 +478,8 @@ document.addEventListener('DOMContentLoaded', () => {
             make: vehicleParts.make,
             model: vehicleParts.model,
             plate: data.newVehiclePlate,
-            year: data.newVehicleYear
+            year: data.newVehicleYear,
+            vehicleImage: await fileInputToPayload('newVehicleImage')
           })
         });
         state.vehicles.push(savedVehicle);
@@ -473,7 +493,6 @@ document.addEventListener('DOMContentLoaded', () => {
       });
       id ? Object.assign(state.bookings.find((item) => item.id === id), savedBooking) : state.bookings.push(savedBooking);
       clearPendingBooking();
-      state.notifications.unshift({ id: nextId(state.notifications), type: 'Booking Update', message: 'Your booking request has been saved.', unread: true });
       showToast('Booking saved successfully.');
     }
 
@@ -482,13 +501,13 @@ document.addEventListener('DOMContentLoaded', () => {
         method: 'POST',
         body: JSON.stringify(data)
       });
-      state.notifications.unshift({ id: nextId(state.notifications), type: 'Emergency Request', message: `Emergency request sent from ${data.location}.`, unread: true });
       showToast('Emergency request sent to support.');
     }
 
     els.modal.close();
     saveState();
     renderAll();
+    await hydrateFromApi({ silent: true });
   }
 
   async function downloadInvoice(id) {
@@ -550,6 +569,7 @@ document.addEventListener('DOMContentLoaded', () => {
       state.bookings.find((item) => item.id === numericId).status = 'Cancelled';
       saveState();
       renderAll();
+      await hydrateFromApi({ silent: true });
       showToast('Booking cancelled.');
     }
     if (action === 'delete-booking') {
@@ -563,10 +583,37 @@ document.addEventListener('DOMContentLoaded', () => {
     if (action === 'download-invoice') await downloadInvoice(numericId);
     if (action === 'download-invoice-pdf') downloadInvoicePdf(numericId);
     if (action === 'download-file') downloadFile(element.dataset.kind, numericId);
+    if (action === 'filter-notifications') {
+      activeNotificationFilter = element.dataset.filter;
+      renderNotifications();
+    }
+    if (action === 'mark-notification-read') {
+      await window.AutoCareApi.request(`/api/customer/notifications/${numericId}/read`, { method: 'PUT' });
+      const notification = state.notifications.find((item) => item.id === numericId);
+      if (notification) notification.unread = false;
+      saveState();
+      renderMetrics();
+      renderNotifications();
+    }
+    if (action === 'mark-all-notifications-read') {
+      await window.AutoCareApi.request('/api/customer/notifications/read-all', { method: 'PUT' });
+      state.notifications.forEach((item) => { item.unread = false; });
+      saveState();
+      renderMetrics();
+      renderNotifications();
+      showToast('All notifications marked as read.');
+    }
     if (action === 'close-modal') els.modal.close();
     if (action === 'logout') {
       window.AutoCareApi.logout();
     }
+  }
+
+  function startNotificationRefresh() {
+    window.clearInterval(notificationRefreshTimer);
+    notificationRefreshTimer = window.setInterval(() => {
+      hydrateFromApi({ silent: true });
+    }, 15000);
   }
 
   function bindEvents() {
@@ -591,6 +638,9 @@ document.addEventListener('DOMContentLoaded', () => {
     els.modalForm.addEventListener('change', (event) => {
       if (event.target.name === 'vehicleId') {
         toggleNewVehicleFields();
+      }
+      if (event.target.type === 'file') {
+        renderFilePreview(event.target.name, event.target.files?.[0]);
       }
       if (['service', 'date'].includes(event.target.name)) {
         refreshBookingSlots();
@@ -637,11 +687,47 @@ document.addEventListener('DOMContentLoaded', () => {
           body: JSON.stringify(data)
         });
         event.currentTarget.reset();
+        await hydrateFromApi({ silent: true });
         showToast('Thank you for your feedback.');
       } catch (error) {
         showToast(error.message || 'Feedback was not submitted.');
       }
     });
+  }
+
+  function readFileAsBase64(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result).split(',')[1]);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
+
+  async function fileInputToPayload(name) {
+    const file = els.modalForm.querySelector(`input[name="${name}"]`)?.files?.[0];
+    if (!file) return null;
+    return {
+      fileName: file.name,
+      mimeType: file.type,
+      contentBase64: await readFileAsBase64(file)
+    };
+  }
+
+  function vehicleImagePreview(image, inputName) {
+    return `
+      <div class="full vehicle-image-preview" data-file-preview="${inputName}">
+        ${image ? `<img src="${image}" alt="" /><span>Current image</span>` : '<span>No image selected</span>'}
+      </div>
+    `;
+  }
+
+  function renderFilePreview(inputName, file) {
+    const preview = els.modalForm.querySelector(`[data-file-preview="${inputName}"]`);
+    if (!preview) return;
+    preview.innerHTML = file
+      ? `<span>${file.name}</span><small>${Math.round(file.size / 1024)} KB</small>`
+      : '<span>No image selected</span>';
   }
 
   injectIcons();
@@ -654,4 +740,5 @@ document.addEventListener('DOMContentLoaded', () => {
     window.setTimeout(() => openPendingBooking(), 300);
   }
   hydrateFromApi();
+  startNotificationRefresh();
 });

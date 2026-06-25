@@ -104,6 +104,8 @@ document.addEventListener('DOMContentLoaded', () => {
     toast: document.getElementById('toast'),
     modal: document.getElementById('dashboard-modal'),
     modalForm: document.getElementById('modal-form'),
+    modalActions: document.querySelector('#dashboard-modal .modal__actions'),
+    modalSubmit: document.getElementById('modal-submit'),
     modalTitle: document.getElementById('modal-title'),
     modalKicker: document.getElementById('modal-kicker'),
     modalBody: document.getElementById('modal-body')
@@ -316,9 +318,15 @@ document.addEventListener('DOMContentLoaded', () => {
         <td>${job.vehicleNumber || vehicleName(job.vehicleId)}</td>
         <td>${job.technicianName || technicianName(job.assignedTechnicianId)}</td>
         <td><span class="badge badge--${statusClass(job.status)}">${job.status}</span></td>
-        <td><div class="row-actions"><button class="mini-btn" type="button" data-action="assign-technician" data-id="${job.id}">Assign</button></div></td>
+        <td><div class="row-actions">${serviceJobActions(job)}</div></td>
       </tr>
     `).join('');
+  }
+
+  function serviceJobActions(job) {
+    const assignButton = `<button class="mini-btn" type="button" data-action="assign-technician" data-id="${job.id}">Assign</button>`;
+    const completedButton = `<button class="mini-btn mini-btn--green" type="button" data-action="view-completed-job" data-id="${job.id}">Completed Details</button>`;
+    return job.status === 'Completed' ? `${completedButton}${assignButton}` : assignButton;
   }
 
   function renderTechnicianReports() {
@@ -400,16 +408,174 @@ document.addEventListener('DOMContentLoaded', () => {
     const query = filter.toLowerCase();
     document.getElementById('documents-body').innerHTML = files
       .filter((file) => !query || `${file.fileName} ${file.photoType} ${file.documentType} ${file.serviceJobId} ${file.uploadedBy}`.toLowerCase().includes(query))
-      .map((file) => `
-        <tr>
-          <td><span class="row-title">${file.fileName}</span><span class="row-sub">${file.description || ''}</span></td>
-          <td>${file.photoType || file.documentType || file.kind}</td>
-          <td>${file.serviceJobId ? `#SJ-${file.serviceJobId}` : '-'}</td>
-          <td>${vehicleName(state.serviceJobs.find((job) => Number(job.id) === Number(file.serviceJobId))?.vehicleId)}</td>
-          <td>${file.uploadedBy || '-'}</td>
-          <td><div class="row-actions"><button class="mini-btn" type="button" data-action="download-file" data-kind="${file.kind}" data-id="${file.id}">Download</button><button class="mini-btn mini-btn--red" type="button" data-action="delete-file" data-kind="${file.kind}" data-id="${file.id}">Delete</button></div></td>
-        </tr>
-      `).join('');
+      .map((file) => documentRow(file)).join('');
+  }
+
+  function documentRow(file) {
+    const job = state.serviceJobs.find((item) => Number(item.id) === Number(file.serviceJobId));
+    const vehicle = vehicleName(job?.vehicleId);
+    const fileType = file.photoType || file.documentType || file.kind || 'File';
+    const extension = String(file.fileName || '').split('.').pop().toUpperCase();
+    const uploadedBy = file.uploadedBy || 'System';
+
+    return `
+      <tr class="document-row">
+        <td>
+          <div class="file-cell">
+            <span class="file-cell__icon">${extension && extension.length <= 5 ? extension : 'FILE'}</span>
+            <div>
+              <span class="row-title file-cell__name" title="${file.fileName || 'Untitled file'}">${file.fileName || 'Untitled file'}</span>
+              <span class="row-sub">${file.description || `Uploaded ${file.uploadedAt || 'recently'}`}</span>
+            </div>
+          </div>
+        </td>
+        <td><span class="file-chip">${fileType}</span></td>
+        <td><span class="row-title">${file.serviceJobId ? `#SJ-${file.serviceJobId}` : '-'}</span></td>
+        <td><span class="row-title">${vehicle}</span><span class="row-sub">${job?.serviceType || ''}</span></td>
+        <td><span class="uploader-pill">${uploadedBy}</span></td>
+        <td>
+          <div class="document-actions">
+            <button class="mini-btn" type="button" data-action="download-file" data-kind="${file.kind}" data-id="${file.id}">Download</button>
+            <button class="mini-btn mini-btn--red" type="button" data-action="delete-file" data-kind="${file.kind}" data-id="${file.id}">Delete</button>
+          </div>
+        </td>
+      </tr>
+    `;
+  }
+
+  function compactList(items, emptyText, renderItem) {
+    return items.length ? items.map(renderItem).join('') : `<p class="completed-empty">${emptyText}</p>`;
+  }
+
+  function isImageFile(file) {
+    const type = String(file.mimeType || '').toLowerCase();
+    const name = String(file.fileName || '').toLowerCase();
+    return type.startsWith('image/') || /\.(jpg|jpeg|png|webp|gif)$/.test(name);
+  }
+
+  function completedFileItem(file) {
+    if (isImageFile(file)) {
+      return `
+        <button class="completed-file completed-file--image" type="button" data-action="preview-completed-image" data-url="${file.previewUrl || file.fileUrl}" data-name="${file.fileName || 'Uploaded image'}">
+          <img src="${file.previewUrl || file.fileUrl}" alt="${file.fileName || 'Uploaded image'}" />
+          <span><strong>${file.fileName || 'Uploaded image'}</strong><small>${file.photoType || file.documentType || file.kind}</small></span>
+        </button>
+      `;
+    }
+
+    return `
+      <div class="completed-file">
+        <span class="file-cell__icon">${String(file.fileName || 'FILE').split('.').pop().slice(0, 5).toUpperCase()}</span>
+        <span><strong>${file.fileName || 'Uploaded file'}</strong><small>${file.photoType || file.documentType || file.kind}</small></span>
+        <button class="mini-btn" type="button" data-action="download-file" data-kind="${file.kind}" data-id="${file.id}">Download</button>
+      </div>
+    `;
+  }
+
+  function openImagePreview(url, name) {
+    selectors.modalKicker.textContent = 'Image Preview';
+    selectors.modalTitle.textContent = name || 'Uploaded image';
+    selectors.modalBody.innerHTML = `
+      <div class="image-preview full">
+        <img src="${url}" alt="${name || 'Uploaded image'}" />
+        <a class="mini-btn" href="${url}" target="_blank" rel="noopener">Open Full Image</a>
+      </div>
+    `;
+    selectors.modalActions.hidden = true;
+    selectors.modal.showModal();
+  }
+
+  function completedDetailsHtml(details) {
+    const job = details.job;
+    return `
+      <div class="completed-details full">
+        <section class="completed-hero">
+          <div>
+            <span class="badge badge--completed">${job.status}</span>
+            <h3>#SJ-${job.id} ${job.serviceType}</h3>
+            <p>${job.customerName} / ${job.vehicleNumber} / ${job.vehicleName}</p>
+          </div>
+          <div>
+            <strong>${job.progress}%</strong>
+            <span>Progress</span>
+          </div>
+        </section>
+
+        <section class="completed-grid">
+          <article>
+            <span>Technician</span>
+            <strong>${job.technicianName || '-'}</strong>
+          </article>
+          <article>
+            <span>Priority</span>
+            <strong>${job.priority || '-'}</strong>
+          </article>
+          <article>
+            <span>Assigned</span>
+            <strong>${job.assignedDate || '-'}</strong>
+          </article>
+          <article>
+            <span>Completed</span>
+            <strong>${job.completionDate || '-'}</strong>
+          </article>
+        </section>
+
+        <section class="completed-section">
+          <h4>Technician Progress Submitted</h4>
+          ${compactList(details.progress, 'No progress submissions found.', (item) => `
+            <div class="completed-item">
+              <strong>${item.progressPercentage}% - ${item.status}</strong>
+              <p>${item.remarks || 'No remarks added.'}</p>
+            </div>
+          `)}
+        </section>
+
+        <section class="completed-section">
+          <h4>Technician Notes</h4>
+          ${compactList(details.notes, 'No technician notes found.', (item) => `
+            <div class="completed-item"><p>${item.note}</p></div>
+          `)}
+        </section>
+
+        <section class="completed-section">
+          <h4>Parts Submitted</h4>
+          ${compactList(details.usedParts, 'No used parts submitted.', (part) => `
+            <div class="completed-item completed-item--split">
+              <div><strong>${part.partName}</strong><p>${part.condition} / Qty ${part.quantity}</p></div>
+              <span>${formatMoney(part.totalPrice || 0)}</span>
+            </div>
+          `)}
+        </section>
+
+        <section class="completed-section">
+          <h4>Replaced Parts</h4>
+          ${compactList(details.replacedParts, 'No replaced parts submitted.', (part) => `
+            <div class="completed-item">
+              <strong>${part.removedPartName} - ${part.condition}</strong>
+              <p>${part.replacementReason}</p>
+            </div>
+          `)}
+        </section>
+
+        <section class="completed-section">
+          <h4>Photos & Documents</h4>
+          ${compactList([...(details.photos || []), ...(details.documents || [])], 'No photos or documents uploaded.', (file) => `
+            ${completedFileItem(file)}
+          `)}
+        </section>
+      </div>
+    `;
+  }
+
+  async function openCompletedDetails(id) {
+    selectors.modalKicker.textContent = 'Technician Submit Details';
+    selectors.modalTitle.textContent = `Completed Job #SJ-${id}`;
+    selectors.modalBody.innerHTML = '<div class="completed-details full"><p class="completed-empty">Loading completed job details...</p></div>';
+    selectors.modalActions.hidden = true;
+    selectors.modal.showModal();
+
+    const details = await window.AutoCareApi.request(`/api/admin/service-jobs/${id}/details`);
+    selectors.modalBody.innerHTML = completedDetailsHtml(details);
   }
 
   function renderPackages() {
@@ -496,6 +662,42 @@ document.addEventListener('DOMContentLoaded', () => {
     return `<label><span>${label}</span><input name="${name}" type="${type}" value="${value}" required /></label>`;
   }
 
+  function vehicleImageUpload(record = {}) {
+    return `
+      <label class="full"><span>Car Image</span><input name="vehicleImage" type="file" accept=".jpg,.jpeg,.png,image/jpeg,image/png" /></label>
+      <div class="full vehicle-image-preview" data-file-preview="vehicleImage">
+        ${record.image ? `<img src="${record.image}" alt="" /><span>Current car image</span>` : '<span>No car image selected</span>'}
+      </div>
+    `;
+  }
+
+  function readFileAsBase64(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result).split(',')[1]);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
+
+  async function fileInputToPayload(name) {
+    const file = selectors.modalForm.querySelector(`input[name="${name}"]`)?.files?.[0];
+    if (!file) return null;
+    return {
+      fileName: file.name,
+      mimeType: file.type,
+      contentBase64: await readFileAsBase64(file)
+    };
+  }
+
+  function renderVehicleFilePreview(inputName, file) {
+    const preview = selectors.modalForm.querySelector(`[data-file-preview="${inputName}"]`);
+    if (!preview) return;
+    preview.innerHTML = file
+      ? `<span>${file.name}</span><small>${Math.round(file.size / 1024)} KB</small>`
+      : '<span>No car image selected</span>';
+  }
+
   function openModal(mode, record = {}) {
     const customerOptions = state.customers.map((customer) => ({ value: customer.id, label: customer.name }));
     const vehicleOptions = state.vehicles.map((vehicle) => ({ value: vehicle.id, label: `${vehicle.make} ${vehicle.model} - ${vehicle.plate}` }));
@@ -517,7 +719,7 @@ document.addEventListener('DOMContentLoaded', () => {
       },
       vehicle: {
         title: record.id ? 'Edit Vehicle' : 'Add Vehicle',
-        body: field('customerId', 'Customer', 'select', record.customerId || customerOptions[0]?.value, customerOptions) + field('make', 'Vehicle Make', 'text', record.make || '') + field('model', 'Model', 'text', record.model || '') + field('plate', 'Number Plate', 'text', record.plate || '') + field('year', 'Year', 'number', record.year || '2026')
+        body: field('customerId', 'Customer', 'select', record.customerId || customerOptions[0]?.value, customerOptions) + field('make', 'Vehicle Make', 'text', record.make || '') + field('model', 'Model', 'text', record.model || '') + field('plate', 'Number Plate', 'text', record.plate || '') + field('year', 'Year', 'number', record.year || '2026') + vehicleImageUpload(record)
       },
       technician: {
         title: record.id ? 'Edit Technician' : 'Create Technician',
@@ -562,6 +764,8 @@ document.addEventListener('DOMContentLoaded', () => {
     selectors.modalKicker.textContent = 'Admin Action';
     selectors.modalTitle.textContent = config[mode].title;
     selectors.modalBody.innerHTML = config[mode].body;
+    selectors.modalActions.hidden = false;
+    selectors.modalSubmit.textContent = 'Save';
     selectors.modal.showModal();
   }
 
@@ -580,7 +784,14 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     if (mode === 'vehicle') {
-      const payload = { ...data, customerId: Number(data.customerId), image: 'assets/images/hero-blue-workshop.png' };
+      const vehicleImage = await fileInputToPayload('vehicleImage');
+      const existingVehicle = state.vehicles.find((item) => item.id === id);
+      const payload = {
+        ...data,
+        customerId: Number(data.customerId),
+        image: existingVehicle?.image || 'assets/images/hero-blue-workshop.png'
+      };
+      if (vehicleImage) payload.vehicleImage = vehicleImage;
       const savedVehicle = await window.AutoCareApi.request(id ? `/api/admin/vehicles/${id}` : '/api/admin/vehicles', {
         method: id ? 'PUT' : 'POST',
         body: JSON.stringify(payload)
@@ -768,6 +979,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     if (action === 'new-service-job') openModal('serviceJob');
     if (action === 'assign-technician') openModal('assignTechnician', state.serviceJobs.find((item) => item.id === numericId));
+    if (action === 'view-completed-job') await openCompletedDetails(numericId);
     if (action === 'new-inventory-item') openModal('inventoryItem');
     if (action === 'edit-inventory-item') openModal('inventoryItem', state.inventoryParts.find((item) => item.id === numericId));
     if (action === 'delete-inventory-item') {
@@ -795,6 +1007,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     if (action === 'download-invoice') await downloadInvoice(numericId);
     if (action === 'download-file') downloadFile(element.dataset.kind, numericId);
+    if (action === 'preview-completed-image') openImagePreview(element.dataset.url, element.dataset.name);
     if (action === 'delete-file') {
       await window.AutoCareApi.request(`/api/admin/files/${element.dataset.kind}/${numericId}`, { method: 'DELETE' });
       state.servicePhotos = (state.servicePhotos || []).filter((item) => !(item.kind === element.dataset.kind && item.id === numericId));
@@ -812,7 +1025,11 @@ document.addEventListener('DOMContentLoaded', () => {
       showToast('Emergency request resolved.');
     }
     if (action === 'send-notification' || action === 'show-notifications') openModal('notification');
-    if (action === 'close-modal') selectors.modal.close();
+    if (action === 'close-modal') {
+      selectors.modal.close();
+      selectors.modalActions.hidden = false;
+      selectors.modalSubmit.textContent = 'Save';
+    }
     if (action === 'logout') {
       window.AutoCareApi.logout();
     }
@@ -840,6 +1057,11 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('mobile-menu').addEventListener('click', () => selectors.sidebar.classList.toggle('is-open'));
     selectors.modalForm.addEventListener('submit', (event) => {
       handleModalSubmit(event).catch((error) => showToast(error.message || 'Save failed.'));
+    });
+    selectors.modalForm.addEventListener('change', (event) => {
+      if (event.target.name === 'vehicleImage') {
+        renderVehicleFilePreview(event.target.name, event.target.files?.[0]);
+      }
     });
 
     document.querySelectorAll('[data-table-search]').forEach((input) => {
