@@ -1,0 +1,5 @@
+PORT=3000
+NODE_ENV=development
+JWT_SECRET=myAutoCareSuperSecretKey2026XYZ!@#$%
+FIREBASE_PROJECT_ID=smartservice-4723f
+FIREBASE_SERVICE_ACCOUNT_PATH=./serviceAccountKey.json
