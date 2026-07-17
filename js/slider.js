@@ -7,13 +7,31 @@ document.addEventListener('DOMContentLoaded', () => {
     return;
   }
 
-  const slideAmount = () => Math.max(slider.clientWidth * 0.72, 280);
+  const slides = Array.from(slider.children);
+  if (slides.length < 3) {
+    return;
+  }
 
-  prevButton.addEventListener('click', () => {
-    slider.scrollBy({ left: -slideAmount(), behavior: 'smooth' });
-  });
+  let activeIndex = 0;
 
-  nextButton.addEventListener('click', () => {
-    slider.scrollBy({ left: slideAmount(), behavior: 'smooth' });
-  });
+  const updateCarousel = (index) => {
+    activeIndex = (index + slides.length) % slides.length;
+
+    slides.forEach((slide, slideIndex) => {
+      slide.classList.remove('is-active', 'is-prev', 'is-next');
+
+      if (slideIndex === activeIndex) {
+        slide.classList.add('is-active');
+      } else if (slideIndex === (activeIndex + 1) % slides.length) {
+        slide.classList.add('is-next');
+      } else {
+        slide.classList.add('is-prev');
+      }
+    });
+  };
+
+  prevButton.addEventListener('click', () => updateCarousel(activeIndex - 1));
+  nextButton.addEventListener('click', () => updateCarousel(activeIndex + 1));
+
+  updateCarousel(0);
 });

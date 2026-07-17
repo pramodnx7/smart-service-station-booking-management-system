@@ -228,10 +228,19 @@
             <button type="button" id="gallery-next" aria-label="Next work">›</button>
           </div>
         </div>
-        <div class="gallery__slider" id="gallery-grid">
-          <article class="gallery-item"><img src="assets/images/service-wheel-closeup.png" alt="Suspension inspection" /><span>Suspension Inspection</span></article>
-          <article class="gallery-item gallery-item--wide"><img src="assets/images/workshop-lift-mechanic.png" alt="Exhaust system repair" /><span>Exhaust System Repair</span></article>
-          <article class="gallery-item"><img src="assets/images/about-mechanic-red-car.png" alt="Engine diagnostics" /><span>Engine Diagnostics</span></article>
+        <div class="gallery-viewport" id="gallery-grid" aria-label="Recent completed work carousel">
+          <article class="gallery-item is-active">
+            <img src="assets/images/service-wheel-closeup.png" alt="Suspension inspection" />
+            <span>Suspension Inspection</span>
+          </article>
+          <article class="gallery-item is-next">
+            <img src="assets/images/workshop-lift-mechanic.png" alt="Exhaust system repair" />
+            <span>Exhaust System Repair</span>
+          </article>
+          <article class="gallery-item is-prev">
+            <img src="assets/images/about-mechanic-red-car.png" alt="Engine diagnostics" />
+            <span>Engine Diagnostics</span>
+          </article>
         </div>
       </div>
     </section>
