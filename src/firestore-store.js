@@ -1372,12 +1372,64 @@ async function createEmergency(userId, data) {
 }
 
 async function createFeedback(userId, data) {
+  const rating = Number(data.rating);
+  if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
+    const error = new Error('Rating must be a whole number from 1 to 5.');
+    error.status = 400;
+    throw error;
+  }
+
+  const service = await findServiceByName(data.service, true);
+  if (!service) {
+    const error = new Error('The selected service is not available.');
+    error.status = 400;
+    throw error;
+  }
+
+  const bookings = await all(collections.bookings);
+  const hasCompletedService = bookings.some((booking) => (
+    Number(booking.userId) === Number(userId)
+    && booking.status === 'Completed'
+    && (Number(booking.servicePackageId) === Number(service.id)
+      || String(booking.serviceName || '').toLowerCase() === String(service.name).toLowerCase())
+  ));
+  if (!hasCompletedService) {
+    const error = new Error('You can only rate a service you have completed.');
+    error.status = 403;
+    throw error;
+  }
+
   await createDocument(collections.feedback, {
     userId,
-    rating: Number(data.rating),
+    servicePackageId: service.id,
+    serviceName: service.name,
+    rating,
     comment: data.feedback.trim()
   });
-  await createUserNotification(userId, 'Feedback Submitted', `Thank you. Your ${Number(data.rating)} star feedback was submitted.`);
+  await createUserNotification(userId, 'Feedback Submitted', `Thank you. Your ${rating} star feedback for ${service.name} was submitted.`);
+}
+
+async function getPublicServiceRatings() {
+  const [services, feedback] = await Promise.all([
+    all(collections.servicePackages),
+    all(collections.feedback)
+  ]);
+
+  return services
+    .filter((service) => service.active !== false)
+    .map((service) => {
+      const reviews = feedback.filter((review) => (
+        Number(review.servicePackageId) === Number(service.id)
+        || String(review.serviceName || '').toLowerCase() === String(service.name).toLowerCase()
+      ));
+      const total = reviews.reduce((sum, review) => sum + Number(review.rating || 0), 0);
+      return {
+        id: service.id,
+        name: service.name,
+        averageRating: reviews.length ? Number((total / reviews.length).toFixed(1)) : 0,
+        reviewCount: reviews.length
+      };
+    });
 }
 
 async function updateProfile(userId, data) {
@@ -2744,6 +2796,7 @@ module.exports = {
   getFileForDownload,
   getInvoicePdf,
   getPartUsagePhotoForDownload,
+  getPublicServiceRatings,
   getTechnicianDashboard,
   getTechnicianPerformance,
   getTechnicianWorkload,

@@ -304,6 +304,14 @@ app.get('/api/health', async (req, res, next) => {
   }
 });
 
+app.get('/api/public/service-ratings', async (req, res, next) => {
+  try {
+    res.json({ services: await store.getPublicServiceRatings() });
+  } catch (error) {
+    next(error);
+  }
+});
+
 app.post('/api/auth/register/request-code', async (req, res, next) => {
   try {
     requireFields(req.body, ['email']);
@@ -655,7 +663,7 @@ app.post('/api/customer/emergency', requireAuth('customer'), async (req, res, ne
 
 app.post('/api/customer/feedback', requireAuth('customer'), async (req, res, next) => {
   try {
-    requireFields(req.body, ['rating', 'feedback']);
+    requireFields(req.body, ['service', 'rating', 'feedback']);
     await store.createFeedback(req.user.id, req.body);
     res.status(201).json({ ok: true });
   } catch (error) {

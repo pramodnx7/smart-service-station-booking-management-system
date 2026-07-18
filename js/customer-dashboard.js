@@ -530,6 +530,25 @@ document.addEventListener('DOMContentLoaded', () => {
     renderProgress();
     renderSpending();
     renderNotifications();
+    renderFeedbackServices();
+  }
+
+  function renderFeedbackServices() {
+    const select = document.getElementById('feedback-service');
+    if (!select) return;
+
+    const currentValue = select.value;
+    const completedServices = [...new Set(
+      state.bookings
+        .filter((booking) => booking.status === 'Completed')
+        .map((booking) => booking.service)
+        .filter(Boolean)
+    )];
+
+    select.innerHTML = '<option value="">Select a completed service</option>' + completedServices
+      .map((service) => `<option value="${escapeHtml(service)}">${escapeHtml(service)}</option>`)
+      .join('');
+    if (completedServices.includes(currentValue)) select.value = currentValue;
   }
 
   function field(name, label, type = 'text', value = '', options = [], required = true) {

@@ -10,6 +10,39 @@ document.addEventListener('DOMContentLoaded', () => {
   const bookingLoginOption = document.getElementById('booking-login-option');
   const newsletterForm = document.getElementById('newsletter-form');
 
+  const renderServiceRatings = async () => {
+    const cards = Array.from(document.querySelectorAll('[data-service-card]'));
+    if (!cards.length) return;
+
+    try {
+      const response = await fetch('/api/public/service-ratings');
+      if (!response.ok) throw new Error('Ratings are unavailable.');
+      const { services = [] } = await response.json();
+      const ratingsByName = new Map(services.map((service) => [service.name.toLowerCase(), service]));
+
+      cards.forEach((card) => {
+        const rating = ratingsByName.get(card.dataset.serviceCard.toLowerCase());
+        const ratingElement = card.querySelector('[data-service-rating]');
+        if (!rating || !ratingElement) return;
+
+        const stars = ratingElement.querySelector('.stars');
+        const summary = ratingElement.querySelector('small');
+        const reviewLabel = rating.reviewCount === 1 ? 'Review' : 'Reviews';
+        stars.style.setProperty('--rating-fill', `${Math.max(0, Math.min(100, rating.averageRating * 20))}%`);
+        ratingElement.setAttribute('aria-label', rating.reviewCount
+          ? `${rating.averageRating} out of 5 stars from ${rating.reviewCount} reviews`
+          : 'No customer reviews yet');
+        summary.innerHTML = rating.reviewCount
+          ? `<strong>${rating.averageRating.toFixed(1)}</strong> (${rating.reviewCount} ${reviewLabel})`
+          : 'No reviews yet';
+      });
+    } catch (error) {
+      // Keep the neutral "No reviews yet" state when the API is offline.
+    }
+  };
+
+  renderServiceRatings();
+
   const getSession = () => {
     try {
       return JSON.parse(localStorage.getItem(sessionKey));
