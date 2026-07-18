@@ -96,27 +96,47 @@ function sortDateDesc(items, dateField, timeField = '') {
 }
 
 function pdfEscape(value) {
-  return String(value || '').replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)');
+  return String(value || '')
+    .normalize('NFKD')
+    .replace(/[^\x20-\x7E]/g, '')
+    .replace(/\\/g, '\\\\')
+    .replace(/\(/g, '\\(')
+    .replace(/\)/g, '\\)');
 }
 
-function createSimplePdfBuffer(lines) {
-  const content = [
-    'BT',
-    '/F1 11 Tf',
-    '44 780 Td',
-    '14 TL',
-    ...lines.flatMap((line, index) => [
-      index === 0 ? '' : 'T*',
-      `(${pdfEscape(line).slice(0, 110)}) Tj`
-    ]).filter(Boolean),
-    'ET'
-  ].join('\n');
+function pdfText(text, x, y, options = {}) {
+  const size = Number(options.size || 10);
+  const font = options.bold ? 'F2' : 'F1';
+  const color = options.color || '0.12 0.22 0.34';
+  const value = pdfEscape(text);
+  const estimatedWidth = value.length * size * (options.bold ? 0.56 : 0.51);
+  const textX = options.align === 'right' ? x - estimatedWidth : x;
+  return `BT ${color} rg /${font} ${size} Tf ${textX.toFixed(1)} ${y} Td (${value}) Tj ET`;
+}
+
+function pdfRect(x, y, width, height, options = {}) {
+  const commands = [];
+  if (options.fill) commands.push(`${options.fill} rg ${x} ${y} ${width} ${height} re f`);
+  if (options.stroke) commands.push(`${options.stroke} RG ${options.lineWidth || 1} w ${x} ${y} ${width} ${height} re S`);
+  return commands.join('\n');
+}
+
+function createPdfDocument(pageContents) {
+  const pageCount = pageContents.length;
+  const firstPageId = 3;
+  const regularFontId = firstPageId + pageCount;
+  const boldFontId = regularFontId + 1;
+  const firstContentId = boldFontId + 1;
+  const pageIds = pageContents.map((_, index) => firstPageId + index);
   const objects = [
     '<< /Type /Catalog /Pages 2 0 R >>',
-    '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
-    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>',
+    `<< /Type /Pages /Kids [${pageIds.map((id) => `${id} 0 R`).join(' ')}] /Count ${pageCount} >>`,
+    ...pageContents.map((_, index) => (
+      `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 ${regularFontId} 0 R /F2 ${boldFontId} 0 R >> >> /Contents ${firstContentId + index} 0 R >>`
+    )),
     '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
-    `<< /Length ${Buffer.byteLength(content)} >>\nstream\n${content}\nendstream`
+    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>',
+    ...pageContents.map((content) => `<< /Length ${Buffer.byteLength(content)} >>\nstream\n${content}\nendstream`)
   ];
   let pdf = '%PDF-1.4\n';
   const offsets = [0];
@@ -131,6 +151,114 @@ function createSimplePdfBuffer(lines) {
   });
   pdf += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`;
   return Buffer.from(pdf, 'utf8');
+}
+
+function money(value) {
+  return `LKR ${Number(value || 0).toLocaleString('en-LK', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+function createInvoicePdfBuffer(details) {
+  const { invoice, user, service, job, vehicle, technicianName, parts } = details;
+  const partChunks = [];
+  const firstPageRows = 8;
+  const followingPageRows = 12;
+  partChunks.push(parts.slice(0, firstPageRows));
+  for (let index = firstPageRows; index < parts.length; index += followingPageRows) {
+    partChunks.push(parts.slice(index, index + followingPageRows));
+  }
+  if (!partChunks.length) partChunks.push([]);
+
+  return createPdfDocument(partChunks.map((pageParts, pageIndex) => {
+    const commands = [];
+    const isFirstPage = pageIndex === 0;
+    const isLastPage = pageIndex === partChunks.length - 1;
+    const navy = '0.055 0.145 0.255';
+    const blue = '0.055 0.55 0.78';
+    const pale = '0.94 0.97 0.985';
+    const muted = '0.38 0.46 0.54';
+    const green = '0.08 0.58 0.38';
+
+    commands.push(pdfRect(0, 682, 612, 110, { fill: navy }));
+    commands.push(pdfRect(0, 676, 612, 6, { fill: blue }));
+    commands.push(pdfText('AUTOCARE', 44, 744, { size: 24, bold: true, color: '1 1 1' }));
+    commands.push(pdfText('SMART SERVICE STATION', 45, 726, { size: 8, color: '0.62 0.84 0.94' }));
+    commands.push(pdfText('INVOICE', 568, 744, { size: 20, bold: true, color: '1 1 1', align: 'right' }));
+    commands.push(pdfText(`#INV-${invoice.id}`, 568, 724, { size: 11, color: '0.78 0.9 0.96', align: 'right' }));
+    commands.push(pdfText(`Page ${pageIndex + 1} of ${partChunks.length}`, 568, 707, { size: 8, color: '0.72 0.8 0.86', align: 'right' }));
+
+    let tableTop;
+    if (isFirstPage) {
+      commands.push(pdfText('BILLED TO', 44, 646, { size: 8, bold: true, color: blue }));
+      commands.push(pdfText(user?.name || 'Customer', 44, 626, { size: 13, bold: true }));
+      commands.push(pdfText(user?.email || '-', 44, 609, { size: 9, color: muted }));
+      commands.push(pdfText(user?.phone || '-', 44, 594, { size: 9, color: muted }));
+
+      commands.push(pdfRect(318, 584, 250, 67, { fill: pale }));
+      commands.push(pdfText('ISSUE DATE', 334, 632, { size: 7, bold: true, color: muted }));
+      commands.push(pdfText(formatDate(invoice.invoiceDate) || '-', 334, 613, { size: 10, bold: true }));
+      commands.push(pdfText('PAYMENT STATUS', 454, 632, { size: 7, bold: true, color: muted }));
+      commands.push(pdfText(invoice.paymentStatus || 'Pending', 454, 613, { size: 10, bold: true, color: invoice.paymentStatus === 'Paid' ? green : blue }));
+
+      commands.push(pdfRect(44, 500, 524, 62, { stroke: '0.84 0.88 0.91' }));
+      commands.push(pdfText('VEHICLE', 59, 542, { size: 7, bold: true, color: muted }));
+      commands.push(pdfText(vehicle ? `${vehicle.make} ${vehicle.model}` : 'Not assigned', 59, 523, { size: 10, bold: true }));
+      commands.push(pdfText(vehicle?.plateNumber || '-', 59, 508, { size: 8, color: muted }));
+      commands.push(pdfText('SERVICE', 240, 542, { size: 7, bold: true, color: muted }));
+      commands.push(pdfText(service?.name || 'Service', 240, 523, { size: 10, bold: true }));
+      commands.push(pdfText(job ? `Job #SJ-${job.id}` : 'General invoice', 240, 508, { size: 8, color: muted }));
+      commands.push(pdfText('TECHNICIAN', 414, 542, { size: 7, bold: true, color: muted }));
+      commands.push(pdfText(technicianName || 'Unassigned', 414, 523, { size: 9, bold: true }));
+      tableTop = 473;
+    } else {
+      commands.push(pdfText('ITEMIZED PARTS - CONTINUED', 44, 642, { size: 12, bold: true }));
+      tableTop = 618;
+    }
+
+    commands.push(pdfRect(44, tableTop - 24, 524, 24, { fill: navy }));
+    commands.push(pdfText('ITEM / DESCRIPTION', 56, tableTop - 16, { size: 8, bold: true, color: '1 1 1' }));
+    commands.push(pdfText('QTY', 371, tableTop - 16, { size: 8, bold: true, color: '1 1 1', align: 'right' }));
+    commands.push(pdfText('UNIT PRICE', 464, tableTop - 16, { size: 8, bold: true, color: '1 1 1', align: 'right' }));
+    commands.push(pdfText('AMOUNT', 556, tableTop - 16, { size: 8, bold: true, color: '1 1 1', align: 'right' }));
+
+    if (!pageParts.length) {
+      commands.push(pdfRect(44, tableTop - 55, 524, 31, { fill: '0.98 0.985 0.99' }));
+      commands.push(pdfText('No replacement parts recorded for this service.', 56, tableTop - 44, { size: 9, color: muted }));
+    }
+    pageParts.forEach((part, index) => {
+      const rowTop = tableTop - 24 - (index * 31);
+      if (index % 2 === 0) commands.push(pdfRect(44, rowTop - 31, 524, 31, { fill: '0.975 0.985 0.992' }));
+      const label = [part.partName || 'Part', part.brand, part.condition].filter(Boolean).join(' - ').slice(0, 52);
+      commands.push(pdfText(label, 56, rowTop - 20, { size: 8.5 }));
+      commands.push(pdfText(Number(part.quantity || 0), 371, rowTop - 20, { size: 8.5, align: 'right' }));
+      commands.push(pdfText(money(part.unitPrice), 464, rowTop - 20, { size: 8.5, align: 'right' }));
+      commands.push(pdfText(money(part.totalPrice || Number(part.quantity || 0) * Number(part.unitPrice || 0)), 556, rowTop - 20, { size: 8.5, bold: true, align: 'right' }));
+    });
+
+    if (isLastPage) {
+      const rowCount = Math.max(pageParts.length, 1);
+      const totalsTop = tableTop - 24 - (rowCount * 31) - 18;
+      const totalRows = [
+        ['Parts subtotal', invoice.partsTotal],
+        ['Labor charges', invoice.laborCost],
+        ['Service charges', invoice.serviceCharges],
+        ['Tax', invoice.tax],
+        ['Discount', -Number(invoice.discount || 0)]
+      ];
+      totalRows.forEach(([label, value], index) => {
+        commands.push(pdfText(label, 414, totalsTop - (index * 18), { size: 8.5, color: muted, align: 'right' }));
+        commands.push(pdfText(money(value), 556, totalsTop - (index * 18), { size: 8.5, align: 'right' }));
+      });
+      const grandY = totalsTop - 112;
+      commands.push(pdfRect(350, grandY - 12, 218, 38, { fill: navy }));
+      commands.push(pdfText('TOTAL', 414, grandY + 2, { size: 10, bold: true, color: '1 1 1', align: 'right' }));
+      commands.push(pdfText(money(invoice.amount), 556, grandY + 2, { size: 12, bold: true, color: '1 1 1', align: 'right' }));
+    }
+
+    commands.push(pdfRect(44, 40, 524, 1, { fill: '0.82 0.87 0.9' }));
+    commands.push(pdfText('Thank you for choosing AutoCare. Drive safe!', 44, 23, { size: 8, bold: true, color: navy }));
+    commands.push(pdfText('Computer-generated invoice', 568, 23, { size: 7.5, color: muted, align: 'right' }));
+    return commands.filter(Boolean).join('\n');
+  }));
 }
 
 function docRef(collection, id) {
@@ -2333,26 +2461,15 @@ async function getInvoicePdf(id, requester) {
   const technicianUser = technician ? users.find((item) => Number(item.id) === Number(technician.userId)) : null;
   const invoiceParts = parts.filter((part) => Number(part.serviceJobId) === Number(invoice.serviceJobId));
 
-  const lines = [
-    'AutoCare Service Station Invoice',
-    `Invoice Number: #INV-${invoice.id}`,
-    `Customer: ${user?.name || 'Unknown'} | ${user?.email || ''} | ${user?.phone || ''}`,
-    `Vehicle: ${vehicle ? `${vehicle.make} ${vehicle.model} - ${vehicle.plateNumber}` : 'N/A'}`,
-    `Technician: ${technicianUser?.name || 'Unassigned'}`,
-    `Service: ${service?.name || 'Unknown Service'}`,
-    `Date: ${formatDate(invoice.invoiceDate)}`,
-    'Parts Used:',
-    ...(invoiceParts.length ? invoiceParts.map((part) => (
-      `${part.partName} | ${part.brand || '-'} | ${part.condition || '-'} | Qty ${part.quantity} | Unit LKR ${Number(part.unitPrice || 0).toLocaleString('en-LK')} | Total LKR ${Number(part.totalPrice || 0).toLocaleString('en-LK')}`
-    )) : ['No parts recorded.']),
-    `Parts Total: LKR ${Number(invoice.partsTotal || 0).toLocaleString('en-LK')}`,
-    `Labor Charges: LKR ${Number(invoice.laborCost || 0).toLocaleString('en-LK')}`,
-    `Service Charges: LKR ${Number(invoice.serviceCharges || 0).toLocaleString('en-LK')}`,
-    `Tax: LKR ${Number(invoice.tax || 0).toLocaleString('en-LK')}`,
-    `Discount: LKR ${Number(invoice.discount || 0).toLocaleString('en-LK')}`,
-    `Grand Total: LKR ${Number(invoice.amount || 0).toLocaleString('en-LK')}`
-  ];
-  return createSimplePdfBuffer(lines);
+  return createInvoicePdfBuffer({
+    invoice,
+    user,
+    service,
+    job,
+    vehicle,
+    technicianName: technicianUser?.name || technician?.name || 'Unassigned',
+    parts: invoiceParts
+  });
 }
 
 async function markInvoiceEmailed(id, adminUserId) {
