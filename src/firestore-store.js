@@ -159,12 +159,29 @@ function money(value) {
 
 function createInvoicePdfBuffer(details) {
   const { invoice, user, service, job, vehicle, technicianName, parts } = details;
+  const billableItems = [
+    ...parts.map((part) => ({ ...part, itemType: 'Spare Part' })),
+    ...(Number(invoice.laborCost || 0) > 0 ? [{
+      partName: `${service?.name || 'Service'} Labour`,
+      itemType: 'Labour',
+      quantity: 1,
+      unitPrice: Number(invoice.laborCost),
+      totalPrice: Number(invoice.laborCost)
+    }] : []),
+    ...(Number(invoice.serviceCharges || 0) > 0 ? [{
+      partName: 'Service Charges',
+      itemType: 'Service',
+      quantity: 1,
+      unitPrice: Number(invoice.serviceCharges),
+      totalPrice: Number(invoice.serviceCharges)
+    }] : [])
+  ];
   const partChunks = [];
-  const firstPageRows = 8;
-  const followingPageRows = 12;
-  partChunks.push(parts.slice(0, firstPageRows));
-  for (let index = firstPageRows; index < parts.length; index += followingPageRows) {
-    partChunks.push(parts.slice(index, index + followingPageRows));
+  const firstPageRows = 4;
+  const followingPageRows = 8;
+  partChunks.push(billableItems.slice(0, firstPageRows));
+  for (let index = firstPageRows; index < billableItems.length; index += followingPageRows) {
+    partChunks.push(billableItems.slice(index, index + followingPageRows));
   }
   if (!partChunks.length) partChunks.push([]);
 
@@ -178,46 +195,74 @@ function createInvoicePdfBuffer(details) {
     const muted = '0.38 0.46 0.54';
     const green = '0.08 0.58 0.38';
 
-    commands.push(pdfRect(0, 682, 612, 110, { fill: navy }));
-    commands.push(pdfRect(0, 676, 612, 6, { fill: blue }));
-    commands.push(pdfText('AUTOCARE', 44, 744, { size: 24, bold: true, color: '1 1 1' }));
-    commands.push(pdfText('SMART SERVICE STATION', 45, 726, { size: 8, color: '0.62 0.84 0.94' }));
-    commands.push(pdfText('INVOICE', 568, 744, { size: 20, bold: true, color: '1 1 1', align: 'right' }));
-    commands.push(pdfText(`#INV-${invoice.id}`, 568, 724, { size: 11, color: '0.78 0.9 0.96', align: 'right' }));
-    commands.push(pdfText(`Page ${pageIndex + 1} of ${partChunks.length}`, 568, 707, { size: 8, color: '0.72 0.8 0.86', align: 'right' }));
+    commands.push(pdfRect(0, 686, 612, 106, { fill: navy }));
+    commands.push(pdfRect(0, 680, 612, 6, { fill: '0.98 0.66 0.04' }));
+    commands.push(pdfText('AUTO', 44, 747, { size: 23, bold: true, color: '1 1 1' }));
+    commands.push(pdfText('CARE', 106, 747, { size: 23, bold: true, color: '0.98 0.66 0.04' }));
+    commands.push(pdfText('SMART SERVICE STATION', 45, 728, { size: 8, color: '0.72 0.84 0.92' }));
+    commands.push(pdfText(process.env.BUSINESS_PHONE || '+94 77 123 4567', 270, 750, { size: 8, color: '1 1 1' }));
+    commands.push(pdfText(process.env.BUSINESS_EMAIL || 'info@autocare.lk', 270, 731, { size: 8, color: '0.78 0.88 0.94' }));
+    commands.push(pdfText(process.env.BUSINESS_ADDRESS || 'Colombo, Sri Lanka', 270, 712, { size: 8, color: '0.78 0.88 0.94' }));
+    commands.push(pdfText('INVOICE', 568, 747, { size: 20, bold: true, color: '1 1 1', align: 'right' }));
+    commands.push(pdfText(`#INV-${invoice.id}`, 568, 726, { size: 11, color: '0.98 0.66 0.04', bold: true, align: 'right' }));
+    commands.push(pdfText(`Page ${pageIndex + 1} of ${partChunks.length}`, 568, 708, { size: 8, color: '0.72 0.8 0.86', align: 'right' }));
 
     let tableTop;
     if (isFirstPage) {
-      commands.push(pdfText('BILLED TO', 44, 646, { size: 8, bold: true, color: blue }));
-      commands.push(pdfText(user?.name || 'Customer', 44, 626, { size: 13, bold: true }));
-      commands.push(pdfText(user?.email || '-', 44, 609, { size: 9, color: muted }));
-      commands.push(pdfText(user?.phone || '-', 44, 594, { size: 9, color: muted }));
+      commands.push(pdfRect(38, 548, 166, 105, { stroke: '0.84 0.88 0.91' }));
+      commands.push(pdfText('BILL TO', 51, 633, { size: 9, bold: true, color: navy }));
+      commands.push(pdfRect(51, 615, 24, 2, { fill: '0.98 0.66 0.04' }));
+      commands.push(pdfText(user?.name || 'Customer', 51, 596, { size: 11, bold: true }));
+      commands.push(pdfText(user?.phone || '-', 51, 578, { size: 8, color: muted }));
+      commands.push(pdfText((user?.email || '-').slice(0, 30), 51, 562, { size: 8, color: muted }));
 
-      commands.push(pdfRect(318, 584, 250, 67, { fill: pale }));
-      commands.push(pdfText('ISSUE DATE', 334, 632, { size: 7, bold: true, color: muted }));
-      commands.push(pdfText(formatDate(invoice.invoiceDate) || '-', 334, 613, { size: 10, bold: true }));
-      commands.push(pdfText('PAYMENT STATUS', 454, 632, { size: 7, bold: true, color: muted }));
-      commands.push(pdfText(invoice.paymentStatus || 'Pending', 454, 613, { size: 10, bold: true, color: invoice.paymentStatus === 'Paid' ? green : blue }));
+      commands.push(pdfRect(214, 548, 166, 105, { stroke: '0.84 0.88 0.91' }));
+      commands.push(pdfText('VEHICLE DETAILS', 227, 633, { size: 9, bold: true, color: navy }));
+      commands.push(pdfRect(227, 615, 24, 2, { fill: '0.98 0.66 0.04' }));
+      commands.push(pdfText('Vehicle No.', 227, 596, { size: 7.5, bold: true, color: muted }));
+      commands.push(pdfText(vehicle?.plateNumber || '-', 365, 596, { size: 8.5, bold: true, align: 'right' }));
+      commands.push(pdfText('Make / Model', 227, 578, { size: 7.5, bold: true, color: muted }));
+      commands.push(pdfText(vehicle ? `${vehicle.make} ${vehicle.model}`.slice(0, 22) : '-', 365, 578, { size: 8, align: 'right' }));
+      commands.push(pdfText('Year / Mileage', 227, 560, { size: 7.5, bold: true, color: muted }));
+      commands.push(pdfText(`${vehicle?.year || '-'} / ${vehicle?.mileage ? `${Number(vehicle.mileage).toLocaleString('en-LK')} km` : 'N/A'}`, 365, 560, { size: 7.5, align: 'right' }));
 
-      commands.push(pdfRect(44, 500, 524, 62, { stroke: '0.84 0.88 0.91' }));
-      commands.push(pdfText('VEHICLE', 59, 542, { size: 7, bold: true, color: muted }));
-      commands.push(pdfText(vehicle ? `${vehicle.make} ${vehicle.model}` : 'Not assigned', 59, 523, { size: 10, bold: true }));
-      commands.push(pdfText(vehicle?.plateNumber || '-', 59, 508, { size: 8, color: muted }));
-      commands.push(pdfText('SERVICE', 240, 542, { size: 7, bold: true, color: muted }));
-      commands.push(pdfText(service?.name || 'Service', 240, 523, { size: 10, bold: true }));
-      commands.push(pdfText(job ? `Job #SJ-${job.id}` : 'General invoice', 240, 508, { size: 8, color: muted }));
-      commands.push(pdfText('TECHNICIAN', 414, 542, { size: 7, bold: true, color: muted }));
-      commands.push(pdfText(technicianName || 'Unassigned', 414, 523, { size: 9, bold: true }));
-      tableTop = 473;
+      commands.push(pdfRect(390, 548, 184, 105, { fill: pale, stroke: '0.82 0.87 0.9' }));
+      commands.push(pdfRect(390, 625, 184, 28, { fill: navy }));
+      commands.push(pdfText('INVOICE INFORMATION', 403, 635, { size: 8.5, bold: true, color: '1 1 1' }));
+      commands.push(pdfText('Invoice date', 403, 606, { size: 7.5, bold: true, color: muted }));
+      commands.push(pdfText(formatDate(invoice.invoiceDate) || '-', 560, 606, { size: 8, align: 'right' }));
+      const invoiceDate = new Date(formatDate(invoice.invoiceDate));
+      invoiceDate.setDate(invoiceDate.getDate() + Number(process.env.INVOICE_DUE_DAYS || 7));
+      commands.push(pdfText('Due date', 403, 590, { size: 7.5, bold: true, color: muted }));
+      commands.push(pdfText(Number.isNaN(invoiceDate.getTime()) ? '-' : formatDate(invoiceDate), 560, 590, { size: 8, align: 'right' }));
+      commands.push(pdfText('Booking no.', 403, 574, { size: 7.5, bold: true, color: muted }));
+      commands.push(pdfText(job?.bookingId ? `BK-${job.bookingId}` : '-', 560, 574, { size: 8, align: 'right' }));
+      commands.push(pdfText('Payment', 403, 558, { size: 7.5, bold: true, color: muted }));
+      commands.push(pdfText(`${invoice.paymentStatus || 'Pending'} / ${invoice.paymentMethod || 'N/A'}`, 560, 558, { size: 7.5, bold: true, color: invoice.paymentStatus === 'Paid' ? green : blue, align: 'right' }));
+
+      commands.push(pdfRect(38, 470, 536, 57, { fill: '0.975 0.985 0.992', stroke: '0.84 0.88 0.91' }));
+      commands.push(pdfText('SERVICE SUMMARY', 51, 510, { size: 9, bold: true, color: navy }));
+      commands.push(pdfRect(51, 493, 24, 2, { fill: '0.98 0.66 0.04' }));
+      commands.push(pdfText('Service type', 51, 478, { size: 7.5, bold: true, color: muted }));
+      commands.push(pdfText((service?.name || 'General Service').slice(0, 25), 175, 478, { size: 8.5, bold: true }));
+      commands.push(pdfText('Service advisor', 190, 510, { size: 7.5, bold: true, color: muted }));
+      commands.push(pdfText((process.env.SERVICE_ADVISOR_NAME || 'AutoCare Service Team').slice(0, 24), 315, 510, { size: 8, align: 'right' }));
+      commands.push(pdfText('Technician', 328, 510, { size: 7.5, bold: true, color: muted }));
+      commands.push(pdfText((technicianName || 'Unassigned').slice(0, 22), 560, 510, { size: 8, bold: true, align: 'right' }));
+      commands.push(pdfText('Service job', 328, 486, { size: 7.5, bold: true, color: muted }));
+      commands.push(pdfText(job ? `SJ-${job.id}` : '-', 560, 486, { size: 8.5, align: 'right' }));
+      tableTop = 452;
     } else {
       commands.push(pdfText('ITEMIZED PARTS - CONTINUED', 44, 642, { size: 12, bold: true }));
       tableTop = 618;
     }
 
     commands.push(pdfRect(44, tableTop - 24, 524, 24, { fill: navy }));
-    commands.push(pdfText('ITEM / DESCRIPTION', 56, tableTop - 16, { size: 8, bold: true, color: '1 1 1' }));
-    commands.push(pdfText('QTY', 371, tableTop - 16, { size: 8, bold: true, color: '1 1 1', align: 'right' }));
-    commands.push(pdfText('UNIT PRICE', 464, tableTop - 16, { size: 8, bold: true, color: '1 1 1', align: 'right' }));
+    commands.push(pdfText('#', 56, tableTop - 16, { size: 8, bold: true, color: '1 1 1' }));
+    commands.push(pdfText('DESCRIPTION', 76, tableTop - 16, { size: 8, bold: true, color: '1 1 1' }));
+    commands.push(pdfText('TYPE', 332, tableTop - 16, { size: 8, bold: true, color: '1 1 1', align: 'right' }));
+    commands.push(pdfText('QTY', 386, tableTop - 16, { size: 8, bold: true, color: '1 1 1', align: 'right' }));
+    commands.push(pdfText('UNIT PRICE', 475, tableTop - 16, { size: 8, bold: true, color: '1 1 1', align: 'right' }));
     commands.push(pdfText('AMOUNT', 556, tableTop - 16, { size: 8, bold: true, color: '1 1 1', align: 'right' }));
 
     if (!pageParts.length) {
@@ -227,10 +272,15 @@ function createInvoicePdfBuffer(details) {
     pageParts.forEach((part, index) => {
       const rowTop = tableTop - 24 - (index * 31);
       if (index % 2 === 0) commands.push(pdfRect(44, rowTop - 31, 524, 31, { fill: '0.975 0.985 0.992' }));
-      const label = [part.partName || 'Part', part.brand, part.condition].filter(Boolean).join(' - ').slice(0, 52);
-      commands.push(pdfText(label, 56, rowTop - 20, { size: 8.5 }));
-      commands.push(pdfText(Number(part.quantity || 0), 371, rowTop - 20, { size: 8.5, align: 'right' }));
-      commands.push(pdfText(money(part.unitPrice), 464, rowTop - 20, { size: 8.5, align: 'right' }));
+      const label = [part.partName || 'Part', part.brand].filter(Boolean).join(' - ').slice(0, 38);
+      const itemNumber = pageIndex === 0
+        ? index + 1
+        : firstPageRows + ((pageIndex - 1) * followingPageRows) + index + 1;
+      commands.push(pdfText(itemNumber, 56, rowTop - 20, { size: 8, color: muted }));
+      commands.push(pdfText(label, 76, rowTop - 20, { size: 8.5 }));
+      commands.push(pdfText(part.itemType || 'Spare Part', 332, rowTop - 20, { size: 7.5, color: muted, align: 'right' }));
+      commands.push(pdfText(Number(part.quantity || 0), 386, rowTop - 20, { size: 8.5, align: 'right' }));
+      commands.push(pdfText(money(part.unitPrice), 475, rowTop - 20, { size: 8.5, align: 'right' }));
       commands.push(pdfText(money(part.totalPrice || Number(part.quantity || 0) * Number(part.unitPrice || 0)), 556, rowTop - 20, { size: 8.5, bold: true, align: 'right' }));
     });
 
@@ -252,11 +302,38 @@ function createInvoicePdfBuffer(details) {
       commands.push(pdfRect(350, grandY - 12, 218, 38, { fill: navy }));
       commands.push(pdfText('TOTAL', 414, grandY + 2, { size: 10, bold: true, color: '1 1 1', align: 'right' }));
       commands.push(pdfText(money(invoice.amount), 556, grandY + 2, { size: 12, bold: true, color: '1 1 1', align: 'right' }));
+      const paidAmount = String(invoice.paymentStatus || '').toLowerCase() === 'paid' ? Number(invoice.amount || 0) : 0;
+      commands.push(pdfText('Paid amount', 414, grandY - 28, { size: 8, color: muted, align: 'right' }));
+      commands.push(pdfText(money(paidAmount), 556, grandY - 28, { size: 8.5, bold: true, align: 'right' }));
+      commands.push(pdfRect(350, grandY - 67, 218, 28, { stroke: green }));
+      commands.push(pdfText('BALANCE', 414, grandY - 57, { size: 8.5, bold: true, color: green, align: 'right' }));
+      commands.push(pdfText(money(Number(invoice.amount || 0) - paidAmount), 556, grandY - 57, { size: 9, bold: true, color: green, align: 'right' }));
+
+      commands.push(pdfRect(44, 181, 270, 52, { fill: '0.98 0.985 0.99', stroke: '0.84 0.88 0.91' }));
+      commands.push(pdfText('NOTES', 57, 215, { size: 8.5, bold: true, color: navy }));
+      commands.push(pdfText('Thank you for choosing AutoCare Service Station.', 57, 198, { size: 7.5, color: muted }));
+      commands.push(pdfText('Drive safe! We appreciate your business - We Care.', 57, 186, { size: 7.5, color: muted }));
+
+      commands.push(pdfRect(44, 72, 270, 96, { fill: '0.98 0.985 0.99', stroke: '0.84 0.88 0.91' }));
+      commands.push(pdfText('BANK DETAILS', 57, 149, { size: 8.5, bold: true, color: navy }));
+      commands.push(pdfText('Bank', 57, 130, { size: 7.5, bold: true, color: muted }));
+      commands.push(pdfText(process.env.BANK_NAME || 'Commercial Bank of Ceylon', 298, 130, { size: 7.5, align: 'right' }));
+      commands.push(pdfText('Account name', 57, 113, { size: 7.5, bold: true, color: muted }));
+      commands.push(pdfText(process.env.BANK_ACCOUNT_NAME || 'AutoCare Service Station', 298, 113, { size: 7.5, align: 'right' }));
+      commands.push(pdfText('Account no.', 57, 96, { size: 7.5, bold: true, color: muted }));
+      commands.push(pdfText(process.env.BANK_ACCOUNT_NUMBER || 'Contact AutoCare', 298, 96, { size: 7.5, align: 'right' }));
+      commands.push(pdfText('Branch', 57, 79, { size: 7.5, bold: true, color: muted }));
+      commands.push(pdfText(process.env.BANK_BRANCH || 'Colombo', 298, 79, { size: 7.5, align: 'right' }));
+
+      commands.push(pdfText(`Prepared by: ${process.env.SERVICE_ADVISOR_NAME || 'AutoCare Service Team'}`, 314, 57, { size: 7, color: muted, align: 'right' }));
+      commands.push(pdfText(`Authorized by: ${process.env.AUTHORIZED_BY_NAME || 'Operations Manager'}`, 568, 57, { size: 7, color: muted, align: 'right' }));
     }
 
-    commands.push(pdfRect(44, 40, 524, 1, { fill: '0.82 0.87 0.9' }));
-    commands.push(pdfText('Thank you for choosing AutoCare. Drive safe!', 44, 23, { size: 8, bold: true, color: navy }));
-    commands.push(pdfText('Computer-generated invoice', 568, 23, { size: 7.5, color: muted, align: 'right' }));
+    commands.push(pdfRect(0, 0, 612, 45, { fill: navy }));
+    commands.push(pdfRect(0, 45, 612, 3, { fill: '0.98 0.66 0.04' }));
+    commands.push(pdfText(process.env.BUSINESS_ADDRESS || 'Colombo, Sri Lanka', 44, 24, { size: 7.5, color: '1 1 1' }));
+    commands.push(pdfText(process.env.BUSINESS_PHONE || '+94 77 123 4567', 306, 24, { size: 7.5, color: '1 1 1', align: 'right' }));
+    commands.push(pdfText(process.env.BUSINESS_EMAIL || 'info@autocare.lk', 568, 24, { size: 7.5, color: '1 1 1', align: 'right' }));
     return commands.filter(Boolean).join('\n');
   }));
 }
