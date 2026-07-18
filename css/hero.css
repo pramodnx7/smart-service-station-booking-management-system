@@ -118,7 +118,7 @@
   position: absolute;
   left: 0;
   right: 0;
-  padding-top: 550px;
+  padding-top: 680px;
   z-index: 4;
 }
 
@@ -166,7 +166,7 @@
   animation-delay: 280ms;
 }
 
-.hero__features svg {
+.hero__features article svg {
   width: 42px;
   height: 42px;
   flex: 0 0 auto;
@@ -177,19 +177,82 @@
   stroke-linejoin: round;
 }
 
-.hero__features strong,
-.hero__features span {
+.hero__features article strong,
+.hero__features article span {
   display: block;
   min-width: 0;
 }
 
-.hero__features strong {
+.scrolldown-wrapper {
+  position: relative;
+  z-index: 8;
+  display: grid;
+  justify-items: center;
+  gap: 3px;
+  width: max-content;
+  margin: 28px auto 0;
+  color: rgba(255, 255, 255, 0.78);
+  text-decoration: none;
+}
+
+.scrolldown {
+  display: grid;
+  place-items: start center;
+  width: 30px;
+  height: 46px;
+  border: 2px solid #fff;
+  border-radius: 30px;
+  transition: border-color 180ms ease, transform 180ms ease;
+}
+
+.scrolldown svg {
+  overflow: visible;
+}
+
+.scrolldown-p1,
+.scrolldown-p2 {
+  fill: var(--yellow);
+  animation: scrolldown 1.5s ease-in-out infinite;
+}
+
+.scrolldown-p2 {
+  animation-delay: 0.75s;
+}
+
+.scrolldown-label {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.scrolldown-wrapper:hover .scrolldown {
+  border-color: var(--yellow);
+  transform: translateY(3px);
+}
+
+@keyframes scrolldown {
+  0% {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  50% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+.hero__features article strong {
   color: rgba(255, 255, 255, 0.9);
   font-size: 13px;
   font-weight: 900;
 }
 
-.hero__features span {
+.hero__features article span {
   margin-top: 4px;
   font-size: 11px;
   line-height: 1.35;
@@ -381,6 +444,7 @@
   .hero__features {
     position: relative;
     top: auto;
+    padding-top: 0;
     margin: 0 0 24px;
   }
 
@@ -398,6 +462,17 @@
     left: auto;
     bottom: auto;
     transform: none;
+  }
+
+  .scrolldown-wrapper {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scrolldown-p1,
+  .scrolldown-p2 {
+    animation: none;
   }
 }
 
