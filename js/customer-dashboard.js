@@ -730,20 +730,30 @@ document.addEventListener('DOMContentLoaded', () => {
       throw new Error('Invoice not found.');
     }
 
-    const blob = await window.AutoCareApi.requestBlob(`/api/invoices/${invoice.id}/pdf`);
-    if (blob.type !== 'application/pdf') {
-      throw new Error('The server did not return a valid PDF invoice.');
+    const previewWindow = window.open('', '_blank');
+    if (previewWindow) {
+      previewWindow.document.title = 'Preparing AutoCare Invoice';
+      previewWindow.document.body.innerHTML = '<p style="font:16px Arial;padding:24px">Preparing invoice PDF...</p>';
     }
 
-    const objectUrl = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = objectUrl;
-    link.download = `AutoCare-Invoice-${invoice.id}.pdf`;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
-    showToast(`Invoice #INV-${invoice.id} downloaded as PDF.`);
+    try {
+      const blob = await window.AutoCareApi.requestBlob(`/api/invoices/${invoice.id}/pdf`);
+      if (blob.type !== 'application/pdf') throw new Error('The server did not return a valid PDF invoice.');
+      const objectUrl = URL.createObjectURL(blob);
+      if (previewWindow) {
+        previewWindow.location.replace(objectUrl);
+      } else {
+        const link = document.createElement('a');
+        link.href = objectUrl;
+        link.download = `AutoCare-Invoice-${invoice.id}.pdf`;
+        link.click();
+      }
+      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 5 * 60 * 1000);
+      showToast(`Invoice #INV-${invoice.id} opened.`);
+    } catch (error) {
+      previewWindow?.close();
+      throw error;
+    }
   }
 
   function downloadFile(kind, id) {

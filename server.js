@@ -686,7 +686,8 @@ app.get('/api/invoices/:id/pdf', requireAuth(), async (req, res, next) => {
     const pdf = await store.getInvoicePdf(req.params.id, req.user);
     if (!pdf) return res.status(404).send('Invoice not found.');
     res.type('application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename="invoice-${req.params.id}.pdf"`);
+    res.setHeader('Content-Disposition', `inline; filename="AutoCare-Invoice-${req.params.id}.pdf"`);
+    res.setHeader('Cache-Control', 'private, no-store');
     res.send(pdf);
   } catch (error) {
     next(error);
@@ -857,7 +858,8 @@ app.get('/api/admin/reports/sales/pdf', requireAuth('admin'), async (req, res, n
   try {
     const pdf = await store.getOverallSalesReportPdf();
     res.type('application/pdf');
-    res.setHeader('Content-Disposition', 'attachment; filename="AutoCare-Overall-Sales-Report.pdf"');
+    res.setHeader('Content-Disposition', 'inline; filename="AutoCare-Overall-Sales-Report.pdf"');
+    res.setHeader('Cache-Control', 'private, no-store');
     res.send(pdf);
   } catch (error) {
     next(error);
@@ -868,7 +870,8 @@ app.get('/api/admin/reports/overall/pdf', requireAuth('admin'), async (req, res,
   try {
     const pdf = await store.getOverallSystemReportPdf();
     res.type('application/pdf');
-    res.setHeader('Content-Disposition', 'attachment; filename="AutoCare-Overall-System-Report.pdf"');
+    res.setHeader('Content-Disposition', 'inline; filename="AutoCare-Overall-System-Report.pdf"');
+    res.setHeader('Cache-Control', 'private, no-store');
     res.send(pdf);
   } catch (error) {
     next(error);

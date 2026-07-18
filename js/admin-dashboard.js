@@ -1114,37 +1114,41 @@ document.addEventListener('DOMContentLoaded', () => {
       throw new Error('Invoice not found.');
     }
 
-    const blob = await window.AutoCareApi.requestBlob(`/api/invoices/${invoice.id}/pdf`);
-    if (blob.type !== 'application/pdf') {
-      throw new Error('The server did not return a valid PDF invoice.');
-    }
-
-    const objectUrl = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = objectUrl;
-    link.download = `AutoCare-Invoice-${invoice.id}.pdf`;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
-    showToast(`Invoice #INV-${invoice.id} downloaded as PDF.`);
+    await openPdfFile(
+      `/api/invoices/${invoice.id}/pdf`,
+      `AutoCare-Invoice-${invoice.id}.pdf`,
+      `Invoice #INV-${invoice.id} opened.`,
+      'The server did not return a valid PDF invoice.'
+    );
   }
 
-  async function downloadManagementReport(endpoint, fileName, successMessage) {
-    const blob = await window.AutoCareApi.requestBlob(endpoint);
-    if (blob.type !== 'application/pdf') {
-      throw new Error('The server did not return a valid PDF report.');
+  async function openPdfFile(endpoint, fileName, successMessage, invalidMessage = 'The server did not return a valid PDF report.') {
+    const previewWindow = window.open('', '_blank');
+    if (previewWindow) {
+      previewWindow.document.title = 'Preparing AutoCare PDF';
+      previewWindow.document.body.innerHTML = '<p style="font:16px Arial;padding:24px">Preparing PDF...</p>';
     }
 
-    const objectUrl = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = objectUrl;
-    link.download = fileName;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
-    showToast(successMessage);
+    try {
+      const blob = await window.AutoCareApi.requestBlob(endpoint);
+      if (blob.type !== 'application/pdf') throw new Error(invalidMessage);
+      const objectUrl = URL.createObjectURL(blob);
+      if (previewWindow) {
+        previewWindow.location.replace(objectUrl);
+      } else {
+        const link = document.createElement('a');
+        link.href = objectUrl;
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+      }
+      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 5 * 60 * 1000);
+      showToast(successMessage);
+    } catch (error) {
+      previewWindow?.close();
+      throw error;
+    }
   }
 
   function downloadFile(kind, id) {
@@ -1243,14 +1247,14 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     if (action === 'download-invoice-pdf') await downloadInvoicePdf(numericId);
     if (action === 'download-sales-report') {
-      await downloadManagementReport(
+      await openPdfFile(
         '/api/admin/reports/sales/pdf',
         'AutoCare-Overall-Sales-Report.pdf',
         'Overall sales report downloaded.'
       );
     }
     if (action === 'download-overall-report') {
-      await downloadManagementReport(
+      await openPdfFile(
         '/api/admin/reports/overall/pdf',
         'AutoCare-Overall-System-Report.pdf',
         'Overall system report downloaded.'
