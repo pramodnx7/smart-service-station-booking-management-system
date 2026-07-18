@@ -52,6 +52,18 @@ Open:
 - Admin dashboard: `http://localhost:3000/admin-dashboard.html`
 - Customer dashboard: `http://localhost:3000/customer-dashboard.html`
 
+## 5. Verify the installation
+
+With the server running, use these commands in a second terminal:
+
+```bash
+npm run check
+npm run test:connection
+```
+
+The first command validates every project JavaScript file. The second verifies the
+API, Firestore, demo logins, authenticated sessions, and all three role dashboards.
+
 ## Security Note
 
 Firestore is accessed through the server with Firebase Admin SDK. The browser only calls `/api/...` routes and never receives Firebase admin credentials.

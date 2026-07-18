@@ -97,9 +97,9 @@
       });
     },
     logout() {
-      fetch('/api/auth/logout', {
+      fetch(`${apiBase}/api/auth/logout`, {
         method: 'POST',
-        credentials: 'same-origin',
+        credentials: window.location.protocol === 'file:' ? 'include' : 'same-origin',
         keepalive: true
       }).finally(() => {
         localStorage.removeItem(sessionKey);

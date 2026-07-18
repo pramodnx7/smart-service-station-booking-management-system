@@ -23,7 +23,11 @@ document.addEventListener('DOMContentLoaded', () => {
   const openSignup = document.getElementById('open-signup');
   const openLogin = document.getElementById('open-login');
   const roleButtons = Array.from(document.querySelectorAll('[data-role]'));
-  const nextTarget = new URLSearchParams(window.location.search).get('next');
+  const requestedNextTarget = new URLSearchParams(window.location.search).get('next');
+  const nextTarget = requestedNextTarget
+    && /^customer-dashboard\.html(?:#[a-z0-9_-]+)?$/i.test(requestedNextTarget)
+    ? requestedNextTarget
+    : null;
   const demoAccounts = {
     admin: { email: 'admin@autocare.lk', password: 'admin123' },
     customer: { email: 'customer@autocare.lk', password: 'customer123' },

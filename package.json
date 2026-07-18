@@ -6,7 +6,9 @@
   "scripts": {
     "start": "node --use-system-ca server.js",
     "dev": "nodemon --exec \"node --use-system-ca\" server.js",
-    "firebase:seed": "node --use-system-ca scripts/seed-firestore.js"
+    "firebase:seed": "node --use-system-ca scripts/seed-firestore.js",
+    "check": "node scripts/check-syntax.js",
+    "test:connection": "node --use-system-ca scripts/check-connection.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
