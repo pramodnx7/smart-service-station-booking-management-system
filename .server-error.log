@@ -1,12 +1,24 @@
-Error: Technician cannot complete a job without updating progress to 100%.
-    at Object.completeTechnicianJob (C:\Users\VICTUS\Desktop\RAD Project\smart-service-station-booking-management-system\src\firestore-store.js:2114:19)
+Error: This technician is already assigned to the service job.
+    at Object.assignTechnician (C:\Users\VICTUS\Desktop\RAD Project\smart-service-station-booking-management-system\src\firestore-store.js:1629:19)
     at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
-    at async C:\Users\VICTUS\Desktop\RAD Project\smart-service-station-booking-management-system\server.js:414:14 {
-  status: 400
+    at async C:\Users\VICTUS\Desktop\RAD Project\smart-service-station-booking-management-system\server.js:1046:14 {
+  status: 409
 }
-Error: Technician cannot complete a job without updating progress to 100%.
-    at Object.completeTechnicianJob (C:\Users\VICTUS\Desktop\RAD Project\smart-service-station-booking-management-system\src\firestore-store.js:2114:19)
-    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
-    at async C:\Users\VICTUS\Desktop\RAD Project\smart-service-station-booking-management-system\server.js:414:14 {
-  status: 400
+4)
+    at Object.<anonymous> (C:\Users\VICTUS\Desktop\RAD Project\smart-service-station-booking-management-system\server.js:1122:5)
+    at Module._compile (node:internal/modules/cjs/loader:1854:14)
+    at Object..js (node:internal/modules/cjs/loader:1985:10)
+    at Module.load (node:internal/modules/cjs/loader:1577:32)
+    at Module._load (node:internal/modules/cjs/loader:1379:12)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:255:19)
+Emitted 'error' event on Server instance at:
+    at emitErrorNT (node:net:2044:8)
+    at process.processTicksAndRejections (node:internal/process/task_queues:90:21) {
+  code: 'EADDRINUSE',
+  errno: -4091,
+  syscall: 'listen',
+  address: '::',
+  port: 3000
 }
+
+Node.js v24.16.0
