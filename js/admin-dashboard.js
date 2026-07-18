@@ -172,6 +172,207 @@ document.addEventListener('DOMContentLoaded', () => {
     return `LKR ${Number(amount).toLocaleString('en-LK')}`;
   }
 
+  function buildInvoicePreviewModel(invoice) {
+    const customer = state.customers.find((item) => item.id === Number(invoice.customerId)) || {};
+    const serviceJob = state.serviceJobs.find((item) => item.id === Number(invoice.serviceJobId)) || null;
+    const booking = serviceJob ? state.bookings.find((item) => item.id === Number(serviceJob.bookingId)) : null;
+    const vehicle = serviceJob ? state.vehicles.find((item) => item.id === Number(serviceJob.vehicleId)) : (booking ? state.vehicles.find((item) => item.id === Number(booking.vehicleId)) : null);
+    const technician = serviceJob ? state.technicians.find((item) => item.id === Number(serviceJob.assignedTechnicianId)) : null;
+    const parts = (state.partUsageHistory || []).filter((item) => Number(item.serviceJobId) === Number(invoice.serviceJobId));
+    const partsTotal = Number(invoice.partsTotal || 0);
+    const laborCost = Number(invoice.laborCost || 0);
+    const serviceCharges = Number(invoice.serviceCharges || 0);
+    const tax = Number(invoice.tax || 0);
+    const discount = Number(invoice.discount || 0);
+    const subtotal = partsTotal + laborCost + serviceCharges;
+    const grandTotal = Number(invoice.amount || subtotal + tax - discount);
+    const paymentStatus = String(invoice.payment || 'Unpaid').trim();
+    return {
+      invoice,
+      customer,
+      serviceJob,
+      booking,
+      vehicle,
+      technician,
+      parts,
+      partsTotal,
+      laborCost,
+      serviceCharges,
+      tax,
+      discount,
+      subtotal,
+      grandTotal,
+      paymentStatus,
+      company: {
+        name: 'AutoCare Service Station',
+        address: '123 AutoCare Drive, Motor City',
+        phone: '+94 77 023 4567',
+        email: 'support@autocare.lk',
+        bankName: 'Sampath Bank',
+        accountName: 'AutoCare Service Station',
+        accountNumber: '100-200-300-4',
+        branch: 'Colombo 03'
+      }
+    };
+  }
+
+  function renderInvoicePreviewMarkup(model) {
+    const { invoice, customer, serviceJob, booking, vehicle, technician, parts, partsTotal, laborCost, serviceCharges, tax, discount, subtotal, grandTotal, paymentStatus, company } = model;
+    const rows = parts.length
+      ? parts.map((part) => `
+          <tr>
+            <td>${part.partName || part.name || 'Spare part'}</td>
+            <td>${part.quantity || 1}</td>
+            <td>${formatMoney(part.unitPrice || 0)}</td>
+            <td>${formatMoney(part.totalPrice || (Number(part.unitPrice || 0) * Number(part.quantity || 1)))}</td>
+          </tr>
+        `).join('')
+      : `
+          <tr>
+            <td colspan="4" class="invoice-preview__empty">No spare parts were recorded for this service.</td>
+          </tr>
+        `;
+    const serviceName = invoice.service || serviceJob?.serviceType || 'Service Package';
+    return `
+      <div class="invoice-preview-shell">
+        <div class="invoice-preview__header">
+          <div>
+            <p class="eyebrow">AutoCare Service Station</p>
+            <h2>Tax Invoice</h2>
+          </div>
+          <div class="invoice-preview__status">${paymentStatus}</div>
+        </div>
+        <div class="invoice-preview__brand-row">
+          <div class="invoice-preview__brand">
+            <div class="invoice-preview__logo">AC</div>
+            <div>
+              <strong>${company.name}</strong>
+              <p>${company.address}</p>
+              <p>${company.phone} · ${company.email}</p>
+            </div>
+          </div>
+          <div class="invoice-preview__meta">
+            <div><span>Invoice No</span><strong>#INV-${invoice.id}</strong></div>
+            <div><span>Invoice Date</span><strong>${invoice.date || 'Pending'}</strong></div>
+            <div><span>Booking</span><strong>#BK-${booking?.id || serviceJob?.bookingId || 'N/A'}</strong></div>
+          </div>
+        </div>
+        <div class="invoice-preview__grid">
+          <section class="invoice-preview__card">
+            <div class="invoice-preview__section-title">Bill To</div>
+            <p><strong>${customer.name || 'Customer Name'}</strong></p>
+            <p>${customer.address || 'Customer address not provided.'}</p>
+            <p>${customer.phone || 'Phone not provided'}</p>
+            <p>${customer.email || 'Email not provided'}</p>
+          </section>
+          <section class="invoice-preview__card">
+            <div class="invoice-preview__section-title">Vehicle & Service</div>
+            <p><strong>${vehicle ? `${vehicle.make || ''} ${vehicle.model || ''}`.trim() : 'Vehicle details unavailable'}</strong></p>
+            <p>Plate: ${vehicle?.plate || vehicle?.plateNumber || 'N/A'}</p>
+            <p>Service: ${serviceName}</p>
+            <p>Mechanic: ${technician?.name || 'AutoCare Team'}</p>
+          </section>
+        </div>
+        <section class="invoice-preview__card invoice-preview__card--full">
+          <div class="invoice-preview__section-title">Service Summary</div>
+          <div class="invoice-preview__summary-list">
+            <div><span>Service Type</span><strong>${serviceName}</strong></div>
+            <div><span>Service Date</span><strong>${booking?.date || invoice.date || 'Pending'}</strong></div>
+            <div><span>Appointment Time</span><strong>${booking?.time || 'Pending'}</strong></div>
+            <div><span>Payment Status</span><strong>${paymentStatus}</strong></div>
+          </div>
+        </section>
+        <section class="invoice-preview__card invoice-preview__card--full">
+          <div class="invoice-preview__section-title">Itemized Charges</div>
+          <table class="invoice-preview__table">
+            <thead>
+              <tr><th>Item</th><th>Qty</th><th>Unit Price</th><th>Total</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>${serviceName}</td>
+                <td>1</td>
+                <td>${formatMoney(laborCost)}</td>
+                <td>${formatMoney(laborCost)}</td>
+              </tr>
+              ${rows}
+            </tbody>
+          </table>
+        </section>
+        <div class="invoice-preview__footer-grid">
+          <section class="invoice-preview__card">
+            <div class="invoice-preview__section-title">Billing Summary</div>
+            <div class="invoice-preview__totals">
+              <div><span>Subtotal</span><strong>${formatMoney(subtotal)}</strong></div>
+              <div><span>Discount</span><strong>-${formatMoney(discount)}</strong></div>
+              <div><span>Tax</span><strong>${formatMoney(tax)}</strong></div>
+              <div class="invoice-preview__total"><span>Grand Total</span><strong>${formatMoney(grandTotal)}</strong></div>
+            </div>
+          </section>
+          <section class="invoice-preview__card">
+            <div class="invoice-preview__section-title">Notes & Payment</div>
+            <p>Thank you for choosing AutoCare Service Station. Please settle any remaining balance before collecting your vehicle.</p>
+            <div class="invoice-preview__bank">
+              <p><strong>Bank Details</strong></p>
+              <p>${company.bankName}</p>
+              <p>${company.accountName}</p>
+              <p>${company.accountNumber}</p>
+              <p>${company.branch}</p>
+            </div>
+          </section>
+        </div>
+        <div class="invoice-preview__signatures">
+          <div>
+            <span>Prepared By</span>
+            <div class="invoice-preview__signature"></div>
+          </div>
+          <div>
+            <span>Authorized Signature</span>
+            <div class="invoice-preview__signature"></div>
+          </div>
+          <div class="invoice-preview__qr">
+            <div class="invoice-preview__qr-box">QR</div>
+            <small>Verify invoice</small>
+          </div>
+        </div>
+        <div class="invoice-preview__footer">
+          <p>Contact: ${company.phone} · ${company.email}</p>
+          <p>Thank you for trusting AutoCare Service Station.</p>
+        </div>
+      </div>
+    `;
+  }
+
+  function openInvoicePreview(id) {
+    const invoice = state.invoices.find((item) => item.id === Number(id));
+    if (!invoice) return;
+    const model = buildInvoicePreviewModel(invoice);
+    selectors.modalKicker.textContent = 'Invoice Preview';
+    selectors.modalTitle.textContent = `Invoice #INV-${invoice.id}`;
+    selectors.modalBody.innerHTML = renderInvoicePreviewMarkup(model);
+    selectors.modalActions.hidden = false;
+    selectors.modalActions.innerHTML = `
+      <div class="invoice-preview__actions">
+        <button class="btn btn--ghost" type="button" data-action="close-modal">Close</button>
+        <button class="btn btn--blue" type="button" data-action="print-invoice" data-id="${invoice.id}">Print</button>
+        <button class="btn btn--yellow" type="button" data-action="download-invoice-pdf" data-id="${invoice.id}">Download PDF</button>
+      </div>
+    `;
+    selectors.modal.showModal();
+  }
+
+  function printInvoice(id) {
+    const invoice = state.invoices.find((item) => item.id === Number(id));
+    if (!invoice) return;
+    const model = buildInvoicePreviewModel(invoice);
+    const previewWindow = window.open('', '_blank', 'width=980,height=1200');
+    if (!previewWindow) return;
+    previewWindow.document.write(`<!DOCTYPE html><html><head><title>Invoice #INV-${invoice.id}</title><style>${document.querySelector('link[rel="stylesheet"]').outerHTML}</style></head><body>${renderInvoicePreviewMarkup(model)}</body></html>`);
+    previewWindow.document.close();
+    previewWindow.focus();
+    previewWindow.print();
+  }
+
   function statusClass(status) {
     const value = status.toLowerCase().replace(/\s+/g, '-');
     if (value === 'in-progress') return 'progress';
@@ -597,7 +798,7 @@ document.addEventListener('DOMContentLoaded', () => {
         <td>${invoice.service}</td>
         <td>${formatMoney(invoice.amount)}</td>
         <td><span class="badge badge--${invoice.payment === 'Paid' ? 'completed' : 'pending'}">${invoice.payment}</span></td>
-        <td><div class="row-actions"><button class="mini-btn" type="button" data-action="mark-paid" data-id="${invoice.id}">Mark Paid</button><button class="mini-btn" type="button" data-action="download-invoice" data-id="${invoice.id}">Download</button></div></td>
+        <td><div class="row-actions"><button class="mini-btn" type="button" data-action="preview-invoice" data-id="${invoice.id}">View</button><button class="mini-btn" type="button" data-action="mark-paid" data-id="${invoice.id}">Mark Paid</button><button class="mini-btn" type="button" data-action="download-invoice" data-id="${invoice.id}">Download</button></div></td>
       </tr>
     `).join('');
   }
@@ -997,6 +1198,14 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
       }
       openModal('invoice');
+    }
+    if (action === 'preview-invoice') {
+      await openInvoicePreview(numericId);
+      return;
+    }
+    if (action === 'print-invoice') {
+      printInvoice(numericId);
+      return;
     }
     if (action === 'mark-paid') {
       await window.AutoCareApi.request(`/api/admin/invoices/${numericId}/pay`, { method: 'PUT' });

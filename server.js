@@ -1094,16 +1094,16 @@ app.use((req, res) => {
 
 app.use((error, req, res, next) => {
   const message = String(error.message || '');
-  const isCredentialError = message.includes('spawn EPERM') || message.toLowerCase().includes('credential');
+  const isCredentialError = message.includes('spawn EPERM')
+    || message.toLowerCase().includes('credential')
+    || message.toLowerCase().includes('service account');
   if (isCredentialError) {
     console.warn(message);
   } else {
     console.error(error);
   }
   res.status(error.status || 500).json({
-    message: isCredentialError
-      ? 'Firebase Admin credentials are not configured. Set FIREBASE_PROJECT_ID and FIREBASE_SERVICE_ACCOUNT_PATH in .env.'
-      : message || 'Server error.'
+    message: message || 'Server error.'
   });
 });
 
@@ -1113,10 +1113,7 @@ store.ensureSeedData()
   })
   .catch((error) => {
     const message = String(error.message || '');
-    const hint = message.includes('spawn EPERM') || message.toLowerCase().includes('credential')
-      ? 'Firebase Admin credentials are not configured. Set FIREBASE_PROJECT_ID and FIREBASE_SERVICE_ACCOUNT_PATH in .env.'
-      : message;
-    console.warn(`Firestore seed skipped: ${hint}`);
+    console.warn(`Firestore seed skipped: ${message}`);
   });
 
 app.listen(port, () => {

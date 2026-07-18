@@ -12,7 +12,13 @@ FIREBASE_PROJECT_ID=your-firebase-project-id
 FIREBASE_SERVICE_ACCOUNT_PATH=./serviceAccountKey.json
 ```
 
-Do not commit `.env` or the service account JSON file.
+`serviceAccountKey.json` must be a Firebase Admin SDK service-account key, not the
+Firebase web configuration object. In Firebase Console, open **Project settings →
+Service accounts → Generate new private key**, then save the downloaded file as
+`serviceAccountKey.json` in the project root.
+
+Do not commit `.env` or the service account JSON file. Both are already ignored by
+Git in this project.
 
 ## 2. Install dependencies
 

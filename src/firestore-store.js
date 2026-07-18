@@ -1,5 +1,5 @@
 const bcrypt = require('bcryptjs');
-const { admin, db, hasFirebaseCredentials } = require('./firebase');
+const { admin, db, firebaseConfigurationError } = require('./firebase');
 
 const collections = {
   users: 'users',
@@ -138,9 +138,12 @@ function docRef(collection, id) {
 }
 
 function assertFirebaseConfigured() {
-  if (hasFirebaseCredentials) return;
+  if (db) return;
 
-  const error = new Error('Firebase Admin credentials are not configured. Set FIREBASE_PROJECT_ID and FIREBASE_SERVICE_ACCOUNT_PATH in .env.');
+  const error = new Error(
+    firebaseConfigurationError
+    || 'Firebase Admin credentials are not configured. Set FIREBASE_PROJECT_ID and one credential option in .env.'
+  );
   error.status = 500;
   throw error;
 }
