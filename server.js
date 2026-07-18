@@ -735,18 +735,9 @@ app.put('/api/admin/bookings/:id/status', requireAuth('admin'), async (req, res,
 
 app.put('/api/admin/bookings/:id/cancel', requireAuth('admin'), async (req, res, next) => {
   try {
-    await store.cancelBooking(req.params.id, req.user.id, false);
+    const cancelled = await store.cancelBooking(req.params.id, req.user.id, false);
+    if (!cancelled) return res.status(404).json({ message: 'Booking not found.' });
     res.json({ ok: true });
-  } catch (error) {
-    next(error);
-  }
-});
-
-app.delete('/api/admin/bookings/:id', requireAuth('admin'), async (req, res, next) => {
-  try {
-    const deleted = await store.deleteBooking(req.params.id, null, false);
-    if (!deleted) return res.status(404).json({ message: 'Booking not found.' });
-    res.status(204).end();
   } catch (error) {
     next(error);
   }
@@ -794,6 +785,16 @@ app.put('/api/admin/customers/:id', requireAuth('admin'), async (req, res, next)
     const user = await store.updateCustomer(req.params.id, req.body);
     if (!user) return res.status(404).json({ message: 'Customer not found.' });
     res.json(user);
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.delete('/api/admin/customers/:id', requireAuth('admin'), async (req, res, next) => {
+  try {
+    const deleted = await store.deleteCustomer(req.params.id);
+    if (!deleted) return res.status(404).json({ message: 'Customer not found.' });
+    res.status(204).end();
   } catch (error) {
     next(error);
   }

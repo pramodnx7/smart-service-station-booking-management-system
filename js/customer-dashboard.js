@@ -776,6 +776,10 @@ document.addEventListener('DOMContentLoaded', () => {
     if (action === 'new-vehicle') openModal('vehicle');
     if (action === 'edit-vehicle') openModal('vehicle', state.vehicles.find((item) => item.id === numericId));
     if (action === 'delete-vehicle') {
+      const vehicle = state.vehicles.find((item) => item.id === numericId);
+      if (!vehicle) return;
+      const vehicleLabel = `${vehicle.make || ''} ${vehicle.model || ''} (${vehicle.plate || 'No plate'})`.trim();
+      if (!window.confirm(`Remove ${vehicleLabel}? This action cannot be undone.`)) return;
       await window.AutoCareApi.request(`/api/customer/vehicles/${numericId}`, { method: 'DELETE' });
       state.vehicles = state.vehicles.filter((item) => item.id !== numericId);
       saveState();
@@ -792,12 +796,20 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     if (action === 'reschedule-booking') openModal('booking', state.bookings.find((item) => item.id === numericId));
     if (action === 'cancel-booking') {
+      const booking = state.bookings.find((item) => item.id === numericId);
+      if (!booking || ['Completed', 'Cancelled'].includes(booking.status)) {
+        showToast('Only active bookings can be cancelled.');
+        return;
+      }
+      if (!window.confirm(`Cancel booking #BK-${numericId}? This will remove it from the active queue.`)) return;
       await window.AutoCareApi.request(`/api/customer/bookings/${numericId}/cancel`, { method: 'PUT' });
-      state.bookings.find((item) => item.id === numericId).status = 'Cancelled';
+      booking.status = 'Cancelled';
+      booking.progress = 0;
+      booking.queue = 0;
       saveState();
       renderAll();
       await hydrateFromApi({ silent: true });
-      showToast('Booking cancelled.');
+      showToast('Booking cancelled. The queue has been updated.');
     }
     if (action === 'delete-booking') {
       await window.AutoCareApi.request(`/api/customer/bookings/${numericId}`, { method: 'DELETE' });

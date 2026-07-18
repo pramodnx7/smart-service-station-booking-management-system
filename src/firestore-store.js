@@ -475,6 +475,67 @@ async function createDocument(collection, data) {
   });
 }
 
+async function createQueuedBookingDocument(data) {
+  assertFirebaseConfigured();
+  const bookingDate = formatDate(data.bookingDate);
+  const queueRef = db.collection('meta').doc(`booking-queue-${bookingDate}`);
+  const bookingsForDate = db.collection(collections.bookings).where('bookingDate', '==', bookingDate);
+
+  return db.runTransaction(async (transaction) => {
+    const [bookingsSnapshot, queueSnapshot] = await Promise.all([
+      transaction.get(bookingsForDate),
+      transaction.get(queueRef)
+    ]);
+    const existingMaximum = bookingsSnapshot.docs.reduce(
+      (maximum, snapshot) => bookingIsActive(snapshot.data())
+        ? Math.max(maximum, Number(snapshot.data().queuePosition || 0))
+        : maximum,
+      0
+    );
+    const storedMaximum = queueSnapshot.exists ? Number(queueSnapshot.data().lastPosition || 0) : 0;
+    const queuePosition = Math.max(existingMaximum, storedMaximum) + 1;
+    const id = await nextId(transaction, collections.bookings);
+    const ref = docRef(collections.bookings, id);
+
+    transaction.set(queueRef, {
+      bookingDate,
+      lastPosition: queuePosition,
+      updatedAt: fieldValue()
+    }, { merge: true });
+    transaction.set(ref, { ...data, bookingDate, queuePosition, id, createdAt: fieldValue() });
+    return { ...data, bookingDate, queuePosition, id };
+  });
+}
+
+async function moveBookingToDateQueue(id, data) {
+  assertFirebaseConfigured();
+  const bookingDate = formatDate(data.bookingDate);
+  const bookingRef = docRef(collections.bookings, id);
+  const queueRef = db.collection('meta').doc(`booking-queue-${bookingDate}`);
+  const bookingsForDate = db.collection(collections.bookings).where('bookingDate', '==', bookingDate);
+
+  return db.runTransaction(async (transaction) => {
+    const [bookingSnapshot, bookingsSnapshot, queueSnapshot] = await Promise.all([
+      transaction.get(bookingRef),
+      transaction.get(bookingsForDate),
+      transaction.get(queueRef)
+    ]);
+    if (!bookingSnapshot.exists) return null;
+    const existingMaximum = bookingsSnapshot.docs.reduce(
+      (maximum, snapshot) => bookingIsActive(snapshot.data())
+        ? Math.max(maximum, Number(snapshot.data().queuePosition || 0))
+        : maximum,
+      0
+    );
+    const storedMaximum = queueSnapshot.exists ? Number(queueSnapshot.data().lastPosition || 0) : 0;
+    const queuePosition = Math.max(existingMaximum, storedMaximum) + 1;
+
+    transaction.set(queueRef, { bookingDate, lastPosition: queuePosition, updatedAt: fieldValue() }, { merge: true });
+    transaction.set(bookingRef, { ...data, bookingDate, queuePosition, updatedAt: fieldValue() }, { merge: true });
+    return { ...bookingSnapshot.data(), ...data, bookingDate, queuePosition, id: Number(id) };
+  });
+}
+
 async function updateDocument(collection, id, data) {
   assertFirebaseConfigured();
   const ref = docRef(collection, id);
@@ -1409,27 +1470,28 @@ async function createBooking(userId, data, status = 'Pending') {
     throw error;
   }
 
+  const vehicle = await getById(collections.vehicles, data.vehicleId);
+  if (!vehicle || Number(vehicle.userId) !== Number(userId)) {
+    const error = new Error('Selected vehicle does not belong to this customer.');
+    error.status = 400;
+    throw error;
+  }
+
   const availability = await bookingAvailability({ serviceName: data.service, date: data.date, time: data.time });
   assertBookingCapacity(availability, data);
   const resources = assignedBookingResources(availability, data);
-  const bookings = await all(collections.bookings);
-  const queuePosition = bookings.filter((booking) => (
-    booking.bookingDate === data.date && !['Completed', 'Cancelled'].includes(booking.status)
-  )).length + 1;
 
-  const booking = await createDocument(collections.bookings, {
+  const booking = await createQueuedBookingDocument({
     userId,
     vehicleId: asId(data.vehicleId),
     servicePackageId: service.id,
     bookingDate: data.date,
     bookingTime: data.time,
     status,
-    queuePosition,
     progress: bookingProgress(status),
     ...resources
   });
 
-  const vehicle = await getById(collections.vehicles, data.vehicleId);
   await createUserNotification(userId, 'Booking Created', bookingNotificationMessage('Booking created', booking, service, vehicle));
 
   return bookingView(booking, new Map([[service.id, service]]));
@@ -1438,6 +1500,13 @@ async function createBooking(userId, data, status = 'Pending') {
 async function updateBooking(id, userId, data, enforceOwner = true) {
   const current = await getById(collections.bookings, id);
   if (!current || (enforceOwner && current.userId !== userId)) return null;
+
+  const vehicle = await getById(collections.vehicles, data.vehicleId);
+  if (!vehicle || Number(vehicle.userId) !== Number(userId)) {
+    const error = new Error('Selected vehicle does not belong to this customer.');
+    error.status = 400;
+    throw error;
+  }
 
   const service = await findServiceByName(data.service, false);
   if (!service) {
@@ -1450,7 +1519,7 @@ async function updateBooking(id, userId, data, enforceOwner = true) {
   const availability = await bookingAvailability({ serviceName: data.service, date: data.date, time: data.time, excludeBookingId: id });
   assertBookingCapacity(availability, data);
   const resources = assignedBookingResources(availability, data);
-  const booking = await updateDocument(collections.bookings, id, {
+  const bookingData = {
     userId,
     vehicleId: asId(data.vehicleId),
     servicePackageId: service.id,
@@ -1459,9 +1528,11 @@ async function updateBooking(id, userId, data, enforceOwner = true) {
     status,
     progress: bookingProgress(status),
     ...resources
-  });
+  };
+  const booking = formatDate(current.bookingDate) === formatDate(data.date)
+    ? await updateDocument(collections.bookings, id, bookingData)
+    : await moveBookingToDateQueue(id, bookingData);
 
-  const vehicle = await getById(collections.vehicles, data.vehicleId);
   await createUserNotification(userId, 'Booking Updated', bookingNotificationMessage('Booking updated', booking, service, vehicle));
 
   return bookingView(booking, new Map([[service.id, service]]));
@@ -1470,12 +1541,51 @@ async function updateBooking(id, userId, data, enforceOwner = true) {
 async function cancelBooking(id, userId, enforceOwner = true) {
   const current = await getById(collections.bookings, id);
   if (!current || (enforceOwner && current.userId !== userId)) return false;
-  const booking = await updateDocument(collections.bookings, id, { status: 'Cancelled', progress: 0 });
+  if (current.status === 'Cancelled') return true;
+  if (current.status === 'Completed') {
+    const error = new Error('A completed booking cannot be cancelled.');
+    error.status = 409;
+    throw error;
+  }
+
+  const bookingDate = formatDate(current.bookingDate);
+  const bookingsQuery = db.collection(collections.bookings).where('bookingDate', '==', bookingDate);
+  const queueRef = db.collection('meta').doc(`booking-queue-${bookingDate}`);
+  const booking = await db.runTransaction(async (transaction) => {
+    const snapshot = await transaction.get(bookingsQuery);
+    const target = snapshot.docs.find((document) => Number(document.id) === Number(id));
+    if (!target) return null;
+    const targetData = target.data();
+    if (enforceOwner && Number(targetData.userId) !== Number(userId)) return null;
+    if (targetData.status === 'Cancelled') return { ...targetData, id: Number(id) };
+    if (targetData.status === 'Completed') {
+      const error = new Error('A completed booking cannot be cancelled.');
+      error.status = 409;
+      throw error;
+    }
+
+    const cancelledPosition = Number(targetData.queuePosition || 0);
+    let lastPosition = 0;
+    snapshot.docs.forEach((document) => {
+      const item = document.data();
+      if (document.id === target.id || !bookingIsActive(item)) return;
+      const oldPosition = Number(item.queuePosition || 0);
+      const queuePosition = cancelledPosition > 0 && oldPosition > cancelledPosition ? oldPosition - 1 : oldPosition;
+      lastPosition = Math.max(lastPosition, queuePosition);
+      if (queuePosition !== oldPosition) {
+        transaction.set(document.ref, { queuePosition, updatedAt: fieldValue() }, { merge: true });
+      }
+    });
+    transaction.set(target.ref, { status: 'Cancelled', progress: 0, queuePosition: 0, updatedAt: fieldValue() }, { merge: true });
+    transaction.set(queueRef, { bookingDate, lastPosition, updatedAt: fieldValue() }, { merge: true });
+    return { ...targetData, status: 'Cancelled', progress: 0, queuePosition: 0, id: Number(id) };
+  });
+  if (!booking) return false;
   const [service, vehicle] = await Promise.all([
     getById(collections.servicePackages, current.servicePackageId),
     getById(collections.vehicles, current.vehicleId)
   ]);
-  await createUserNotification(userId, 'Booking Cancelled', bookingNotificationMessage('Booking cancelled', booking, service, vehicle));
+  await createUserNotification(current.userId, 'Booking Cancelled', bookingNotificationMessage('Booking cancelled', booking, service, vehicle));
   return true;
 }
 
@@ -1608,6 +1718,41 @@ async function updateCustomer(id, data) {
   });
 
   return customerView(user);
+}
+
+async function deleteCustomer(id) {
+  const customer = await getById(collections.users, id);
+  if (!customer || customer.role !== 'customer') return false;
+
+  const [vehicles, bookings, invoices, jobs, emergencies, feedback, notifications] = await Promise.all([
+    all(collections.vehicles),
+    all(collections.bookings),
+    all(collections.invoices),
+    all(collections.serviceJobs),
+    all(collections.emergencyRequests),
+    all(collections.feedback),
+    all(collections.notifications)
+  ]);
+  const customerId = Number(id);
+  const dependencies = [
+    ['vehicle', vehicles.some((item) => Number(item.userId) === customerId)],
+    ['booking', bookings.some((item) => Number(item.userId) === customerId)],
+    ['invoice', invoices.some((item) => Number(item.userId) === customerId)],
+    ['service job', jobs.some((item) => Number(item.customerId) === customerId)],
+    ['emergency request', emergencies.some((item) => Number(item.userId) === customerId)],
+    ['feedback', feedback.some((item) => Number(item.userId) === customerId)]
+  ].filter(([, exists]) => exists).map(([label]) => label);
+
+  if (dependencies.length) {
+    const error = new Error(`Customer cannot be removed because linked ${dependencies.join(', ')} records exist. Set the customer status to inactive instead.`);
+    error.status = 409;
+    throw error;
+  }
+
+  const customerNotifications = notifications.filter((item) => Number(item.userId) === customerId);
+  await Promise.all(customerNotifications.map((item) => deleteDocument(collections.notifications, item.id)));
+  await deleteDocument(collections.users, id);
+  return true;
 }
 
 async function itemCodeExists(itemCode, ignoreId) {
@@ -3012,6 +3157,7 @@ module.exports = {
   createUser,
   createVehicle,
   deleteInventoryItem,
+  deleteCustomer,
   deleteTechnician,
   deleteVehicle,
   ensureSeedData,

@@ -399,6 +399,12 @@ svg { display: block; }
 .table-wrap {
   width: 100%;
   overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.table-wrap::-webkit-scrollbar {
+  display: none;
 }
 
 table {
@@ -479,9 +485,86 @@ td {
   background: #fff0f0;
 }
 
+.mini-btn--danger {
+  color: #fff;
+  background: #d92d20;
+}
+
 .mini-btn--green {
   color: #14864a;
   background: #e9f9f0;
+}
+
+.booking-icon-btn {
+  width: 36px;
+  min-width: 36px;
+  height: 36px;
+  min-height: 36px;
+  display: inline-grid;
+  place-items: center;
+  padding: 0;
+}
+
+.booking-icon-btn [data-icon],
+.booking-icon-btn svg {
+  width: 18px;
+  height: 18px;
+}
+
+.booking-icon-btn:hover {
+  filter: brightness(0.95);
+  transform: translateY(-1px);
+}
+
+.booking-actions {
+  width: max-content;
+  display: grid;
+  grid-template-columns: repeat(3, 36px);
+  gap: 6px;
+  padding: 5px;
+  background: #f7f9fd;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.booking-actions .booking-icon-btn {
+  transition: transform 0.16s ease, filter 0.16s ease;
+}
+
+.bookings-table-wrap {
+  overflow-x: hidden;
+}
+
+.overview-bookings-table {
+  min-width: 0;
+  table-layout: fixed;
+}
+
+.overview-bookings-table th:nth-child(1) { width: 10%; }
+.overview-bookings-table th:nth-child(2) { width: 18%; }
+.overview-bookings-table th:nth-child(3) { width: 17%; }
+.overview-bookings-table th:nth-child(4) { width: 14%; }
+.overview-bookings-table th:nth-child(5) { width: 13%; }
+.overview-bookings-table th:nth-child(6) { width: 8%; }
+.overview-bookings-table th:nth-child(7) { width: 20%; }
+
+.overview-bookings-table th,
+.overview-bookings-table td {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.overview-bookings-table .booking-actions {
+  position: relative;
+  left: -4px;
+  width: max-content;
+  grid-template-columns: repeat(3, 36px);
+}
+
+.overview-bookings-table .booking-actions .booking-icon-btn {
+  width: 36px;
+  min-width: 36px;
+  height: 36px;
 }
 
 .document-row td {
@@ -708,11 +791,21 @@ td {
 }
 
 .vehicle-image-preview img {
-  width: 76px;
-  height: 48px;
+  width: 120px;
+  height: 78px;
   object-fit: cover;
   border-radius: 6px;
   background: #fff;
+}
+
+.vehicle-image-preview > div {
+  min-width: 0;
+  display: grid;
+  gap: 5px;
+}
+
+.vehicle-image-preview span {
+  overflow-wrap: anywhere;
 }
 
 .vehicle-image-preview small {
@@ -1078,6 +1171,24 @@ td {
 
 .modal__body label.full {
   grid-column: 1 / -1;
+}
+
+.modal__body .time-field {
+  position: relative;
+}
+
+.time-field__current {
+  justify-self: start;
+  padding: 0;
+  color: var(--blue);
+  background: transparent;
+  border: 0;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.time-field__current:hover {
+  text-decoration: underline;
 }
 
   .modal:has(.invoice-preview-shell) {

@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="css/admin-dashboard.css?v=admin-vehicle-image-1" />
+  <link rel="stylesheet" href="css/admin-dashboard.css?v=booking-actions-box-1" />
   <link rel="stylesheet" href="css/responsive.css?v=mobile-1" />
 </head>
 <body>
@@ -27,6 +27,7 @@
         <button class="side-nav__item" type="button" data-view="vehicles"><span data-icon="car"></span>Vehicles</button>
         <button class="side-nav__item" type="button" data-view="bookings"><span data-icon="calendar"></span>Bookings</button>
         <button class="side-nav__item" type="button" data-view="technicians"><span data-icon="technician"></span>Technicians</button>
+        <button class="side-nav__item" type="button" data-view="service-jobs"><span data-icon="tools"></span>Service Jobs</button>
         <button class="side-nav__item" type="button" data-view="workload"><span data-icon="tools"></span>Workload</button>
         <button class="side-nav__item" type="button" data-view="performance"><span data-icon="star"></span>Performance</button>
         <button class="side-nav__item" type="button" data-view="inventory"><span data-icon="invoice"></span>Inventory</button>
@@ -86,7 +87,7 @@
                 <div><h2>Upcoming Bookings</h2><p>Approve, reschedule, cancel and track queue positions.</p></div>
                 <button class="btn btn--blue" type="button" data-action="new-booking">New Booking</button>
               </div>
-              <div class="table-wrap"><table><thead><tr><th>Booking</th><th>Customer</th><th>Vehicle</th><th>Date</th><th>Status</th><th>Queue</th><th>Action</th></tr></thead><tbody id="overview-bookings"></tbody></table></div>
+              <div class="table-wrap bookings-table-wrap"><table class="overview-bookings-table"><thead><tr><th>Booking</th><th>Customer</th><th>Vehicle</th><th>Date</th><th>Status</th><th>Queue</th><th>Action</th></tr></thead><tbody id="overview-bookings"></tbody></table></div>
             </article>
 
             <aside class="panel quick-actions">
@@ -121,7 +122,7 @@
           <div class="panel">
             <div class="panel__header">
               <div><h2>Customer Accounts</h2><p>Register accounts, reset access, edit profiles and manage customer status.</p></div>
-              <button class="btn btn--blue" type="button" data-action="new-customer">Add Customer</button>
+              <button class="btn btn--blue" type="button" data-action="new-customer">Add New Customer</button>
             </div>
             <div class="table-tools"><input data-table-search="customers-table" type="search" placeholder="Search customers..." /></div>
             <div class="table-wrap"><table id="customers-table"><thead><tr><th>Name</th><th>Email</th><th>Phone</th><th>Vehicles</th><th>Status</th><th>Action</th></tr></thead><tbody id="customers-body"></tbody></table></div>
@@ -132,7 +133,7 @@
           <div class="panel">
             <div class="panel__header">
               <div><h2>Vehicle Management</h2><p>Add, edit, delete and view all registered customer vehicles.</p></div>
-              <button class="btn btn--blue" type="button" data-action="new-vehicle">Add Vehicle</button>
+              <button class="btn btn--blue" type="button" data-action="new-vehicle">Add New Vehicle</button>
             </div>
             <div class="vehicle-grid" id="vehicle-grid"></div>
           </div>
@@ -152,11 +153,14 @@
         <section class="view" data-view-panel="technicians">
           <div class="panel">
             <div class="panel__header">
-              <div><h2>Technician Management</h2><p>Create accounts, activate or deactivate technicians, and assign service jobs.</p></div>
+              <div><h2>Technician Management</h2><p>Create accounts and activate or deactivate technicians.</p></div>
               <button class="btn btn--blue" type="button" data-action="new-technician">Add Technician</button>
             </div>
             <div class="table-wrap"><table><thead><tr><th>Technician</th><th>Employee No</th><th>Specialization</th><th>Experience</th><th>Status</th><th>Action</th></tr></thead><tbody id="technicians-body"></tbody></table></div>
           </div>
+        </section>
+
+        <section class="view" data-view-panel="service-jobs">
           <div class="panel">
             <div class="panel__header">
               <div><h2>Service Jobs</h2><p>Create jobs from approved bookings and assign technicians.</p></div>
@@ -301,6 +305,6 @@
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
   <script src="js/api.js?v=pdf-open-2"></script>
-  <script src="js/admin-dashboard.js?v=pdf-open-2"></script>
+  <script src="js/admin-dashboard.js?v=vehicle-remove-warning-1"></script>
 </body>
 </html>

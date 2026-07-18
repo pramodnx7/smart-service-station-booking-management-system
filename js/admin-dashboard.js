@@ -23,6 +23,10 @@ document.addEventListener('DOMContentLoaded', () => {
     settings: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2.8 2.8-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6V21h-4v-.1a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1L4.2 17l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.6-1H3v-4h.1a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1L7 4.2l.1.1a1.7 1.7 0 0 0 1.9.3 1.7 1.7 0 0 0 1-1.6V3h4v.1a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1L19.8 7l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6 1h.1v4H21a1.7 1.7 0 0 0-1.6 1Z"/></svg>',
     menu: '<svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></svg>',
     search: '<svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>',
+    update: '<svg viewBox="0 0 24 24"><path d="M20 7v5h-5"/><path d="M19 12a7 7 0 1 1-2-5"/><path d="m20 7-3-3"/></svg>',
+    reschedule: '<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/><path d="m14 16 4-4 2 2-4 4-3 1 1-3Z"/></svg>',
+    cancel: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8 8 8 8M16 8l-8 8"/></svg>',
+    trash: '<svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 14h10l1-14M10 11v6M14 11v6"/></svg>',
     x: '<svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg>',
     logout: '<svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5M21 12H9"/></svg>'
   };
@@ -96,6 +100,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   let state = loadState();
   let activeBookingStatus = 'All';
+  let pendingBookingDraft = null;
   const technicianSpecializations = ['General Service', 'Oil Change', 'Brake Service', 'Electrical Repair', 'Engine Repair', 'Suspension Repair', 'Hybrid/EV Service'];
 
   const selectors = {
@@ -428,11 +433,10 @@ document.addEventListener('DOMContentLoaded', () => {
         <td><span class="badge badge--${statusClass(booking.status)}">${booking.status}</span></td>
         <td>${booking.queue ? `#${booking.queue}` : '-'}</td>
         <td>
-          <div class="row-actions">
-            <button class="mini-btn" type="button" data-action="advance-booking" data-id="${booking.id}">Update</button>
-            <button class="mini-btn" type="button" data-action="reschedule-booking" data-id="${booking.id}">Reschedule</button>
-            <button class="mini-btn mini-btn--red" type="button" data-action="cancel-booking" data-id="${booking.id}">Cancel</button>
-            <button class="mini-btn mini-btn--danger" type="button" data-action="delete-booking" data-id="${booking.id}">Delete</button>
+          <div class="row-actions booking-actions">
+            <button class="mini-btn booking-icon-btn" type="button" data-action="advance-booking" data-id="${booking.id}" aria-label="Update booking status" title="Update status"><span data-icon="update"></span></button>
+            <button class="mini-btn booking-icon-btn" type="button" data-action="reschedule-booking" data-id="${booking.id}" aria-label="Reschedule booking" title="Reschedule"><span data-icon="reschedule"></span></button>
+            <button class="mini-btn mini-btn--red booking-icon-btn" type="button" data-action="cancel-booking" data-id="${booking.id}" aria-label="Cancel booking" title="Cancel"><span data-icon="cancel"></span></button>
           </div>
         </td>
       </tr>
@@ -473,7 +477,7 @@ document.addEventListener('DOMContentLoaded', () => {
           <td>${customer.phone}</td>
           <td>${vehicleCount}</td>
           <td><span class="badge badge--${customer.status === 'Active' ? 'completed' : 'pending'}">${customer.status}</span></td>
-          <td><div class="row-actions"><button class="mini-btn" type="button" data-action="edit-customer" data-id="${customer.id}">Edit</button><button class="mini-btn" type="button" data-action="reset-password" data-id="${customer.id}">Reset</button></div></td>
+          <td><div class="row-actions"><button class="mini-btn" type="button" data-action="edit-customer" data-id="${customer.id}">Edit</button><button class="mini-btn mini-btn--red" type="button" data-action="delete-customer" data-id="${customer.id}">Remove</button></div></td>
         </tr>
       `;
     }).join('');
@@ -894,14 +898,40 @@ document.addEventListener('DOMContentLoaded', () => {
   function renderVehicleFilePreview(inputName, file) {
     const preview = selectors.modalForm.querySelector(`[data-file-preview="${inputName}"]`);
     if (!preview) return;
-    preview.innerHTML = file
-      ? `<span>${file.name}</span><small>${Math.round(file.size / 1024)} KB</small>`
-      : '<span>No car image selected</span>';
+    preview.replaceChildren();
+    if (!file) {
+      preview.textContent = 'No car image selected';
+      return;
+    }
+
+    const image = document.createElement('img');
+    image.alt = 'Selected car preview';
+    const details = document.createElement('div');
+    const fileName = document.createElement('span');
+    const fileSize = document.createElement('small');
+    fileName.textContent = file.name;
+    fileSize.textContent = `${Math.round(file.size / 1024)} KB`;
+    details.append(fileName, fileSize);
+    preview.append(image, details);
+
+    const reader = new FileReader();
+    reader.addEventListener('load', () => {
+      image.src = String(reader.result);
+    });
+    reader.readAsDataURL(file);
   }
 
   function openModal(mode, record = {}) {
     const customerOptions = state.customers.map((customer) => ({ value: customer.id, label: customer.name }));
+    const bookingCustomerOptions = [
+      { value: '__new_customer__', label: '+ Add New Customer' },
+      ...customerOptions
+    ];
     const vehicleOptions = state.vehicles.map((vehicle) => ({ value: vehicle.id, label: `${vehicle.make} ${vehicle.model} - ${vehicle.plate}` }));
+    const bookingVehicleOptions = [
+      { value: '__new_vehicle__', label: '+ Add New Vehicle' },
+      ...vehicleOptions
+    ];
     const technicianOptions = state.technicians
       .filter((technician) => technician.status === 'Active' || Number(technician.id) === Number(record.assignedTechnicianId))
       .map((technician) => ({ value: technician.id, label: `${technician.name} - ${technician.specialization}` }));
@@ -911,12 +941,11 @@ document.addEventListener('DOMContentLoaded', () => {
       .map((job) => ({ value: job.id, label: `#SJ-${job.id} - ${job.serviceType} - ${job.customerName || customerName(job.customerId)}` }));
     const categoryOptions = ['Engine Parts', 'Brake System', 'Electrical', 'Suspension', 'Cooling System', 'Filters', 'Fluids & Lubricants', 'Batteries', 'Tires & Wheels', 'Accessories'].map((category) => ({ value: category, label: category }));
     const supplierOptions = (state.inventorySuppliers || []).map((supplier) => ({ value: supplier.id, label: supplier.name }));
-    const statusOptions = statusLabels.slice(1).map((status) => ({ value: status, label: status }));
     const paymentOptions = ['Unpaid', 'Paid'].map((payment) => ({ value: payment, label: payment }));
     const config = {
       customer: {
         title: record.id ? 'Edit Customer' : 'Register Customer',
-        body: field('name', 'Full Name', 'text', record.name || '') + field('email', 'Email', 'email', record.email || '') + field('phone', 'Phone', 'tel', record.phone || '') + field('status', 'Status', 'select', record.status || 'Active', [{ value: 'Active', label: 'Active' }, { value: 'Pending', label: 'Pending' }])
+        body: field('name', 'Full Name', 'text', record.name || '') + field('email', 'Email', 'email', record.email || '') + field('phone', 'Phone', 'tel', record.phone || '') + field('status', 'Status', 'select', record.status || 'Active', [{ value: 'Active', label: 'Active' }, { value: 'Pending', label: 'Pending' }, { value: 'Inactive', label: 'Inactive' }])
       },
       vehicle: {
         title: record.id ? 'Edit Vehicle' : 'Add Vehicle',
@@ -928,7 +957,7 @@ document.addEventListener('DOMContentLoaded', () => {
       },
       booking: {
         title: record.id ? 'Reschedule Booking' : 'Book Service Appointment',
-        body: field('customerId', 'Customer', 'select', record.customerId || customerOptions[0]?.value, customerOptions) + field('vehicleId', 'Vehicle', 'select', record.vehicleId || vehicleOptions[0]?.value, vehicleOptions) + field('service', 'Service', 'select', record.service || state.packages[0]?.name, state.packages.map((item) => ({ value: item.name, label: item.name }))) + field('date', 'Date', 'date', record.date || '') + field('time', 'Time', 'time', record.time || '') + field('status', 'Status', 'select', record.status || 'Pending', statusOptions)
+        body: field('customerId', 'Customer', 'select', record.customerId || customerOptions[0]?.value, bookingCustomerOptions) + field('vehicleId', 'Vehicle', 'select', record.vehicleId || vehicleOptions[0]?.value, bookingVehicleOptions) + field('service', 'Service', 'select', record.service || state.packages[0]?.name, state.packages.map((item) => ({ value: item.name, label: item.name }))) + field('date', 'Date', 'date', record.date || '') + `<label class="time-field"><span>Time</span><input name="time" type="time" value="${record.time || ''}" required /><button class="time-field__current" type="button" data-action="use-current-time">Use Current Time</button></label>`
       },
       serviceJob: {
         title: 'Create Service Job',
@@ -982,6 +1011,15 @@ document.addEventListener('DOMContentLoaded', () => {
         body: JSON.stringify(data)
       });
       id ? Object.assign(state.customers.find((item) => item.id === id), savedCustomer) : state.customers.push(savedCustomer);
+      if (pendingBookingDraft && !id) {
+        pendingBookingDraft.customerId = savedCustomer.id;
+        saveState();
+        renderAll();
+        openModal('booking', pendingBookingDraft);
+        pendingBookingDraft = null;
+        showToast('New customer added and selected for this appointment.');
+        return;
+      }
     }
 
     if (mode === 'vehicle') {
@@ -998,6 +1036,16 @@ document.addEventListener('DOMContentLoaded', () => {
         body: JSON.stringify(payload)
       });
       id ? Object.assign(state.vehicles.find((item) => item.id === id), savedVehicle) : state.vehicles.push(savedVehicle);
+      if (pendingBookingDraft && !id) {
+        pendingBookingDraft.customerId = savedVehicle.customerId;
+        pendingBookingDraft.vehicleId = savedVehicle.id;
+        saveState();
+        renderAll();
+        openModal('booking', pendingBookingDraft);
+        pendingBookingDraft = null;
+        showToast('New vehicle added and selected for this appointment.');
+        return;
+      }
     }
 
     if (mode === 'technician') {
@@ -1010,7 +1058,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     if (mode === 'booking') {
-      const payload = { ...data, customerId: Number(data.customerId), vehicleId: Number(data.vehicleId), queue: id ? state.bookings.find((item) => item.id === id).queue : state.bookings.length + 1, progress: data.status === 'Completed' ? 100 : 10 };
+      const existingBooking = id ? state.bookings.find((item) => item.id === id) : null;
+      const status = existingBooking?.status || 'Pending';
+      const payload = { ...data, status, customerId: Number(data.customerId), vehicleId: Number(data.vehicleId) };
       const savedBooking = await window.AutoCareApi.request(id ? `/api/admin/bookings/${id}` : '/api/admin/bookings', {
         method: id ? 'PUT' : 'POST',
         body: JSON.stringify(payload)
@@ -1162,7 +1212,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const numericId = Number(id);
     if (action === 'new-customer') openModal('customer');
     if (action === 'edit-customer') openModal('customer', state.customers.find((item) => item.id === numericId));
-    if (action === 'reset-password') showToast(`Password reset link prepared for ${customerName(numericId)}.`);
+    if (action === 'delete-customer') {
+      const customer = state.customers.find((item) => item.id === numericId);
+      if (!customer) return;
+      if (!window.confirm(`Remove ${customer.name}'s customer account? This cannot be undone.`)) return;
+      await window.AutoCareApi.request(`/api/admin/customers/${numericId}`, { method: 'DELETE' });
+      state.customers = state.customers.filter((item) => item.id !== numericId);
+      saveState();
+      renderAll();
+      showToast('Customer account removed.');
+    }
     if (action === 'new-vehicle') openModal('vehicle');
     if (action === 'edit-vehicle') openModal('vehicle', state.vehicles.find((item) => item.id === numericId));
     if (action === 'new-technician') openModal('technician');
@@ -1180,30 +1239,45 @@ document.addEventListener('DOMContentLoaded', () => {
       openModal('booking', { customerId: vehicle.customerId, vehicleId: vehicle.id });
     }
     if (action === 'delete-vehicle') {
+      const vehicle = state.vehicles.find((item) => item.id === numericId);
+      if (!vehicle) return;
+      const vehicleLabel = `${vehicle.make || ''} ${vehicle.model || ''} (${vehicle.plate || 'No plate'})`.trim();
+      if (!window.confirm(`Remove ${vehicleLabel}? This action cannot be undone.`)) return;
       await window.AutoCareApi.request(`/api/admin/vehicles/${numericId}`, { method: 'DELETE' });
       state.vehicles = state.vehicles.filter((item) => item.id !== numericId);
       saveState();
       renderAll();
       showToast('Vehicle removed from account.');
     }
-    if (action === 'new-booking') openModal('booking');
+    if (action === 'new-booking') {
+      openModal('booking');
+    }
+    if (action === 'use-current-time') {
+      const now = new Date();
+      const currentTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+      const timeInput = selectors.modalForm.querySelector('input[name="time"]');
+      if (timeInput) {
+        timeInput.value = currentTime;
+        timeInput.focus();
+      }
+    }
     if (action === 'reschedule-booking') openModal('booking', state.bookings.find((item) => item.id === numericId));
     if (action === 'advance-booking') await advanceBooking(numericId);
     if (action === 'cancel-booking') {
-      await window.AutoCareApi.request(`/api/admin/bookings/${numericId}/cancel`, { method: 'PUT' });
       const booking = state.bookings.find((item) => item.id === numericId);
+      if (!booking || ['Completed', 'Cancelled'].includes(booking.status)) {
+        showToast('Only active bookings can be cancelled.');
+        return;
+      }
+      if (!window.confirm(`Cancel booking #BK-${numericId}? This will remove it from the active queue.`)) return;
+      await window.AutoCareApi.request(`/api/admin/bookings/${numericId}/cancel`, { method: 'PUT' });
       booking.status = 'Cancelled';
       booking.progress = 0;
+      booking.queue = 0;
       saveState();
       renderAll();
-      showToast('Booking cancelled.');
-    }
-    if (action === 'delete-booking') {
-      await window.AutoCareApi.request(`/api/admin/bookings/${numericId}`, { method: 'DELETE' });
-      state.bookings = state.bookings.filter((item) => item.id !== numericId);
-      saveState();
-      renderAll();
-      showToast('Booking deleted.');
+      await hydrateFromApi();
+      showToast('Booking cancelled. The queue has been updated.');
     }
     if (action === 'filter-bookings') {
       activeBookingStatus = element.dataset.status;
@@ -1280,6 +1354,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     if (action === 'send-notification' || action === 'show-notifications') openModal('notification');
     if (action === 'close-modal') {
+      pendingBookingDraft = null;
       selectors.modal.close();
       selectors.modalActions.hidden = false;
       selectors.modalSubmit.textContent = 'Save';
@@ -1313,6 +1388,24 @@ document.addEventListener('DOMContentLoaded', () => {
       handleModalSubmit(event).catch((error) => showToast(error.message || 'Save failed.'));
     });
     selectors.modalForm.addEventListener('change', (event) => {
+      if (selectors.modalForm.dataset.mode === 'booking'
+        && event.target.name === 'customerId'
+        && event.target.value === '__new_customer__') {
+        pendingBookingDraft = Object.fromEntries(new FormData(selectors.modalForm).entries());
+        pendingBookingDraft.id = Number(selectors.modalForm.dataset.id) || undefined;
+        pendingBookingDraft.customerId = '';
+        openModal('customer');
+        return;
+      }
+      if (selectors.modalForm.dataset.mode === 'booking'
+        && event.target.name === 'vehicleId'
+        && event.target.value === '__new_vehicle__') {
+        pendingBookingDraft = Object.fromEntries(new FormData(selectors.modalForm).entries());
+        pendingBookingDraft.id = Number(selectors.modalForm.dataset.id) || undefined;
+        pendingBookingDraft.vehicleId = '';
+        openModal('vehicle', { customerId: Number(pendingBookingDraft.customerId) });
+        return;
+      }
       if (event.target.name === 'vehicleImage') {
         renderVehicleFilePreview(event.target.name, event.target.files?.[0]);
       }
