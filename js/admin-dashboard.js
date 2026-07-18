@@ -798,7 +798,7 @@ document.addEventListener('DOMContentLoaded', () => {
         <td>${invoice.service}</td>
         <td>${formatMoney(invoice.amount)}</td>
         <td><span class="badge badge--${invoice.payment === 'Paid' ? 'completed' : 'pending'}">${invoice.payment}</span></td>
-        <td><div class="row-actions"><button class="mini-btn" type="button" data-action="preview-invoice" data-id="${invoice.id}">View</button><button class="mini-btn" type="button" data-action="mark-paid" data-id="${invoice.id}">Mark Paid</button><button class="mini-btn" type="button" data-action="download-invoice" data-id="${invoice.id}">Download</button></div></td>
+        <td><div class="row-actions"><button class="mini-btn" type="button" data-action="preview-invoice" data-id="${invoice.id}">View</button><button class="mini-btn" type="button" data-action="mark-paid" data-id="${invoice.id}">Mark Paid</button><button class="mini-btn" type="button" data-action="download-invoice-pdf" data-id="${invoice.id}">Download PDF</button></div></td>
       </tr>
     `).join('');
   }
@@ -1108,16 +1108,26 @@ document.addEventListener('DOMContentLoaded', () => {
     showToast(`Booking moved to ${next}.`);
   }
 
-  async function downloadInvoice(id) {
+  async function downloadInvoicePdf(id) {
     const invoice = state.invoices.find((item) => item.id === Number(id));
-    if (!invoice) return;
-    const text = await window.AutoCareApi.request(`/api/invoices/${invoice.id}/download`);
-    const blob = new Blob([text], { type: 'text/plain' });
+    if (!invoice) {
+      throw new Error('Invoice not found.');
+    }
+
+    const blob = await window.AutoCareApi.requestBlob(`/api/invoices/${invoice.id}/pdf`);
+    if (blob.type !== 'application/pdf') {
+      throw new Error('The server did not return a valid PDF invoice.');
+    }
+
+    const objectUrl = URL.createObjectURL(blob);
     const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = `invoice-${invoice.id}.txt`;
+    link.href = objectUrl;
+    link.download = `AutoCare-Invoice-${invoice.id}.pdf`;
+    document.body.appendChild(link);
     link.click();
-    URL.revokeObjectURL(link.href);
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+    showToast(`Invoice #INV-${invoice.id} downloaded as PDF.`);
   }
 
   function downloadFile(kind, id) {
@@ -1214,7 +1224,7 @@ document.addEventListener('DOMContentLoaded', () => {
       renderAll();
       showToast('Payment marked as paid.');
     }
-    if (action === 'download-invoice') await downloadInvoice(numericId);
+    if (action === 'download-invoice-pdf') await downloadInvoicePdf(numericId);
     if (action === 'download-file') downloadFile(element.dataset.kind, numericId);
     if (action === 'preview-completed-image') openImagePreview(element.dataset.url, element.dataset.name);
     if (action === 'delete-file') {

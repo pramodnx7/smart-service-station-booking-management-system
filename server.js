@@ -673,16 +673,6 @@ app.put('/api/customer/profile', requireAuth('customer'), async (req, res, next)
   }
 });
 
-app.get('/api/invoices/:id/download', requireAuth(), async (req, res, next) => {
-  try {
-    const text = await store.getInvoiceText(req.params.id, req.user);
-    if (!text) return res.status(404).send('Invoice not found.');
-    res.type('text/plain').send(text);
-  } catch (error) {
-    next(error);
-  }
-});
-
 app.get('/api/invoices/:id/pdf', requireAuth(), async (req, res, next) => {
   try {
     const pdf = await store.getInvoicePdf(req.params.id, req.user);

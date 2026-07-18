@@ -2315,38 +2315,6 @@ async function createNotification(data) {
   });
 }
 
-async function getInvoiceText(id, requester) {
-  const invoice = await getById(collections.invoices, id);
-  if (!invoice || (requester.role !== 'admin' && invoice.userId !== requester.id)) return null;
-
-  const [user, service, parts] = await Promise.all([
-    getById(collections.users, invoice.userId),
-    getById(collections.servicePackages, invoice.servicePackageId),
-    all(collections.serviceJobParts)
-  ]);
-  const invoiceParts = parts.filter((part) => Number(part.serviceJobId) === Number(invoice.serviceJobId));
-  const partLines = invoiceParts.length
-    ? invoiceParts.map((part) => `${part.partName} | ${part.brand || '-'} | ${part.condition || '-'} | Qty ${part.quantity} | LKR ${Number(part.unitPrice || 0).toLocaleString('en-LK')} | LKR ${Number(part.totalPrice || 0).toLocaleString('en-LK')}`)
-    : ['No parts recorded.'];
-
-  return [
-    'AutoCare Service Station Invoice',
-    `Invoice: #INV-${invoice.id}`,
-    `Customer: ${user?.name || 'Unknown customer'}`,
-    `Service: ${service?.name || 'Unknown Service'}`,
-    'Parts:',
-    ...partLines,
-    `Parts Total: LKR ${Number(invoice.partsTotal || 0).toLocaleString('en-LK')}`,
-    `Labor Cost: LKR ${Number(invoice.laborCost || 0).toLocaleString('en-LK')}`,
-    `Service Charges: LKR ${Number(invoice.serviceCharges || 0).toLocaleString('en-LK')}`,
-    `Tax: LKR ${Number(invoice.tax || 0).toLocaleString('en-LK')}`,
-    `Discount: LKR ${Number(invoice.discount || 0).toLocaleString('en-LK')}`,
-    `Grand Total: LKR ${Number(invoice.amount).toLocaleString('en-LK')}`,
-    `Payment: ${invoice.paymentStatus}`,
-    `Date: ${formatDate(invoice.invoiceDate)}`
-  ].join('\n');
-}
-
 async function getInvoicePdf(id, requester) {
   const invoice = await getById(collections.invoices, id);
   if (!invoice || (requester.role !== 'admin' && invoice.userId !== requester.id)) return null;
@@ -2657,7 +2625,6 @@ module.exports = {
   getBookingSlots,
   getInventoryReports,
   getFileForDownload,
-  getInvoiceText,
   getInvoicePdf,
   getPartUsagePhotoForDownload,
   getTechnicianDashboard,
