@@ -1130,6 +1130,23 @@ document.addEventListener('DOMContentLoaded', () => {
     showToast(`Invoice #INV-${invoice.id} downloaded as PDF.`);
   }
 
+  async function downloadManagementReport(endpoint, fileName, successMessage) {
+    const blob = await window.AutoCareApi.requestBlob(endpoint);
+    if (blob.type !== 'application/pdf') {
+      throw new Error('The server did not return a valid PDF report.');
+    }
+
+    const objectUrl = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = objectUrl;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+    showToast(successMessage);
+  }
+
   function downloadFile(kind, id) {
     const link = document.createElement('a');
     link.href = `/api/files/${kind}/${id}/download`;
@@ -1225,6 +1242,20 @@ document.addEventListener('DOMContentLoaded', () => {
       showToast('Payment marked as paid.');
     }
     if (action === 'download-invoice-pdf') await downloadInvoicePdf(numericId);
+    if (action === 'download-sales-report') {
+      await downloadManagementReport(
+        '/api/admin/reports/sales/pdf',
+        'AutoCare-Overall-Sales-Report.pdf',
+        'Overall sales report downloaded.'
+      );
+    }
+    if (action === 'download-overall-report') {
+      await downloadManagementReport(
+        '/api/admin/reports/overall/pdf',
+        'AutoCare-Overall-System-Report.pdf',
+        'Overall system report downloaded.'
+      );
+    }
     if (action === 'download-file') downloadFile(element.dataset.kind, numericId);
     if (action === 'preview-completed-image') openImagePreview(element.dataset.url, element.dataset.name);
     if (action === 'delete-file') {

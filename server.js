@@ -853,6 +853,28 @@ app.get('/api/admin/inventory/reports', requireAuth('admin'), async (req, res, n
   }
 });
 
+app.get('/api/admin/reports/sales/pdf', requireAuth('admin'), async (req, res, next) => {
+  try {
+    const pdf = await store.getOverallSalesReportPdf();
+    res.type('application/pdf');
+    res.setHeader('Content-Disposition', 'attachment; filename="AutoCare-Overall-Sales-Report.pdf"');
+    res.send(pdf);
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get('/api/admin/reports/overall/pdf', requireAuth('admin'), async (req, res, next) => {
+  try {
+    const pdf = await store.getOverallSystemReportPdf();
+    res.type('application/pdf');
+    res.setHeader('Content-Disposition', 'attachment; filename="AutoCare-Overall-System-Report.pdf"');
+    res.send(pdf);
+  } catch (error) {
+    next(error);
+  }
+});
+
 app.post('/api/admin/service-jobs/:id/photos/upload', requireAuth('admin'), async (req, res, next) => {
   req.body.serviceJobId = req.params.id;
   await handleFileUpload(req, res, next, 'photo');

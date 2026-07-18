@@ -338,6 +338,70 @@ function createInvoicePdfBuffer(details) {
   }));
 }
 
+function createReportPdfBuffer({ title, subtitle, metrics, columns, rows }) {
+  const chunks = [];
+  const rowsPerPage = 19;
+  for (let index = 0; index < Math.max(rows.length, 1); index += rowsPerPage) {
+    chunks.push(rows.slice(index, index + rowsPerPage));
+  }
+
+  return createPdfDocument(chunks.map((pageRows, pageIndex) => {
+    const navy = '0.055 0.145 0.255';
+    const gold = '0.98 0.66 0.04';
+    const muted = '0.38 0.46 0.54';
+    const commands = [
+      pdfRect(0, 700, 612, 92, { fill: navy }),
+      pdfRect(0, 694, 612, 6, { fill: gold }),
+      pdfText('AUTO', 44, 750, { size: 21, bold: true, color: '1 1 1' }),
+      pdfText('CARE', 101, 750, { size: 21, bold: true, color: gold }),
+      pdfText('MANAGEMENT REPORT', 45, 731, { size: 8, color: '0.72 0.84 0.92' }),
+      pdfText(title, 568, 750, { size: 17, bold: true, color: '1 1 1', align: 'right' }),
+      pdfText(`Generated ${formatDate(new Date())}  |  Page ${pageIndex + 1} of ${chunks.length}`, 568, 729, { size: 8, color: '0.76 0.84 0.9', align: 'right' }),
+      pdfText(subtitle, 44, 670, { size: 9, color: muted })
+    ];
+
+    const metricWidth = 524 / Math.max(metrics.length, 1);
+    metrics.forEach(([label, value], index) => {
+      const x = 44 + (index * metricWidth);
+      commands.push(pdfRect(x, 610, metricWidth - 8, 45, { fill: '0.95 0.975 0.99', stroke: '0.84 0.88 0.91' }));
+      commands.push(pdfText(label, x + 10, 639, { size: 7, bold: true, color: muted }));
+      commands.push(pdfText(String(value), x + 10, 620, { size: 11, bold: true, color: navy }));
+    });
+
+    const tableTop = 584;
+    commands.push(pdfRect(44, tableTop - 25, 524, 25, { fill: navy }));
+    columns.forEach((column) => {
+      commands.push(pdfText(column.label, column.x, tableTop - 17, {
+        size: 7.5,
+        bold: true,
+        color: '1 1 1',
+        align: column.align
+      }));
+    });
+    if (!pageRows.length) {
+      commands.push(pdfText('No records are available for this report.', 56, tableTop - 47, { size: 9, color: muted }));
+    }
+    pageRows.forEach((row, rowIndex) => {
+      const y = tableTop - 45 - (rowIndex * 25);
+      if (rowIndex % 2 === 0) commands.push(pdfRect(44, y - 8, 524, 25, { fill: '0.975 0.985 0.992' }));
+      columns.forEach((column, columnIndex) => {
+        commands.push(pdfText(String(row[columnIndex] ?? '-').slice(0, column.maxLength || 32), column.x, y, {
+          size: 7.5,
+          bold: column.bold,
+          color: column.color || '0.12 0.22 0.34',
+          align: column.align
+        }));
+      });
+    });
+
+    commands.push(pdfRect(0, 0, 612, 42, { fill: navy }));
+    commands.push(pdfRect(0, 42, 612, 3, { fill: gold }));
+    commands.push(pdfText(process.env.BUSINESS_ADDRESS || 'Colombo, Sri Lanka', 44, 22, { size: 7.5, color: '1 1 1' }));
+    commands.push(pdfText(process.env.BUSINESS_EMAIL || 'info@autocare.lk', 568, 22, { size: 7.5, color: '1 1 1', align: 'right' }));
+    return commands.join('\n');
+  }));
+}
+
 function docRef(collection, id) {
   return db.collection(collection).doc(String(id));
 }
@@ -1719,6 +1783,94 @@ async function getInventoryReports() {
   return buildInventoryReports(parts, movements, usages, context);
 }
 
+async function getOverallSalesReportPdf() {
+  const [invoices, packages, users] = await Promise.all([
+    all(collections.invoices),
+    all(collections.servicePackages),
+    all(collections.users)
+  ]);
+  const servicesByIdMap = new Map(packages.map((service) => [Number(service.id), service]));
+  const usersById = new Map(users.map((user) => [Number(user.id), user]));
+  const sortedInvoices = [...invoices].sort((left, right) => formatDate(right.invoiceDate).localeCompare(formatDate(left.invoiceDate)));
+  const totalRevenue = invoices.reduce((sum, invoice) => sum + Number(invoice.amount || 0), 0);
+  const paidRevenue = invoices
+    .filter((invoice) => String(invoice.paymentStatus).toLowerCase() === 'paid')
+    .reduce((sum, invoice) => sum + Number(invoice.amount || 0), 0);
+  const outstanding = totalRevenue - paidRevenue;
+
+  return createReportPdfBuffer({
+    title: 'OVERALL SALES REPORT',
+    subtitle: 'Complete invoice and revenue summary for AutoCare Service Station.',
+    metrics: [
+      ['TOTAL SALES', money(totalRevenue)],
+      ['PAID REVENUE', money(paidRevenue)],
+      ['OUTSTANDING', money(outstanding)],
+      ['INVOICES', invoices.length]
+    ],
+    columns: [
+      { label: 'INVOICE', x: 56, maxLength: 14, bold: true },
+      { label: 'DATE', x: 132, maxLength: 12 },
+      { label: 'CUSTOMER', x: 205, maxLength: 24 },
+      { label: 'SERVICE', x: 350, maxLength: 20 },
+      { label: 'STATUS', x: 470, maxLength: 10 },
+      { label: 'AMOUNT', x: 556, maxLength: 20, align: 'right', bold: true }
+    ],
+    rows: sortedInvoices.map((invoice) => [
+      `INV-${invoice.id}`,
+      formatDate(invoice.invoiceDate),
+      usersById.get(Number(invoice.userId))?.name || 'Unknown',
+      servicesByIdMap.get(Number(invoice.servicePackageId))?.name || invoice.serviceName || 'Service',
+      invoice.paymentStatus || 'Pending',
+      money(invoice.amount)
+    ])
+  });
+}
+
+async function getOverallSystemReportPdf() {
+  const [users, vehicles, bookings, jobs, invoices, emergencies, parts] = await Promise.all([
+    all(collections.users),
+    all(collections.vehicles),
+    all(collections.bookings),
+    all(collections.serviceJobs),
+    all(collections.invoices),
+    all(collections.emergencyRequests),
+    all(collections.inventoryParts)
+  ]);
+  const customers = users.filter((user) => user.role === 'customer');
+  const completedJobs = jobs.filter((job) => job.status === 'Completed');
+  const activeJobs = jobs.filter((job) => !['Completed', 'Cancelled'].includes(job.status));
+  const revenue = invoices.reduce((sum, invoice) => sum + Number(invoice.amount || 0), 0);
+  const stockValue = parts.reduce((sum, part) => sum + (Number(part.stock ?? part.stockQuantity ?? 0) * Number(part.purchasePrice || 0)), 0);
+  const lowStock = parts.filter((part) => Number(part.stock ?? part.stockQuantity ?? 0) <= lowStockThreshold);
+  const rows = [
+    ['Customers', customers.length, 'Registered customer accounts'],
+    ['Vehicles', vehicles.length, 'Vehicles registered in the system'],
+    ['Bookings', bookings.length, `${bookings.filter((item) => item.status === 'Pending').length} pending approval`],
+    ['Service jobs', jobs.length, `${activeJobs.length} active / ${completedJobs.length} completed`],
+    ['Invoices', invoices.length, `${money(revenue)} total value`],
+    ['Inventory items', parts.length, `${lowStock.length} low or out of stock`],
+    ['Inventory cost value', money(stockValue), 'Current purchase-value estimate'],
+    ['Emergency requests', emergencies.length, `${emergencies.filter((item) => item.status !== 'Closed').length} currently open`]
+  ];
+
+  return createReportPdfBuffer({
+    title: 'OVERALL SYSTEM REPORT',
+    subtitle: 'Operational, service, customer, inventory and financial overview.',
+    metrics: [
+      ['CUSTOMERS', customers.length],
+      ['BOOKINGS', bookings.length],
+      ['COMPLETED JOBS', completedJobs.length],
+      ['TOTAL REVENUE', money(revenue)]
+    ],
+    columns: [
+      { label: 'REPORT AREA', x: 56, maxLength: 28, bold: true },
+      { label: 'TOTAL / VALUE', x: 320, maxLength: 24, align: 'right', bold: true },
+      { label: 'DETAILS', x: 350, maxLength: 38 }
+    ],
+    rows
+  });
+}
+
 async function employeeNoExists(employeeNo, ignoreId) {
   const normalized = String(employeeNo || '').trim().toUpperCase();
   const technicians = await all(collections.technicians);
@@ -2870,6 +3022,8 @@ module.exports = {
   getCustomerDashboard,
   getBookingSlots,
   getInventoryReports,
+  getOverallSalesReportPdf,
+  getOverallSystemReportPdf,
   getFileForDownload,
   getInvoicePdf,
   getPartUsagePhotoForDownload,
