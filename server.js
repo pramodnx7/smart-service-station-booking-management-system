@@ -243,6 +243,30 @@ app.get('/api/public/service-ratings', async (req, res, next) => {
   }
 });
 
+app.get('/api/public/pricing-plans', async (req, res, next) => {
+  try { res.json({ plans: await store.getPublicPricingPlans() }); } catch (error) { next(error); }
+});
+
+function pricingPlanPayload(body) {
+  requireFields(body, ['name', 'badge', 'price', 'image', 'buttonText']);
+  const image = String(body.image || '').trim();
+  const isSafePath = /^(?:assets|uploads)\/[-a-z0-9_./]+$/i.test(image);
+  const isImageData = /^data:image\/(?:jpeg|png|webp);base64,[a-z0-9+/=]+$/i.test(image) && Buffer.byteLength(image, 'utf8') <= 700 * 1024;
+  if (!isSafePath && !isImageData) {
+    const error = new Error('Plan image must be a valid uploaded image or project image path.');
+    error.status = 400;
+    throw error;
+  }
+  const features = Array.isArray(body.features) ? body.features : String(body.features || '').split(/\r?\n/);
+  const cleanedFeatures = features.map((item) => String(item).trim()).filter(Boolean).slice(0, 10);
+  if (!cleanedFeatures.length) {
+    const error = new Error('Add at least one plan feature.');
+    error.status = 400;
+    throw error;
+  }
+  return { ...body, image, features: cleanedFeatures, featured: body.featured === true, active: body.active !== false };
+}
+
 app.post('/api/auth/register', async (req, res, next) => {
   try {
     const { role = 'customer', name, email, password, phone = '' } = req.body;
@@ -1021,6 +1045,25 @@ app.put('/api/admin/services/:id', requireAuth('admin'), async (req, res, next) 
   } catch (error) {
     next(error);
   }
+});
+
+app.post('/api/admin/pricing-plans', requireAuth('admin'), async (req, res, next) => {
+  try { res.status(201).json(await store.createPricingPlan(pricingPlanPayload(req.body))); } catch (error) { next(error); }
+});
+
+app.put('/api/admin/pricing-plans/:id', requireAuth('admin'), async (req, res, next) => {
+  try {
+    const plan = await store.updatePricingPlan(req.params.id, pricingPlanPayload(req.body));
+    if (!plan) return res.status(404).json({ message: 'Landing plan not found.' });
+    res.json(plan);
+  } catch (error) { next(error); }
+});
+
+app.delete('/api/admin/pricing-plans/:id', requireAuth('admin'), async (req, res, next) => {
+  try {
+    if (!(await store.deletePricingPlan(req.params.id))) return res.status(404).json({ message: 'Landing plan not found.' });
+    res.status(204).end();
+  } catch (error) { next(error); }
 });
 
 app.get('/api/admin/booking-slots', requireAuth('admin'), async (req, res, next) => {

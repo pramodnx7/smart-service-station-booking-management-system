@@ -62,6 +62,7 @@ document.addEventListener('DOMContentLoaded', () => {
       { id: 8, name: 'Suspension Repair', price: 16000, duration: '2 hr', description: 'Suspension inspection, repair and alignment checks.' },
       { id: 9, name: 'Hybrid/EV Service', price: 26000, duration: '2 hr', description: 'Hybrid and electric vehicle safety inspection and service.' }
     ],
+    pricingPlans: [],
     invoices: [
       { id: 1001, customerId: 1, service: 'General Service', amount: 8500, payment: 'Unpaid', date: '2026-05-25' },
       { id: 1002, customerId: 2, service: 'Oil Change', amount: 6000, payment: 'Paid', date: '2026-05-18' },
@@ -854,6 +855,17 @@ document.addEventListener('DOMContentLoaded', () => {
     `).join('');
   }
 
+  function renderPricingPlans() {
+    const grid = document.getElementById('admin-pricing-plan-grid');
+    grid.innerHTML = state.pricingPlans?.length ? state.pricingPlans.map((plan) => `
+      <article class="admin-plan-card ${plan.featured ? 'is-featured' : ''}">
+        <div class="admin-plan-card__image"><img src="${escapeHtml(plan.image)}" alt="" /><span>${escapeHtml(plan.badge)}</span></div>
+        <div class="admin-plan-card__body"><div><small>Order ${plan.displayOrder} · ${plan.active ? 'Visible' : 'Hidden'}</small><h3>${escapeHtml(plan.name)}</h3></div><strong>${formatMoney(plan.price)}</strong><p>${plan.features.map(escapeHtml).join(' · ')}</p></div>
+        <div class="row-actions"><button class="mini-btn" type="button" data-action="edit-pricing-plan" data-id="${plan.id}">Edit</button><button class="mini-btn mini-btn--red" type="button" data-action="delete-pricing-plan" data-id="${plan.id}">Delete</button></div>
+      </article>
+    `).join('') : '<p class="table-empty">No landing plans yet. Add your first plan.</p>';
+  }
+
   function renderBilling() {
     document.getElementById('billing-body').innerHTML = state.invoices.map((invoice) => `
       <tr>
@@ -946,6 +958,7 @@ document.addEventListener('DOMContentLoaded', () => {
     renderInventory();
     renderDocuments();
     renderPackages();
+    renderPricingPlans();
     renderBilling();
     renderEmergency();
     renderNotifications();
@@ -1073,6 +1086,10 @@ document.addEventListener('DOMContentLoaded', () => {
       service: {
         title: record.id ? 'Edit Service Package' : 'Add Service Package',
         body: field('name', 'Package Name', 'text', record.name || '') + field('price', 'Price', 'number', record.price || '') + field('duration', 'Duration', 'text', record.duration || '') + field('description', 'Description', 'textarea', record.description || '')
+      },
+      pricingPlan: {
+        title: record.id ? 'Edit Landing Plan' : 'Add Landing Plan',
+        body: field('name', 'Plan Name', 'text', record.name || '') + field('badge', 'Image Badge', 'text', record.badge || '') + field('price', 'Price (LKR)', 'number', record.price || '') + field('billingPeriod', 'Billing Period', 'text', record.billingPeriod || 'month') + field('buttonText', 'Button Text', 'text', record.buttonText || '') + field('displayOrder', 'Display Order', 'number', record.displayOrder || (state.pricingPlans.length + 1)) + field('featured', 'Highlight Plan', 'select', String(Boolean(record.featured)), [{ value: 'false', label: 'No' }, { value: 'true', label: 'Yes - Most Popular' }]) + field('active', 'Visibility', 'select', String(record.active !== false), [{ value: 'true', label: 'Visible' }, { value: 'false', label: 'Hidden' }]) + field('image', 'Current Image Path', 'text', record.image || 'assets/images/workshop-lift-mechanic.png') + '<label class="full"><span>Upload New Image (optional)</span><input name="planImage" type="file" accept="image/jpeg,image/png,image/webp" /></label>' + field('features', 'Features (one per line)', 'textarea', (record.features || []).join('\n'))
       },
       invoice: {
         title: 'Create Invoice',
@@ -1254,6 +1271,16 @@ document.addEventListener('DOMContentLoaded', () => {
         body: JSON.stringify(payload)
       });
       id ? Object.assign(state.packages.find((item) => item.id === id), savedService) : state.packages.push(savedService);
+    }
+
+    if (mode === 'pricingPlan') {
+      const imageFile = selectors.modalForm.elements.planImage.files[0];
+      const image = imageFile ? await window.AutoCareApi.optimizeProfileImage(imageFile) : data.image;
+      const payload = { ...data, image, price: Number(data.price), displayOrder: Number(data.displayOrder), featured: data.featured === 'true', active: data.active === 'true', features: data.features.split(/\r?\n/).map((item) => item.trim()).filter(Boolean) };
+      delete payload.planImage;
+      const savedPlan = await window.AutoCareApi.request(id ? `/api/admin/pricing-plans/${id}` : '/api/admin/pricing-plans', { method: id ? 'PUT' : 'POST', body: JSON.stringify(payload) });
+      id ? Object.assign(state.pricingPlans.find((item) => item.id === id), savedPlan) : state.pricingPlans.push(savedPlan);
+      successMessage = id ? 'Landing plan updated.' : 'Landing plan created.';
     }
 
     if (mode === 'invoice') {
@@ -1451,6 +1478,14 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     if (action === 'new-service') openModal('service');
     if (action === 'edit-service') openModal('service', state.packages.find((item) => item.id === numericId));
+    if (action === 'new-pricing-plan') openModal('pricingPlan');
+    if (action === 'edit-pricing-plan') openModal('pricingPlan', state.pricingPlans.find((item) => item.id === numericId));
+    if (action === 'delete-pricing-plan') {
+      if (!window.confirm('Delete this landing page plan?')) return;
+      await window.AutoCareApi.request(`/api/admin/pricing-plans/${numericId}`, { method: 'DELETE' });
+      state.pricingPlans = state.pricingPlans.filter((item) => item.id !== numericId);
+      saveState(); renderAll(); showToast('Landing plan deleted.'); return;
+    }
     if (action === 'new-invoice') {
       if (!state.serviceJobs.some((job) => job.status === 'Completed')) {
         showToast('Complete a service job before generating billing.');
