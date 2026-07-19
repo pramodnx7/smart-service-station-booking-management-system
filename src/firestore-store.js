@@ -5,6 +5,7 @@ const collections = {
   users: 'users',
   vehicles: 'vehicles',
   servicePackages: 'servicePackages',
+  pricingPlans: 'pricingPlans',
   bookings: 'bookings',
   invoices: 'invoices',
   emergencyRequests: 'emergencyRequests',
@@ -603,6 +604,55 @@ function vehicleView(vehicle) {
   };
 }
 
+function pricingPlanView(plan) {
+  return {
+    id: plan.id,
+    name: plan.name || 'Service Plan',
+    badge: plan.badge || '',
+    price: Number(plan.price || 0),
+    billingPeriod: plan.billingPeriod || 'month',
+    image: plan.image || defaultImage,
+    features: Array.isArray(plan.features) ? plan.features.filter(Boolean) : [],
+    buttonText: plan.buttonText || `Choose ${plan.name || 'Plan'}`,
+    featured: Boolean(plan.featured),
+    active: plan.active !== false,
+    displayOrder: Number(plan.displayOrder || 0)
+  };
+}
+
+async function getPublicPricingPlans() {
+  return (await all(collections.pricingPlans))
+    .map(pricingPlanView)
+    .filter((plan) => plan.active)
+    .sort((a, b) => a.displayOrder - b.displayOrder || a.id - b.id);
+}
+
+async function createPricingPlan(data) {
+  return pricingPlanView(await createDocument(collections.pricingPlans, {
+    name: data.name.trim(), badge: data.badge.trim(), price: Number(data.price),
+    billingPeriod: String(data.billingPeriod || 'month').trim(), image: data.image,
+    features: data.features, buttonText: data.buttonText.trim(), featured: Boolean(data.featured),
+    active: data.active !== false, displayOrder: Number(data.displayOrder || 0)
+  }));
+}
+
+async function updatePricingPlan(id, data) {
+  const plan = await updateDocument(collections.pricingPlans, id, {
+    name: data.name.trim(), badge: data.badge.trim(), price: Number(data.price),
+    billingPeriod: String(data.billingPeriod || 'month').trim(), image: data.image,
+    features: data.features, buttonText: data.buttonText.trim(), featured: Boolean(data.featured),
+    active: data.active !== false, displayOrder: Number(data.displayOrder || 0)
+  });
+  return plan ? pricingPlanView(plan) : null;
+}
+
+async function deletePricingPlan(id) {
+  const plan = await getById(collections.pricingPlans, id);
+  if (!plan) return false;
+  await deleteDocument(collections.pricingPlans, id);
+  return true;
+}
+
 function partView(part) {
   const stock = Number(part.stock ?? part.stockQuantity ?? 0);
   const minimumStockLevel = Number(part.minimumStockLevel ?? part.minStock ?? 0);
@@ -1150,11 +1200,12 @@ function buildInventoryReports(parts, movements, usages, context = {}) {
 }
 
 async function getAdminDashboard(userId) {
-  const [users, vehicles, bookings, packages, invoices, emergencies, notifications, notificationDrafts, feedback, technicians, serviceJobs, inventoryParts, suppliers, categories, movements, usages, photos, documents, serviceMap] = await Promise.all([
+  const [users, vehicles, bookings, packages, pricingPlans, invoices, emergencies, notifications, notificationDrafts, feedback, technicians, serviceJobs, inventoryParts, suppliers, categories, movements, usages, photos, documents, serviceMap] = await Promise.all([
     all(collections.users),
     all(collections.vehicles),
     all(collections.bookings),
     all(collections.servicePackages),
+    all(collections.pricingPlans),
     all(collections.invoices),
     all(collections.emergencyRequests),
     all(collections.notifications),
@@ -1201,6 +1252,7 @@ async function getAdminDashboard(userId) {
     technicianWorkload: buildTechnicianWorkload(technicians, jobViews, context.usersById),
     technicianPerformance: buildTechnicianPerformance(technicians, jobViews, context.usersById),
     packages: sortById(packages).map(({ id, name, price, duration, description }) => ({ id, name, price: Number(price), duration, description })),
+    pricingPlans: pricingPlans.map(pricingPlanView).sort((a, b) => a.displayOrder - b.displayOrder || a.id - b.id),
     invoices: sortDateDesc(invoices.map((item) => invoiceView(item, serviceMap)), 'date'),
     emergencies: sortById(emergencies).reverse().map(({ id, userId, customerId, location, problem, status }) => ({ id, customerId: customerId || userId, location, problem, status })),
     notifications: sortById(notifications.filter((item) => Number(item.userId) === Number(userId))).reverse().map(({ id, type, message, unread }) => ({ id, type, message, unread })),
@@ -3438,6 +3490,13 @@ async function ensureSeedData() {
     invoiceDate: today(-5)
   });
 
+  const defaultPricingPlans = [
+    { id: 1, name: 'Basic Plan', badge: 'Essential care', price: 16000, billingPeriod: 'month', image: 'assets/images/workshop-lift-mechanic.png', features: ['Oil, filter and fluid check', 'Brake inspection', 'Quick health report', 'Basic support'], buttonText: 'Choose Basic', featured: false, active: true, displayOrder: 1 },
+    { id: 2, name: 'Popular Plan', badge: 'Most popular', price: 20000, billingPeriod: 'month', image: 'assets/images/about-mechanic-red-car.png', features: ['Starter plan features', 'Engine diagnostics', 'Battery and AC check', 'Priority service slot'], buttonText: 'Choose Popular', featured: true, active: true, displayOrder: 2 },
+    { id: 3, name: 'Premium Plan', badge: 'Extra protection', price: 18000, billingPeriod: 'month', image: 'assets/images/service-wheel-closeup.png', features: ['Popular plan features', 'Wheel alignment', 'Transmission inspection', 'Extended warranty'], buttonText: 'Choose Premium', featured: false, active: true, displayOrder: 3 }
+  ];
+  await Promise.all(defaultPricingPlans.map(({ id, ...plan }) => writeIfMissing(collections.pricingPlans, id, plan)));
+
   await writeIfMissing(collections.notifications, 1, {
     userId: 2,
     type: 'Booking Approved',
@@ -3467,6 +3526,7 @@ module.exports = {
   createEmergency,
   createFeedback,
   createInvoice,
+  createPricingPlan,
   createInventoryItem,
   createInventorySupplier,
   createNotification,
@@ -3477,6 +3537,7 @@ module.exports = {
   createUser,
   createVehicle,
   deleteInventoryItem,
+  deletePricingPlan,
   deleteNotificationDraft,
   deleteCustomer,
   deleteTechnician,
@@ -3498,6 +3559,7 @@ module.exports = {
   getInvoicePdf,
   getPartUsagePhotoForDownload,
   getPublicServiceRatings,
+  getPublicPricingPlans,
   getTechnicianDashboard,
   getTechnicianPerformance,
   getTechnicianWorkload,
@@ -3521,6 +3583,7 @@ module.exports = {
   updateInventoryItem,
   updateInventorySupplier,
   updateProfile,
+  updatePricingPlan,
   updateService,
   updateTechnician,
   updateTechnicianProgress,

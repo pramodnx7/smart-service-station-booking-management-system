@@ -10,6 +10,24 @@ document.addEventListener('DOMContentLoaded', () => {
   const bookingLoginOption = document.getElementById('booking-login-option');
   const newsletterForm = document.getElementById('newsletter-form');
 
+  const escapeHtml = (value) => String(value ?? '').replace(/[&<>'"]/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[character]));
+  const renderPricingPlans = async () => {
+    const grid = document.querySelector('.pricing__grid');
+    if (!grid) return;
+    try {
+      const response = await fetch('/api/public/pricing-plans');
+      if (!response.ok) throw new Error('Plans unavailable');
+      const { plans = [] } = await response.json();
+      if (!plans.length) return;
+      const icons = [
+        '<path d="M12 3v18M3 12h18"/>',
+        '<path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2-5.6-3-5.6 3 1.1-6.2L3 9.6l6.2-.9L12 3Z"/>',
+        '<path d="M12 3 4 6v5c0 5 3.2 8.5 8 10 4.8-1.5 8-5 8-10V6l-8-3Z"/><path d="m8.5 12 2.3 2.3 4.7-5"/>'
+      ];
+      grid.innerHTML = plans.map((plan, index) => `<article class="pricing-card ${plan.featured ? 'pricing-card--featured' : ''}"><div class="pricing-card__visual"><img src="${escapeHtml(plan.image)}" alt="${escapeHtml(plan.name)}" /><span class="pricing-card__tag">${escapeHtml(plan.badge)}</span></div><div class="pricing-card__body"><div class="pricing-card__heading"><span><svg viewBox="0 0 24 24" aria-hidden="true">${icons[index % icons.length]}</svg></span><div><small>${escapeHtml(plan.billingPeriod)} package</small><h3>${escapeHtml(plan.name)}</h3></div></div><strong><small>LKR</small>${Number(plan.price).toLocaleString('en-LK')}<span>/ ${escapeHtml(plan.billingPeriod)}</span></strong><ul>${plan.features.map((feature) => `<li>${escapeHtml(feature)}</li>`).join('')}</ul></div><a href="login.html?role=customer&next=customer-dashboard.html%23bookings"><span>${escapeHtml(plan.buttonText)}</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></a></article>`).join('');
+    } catch (error) { /* Keep the static fallback cards. */ }
+  };
+
   const renderServiceRatings = async () => {
     const cards = Array.from(document.querySelectorAll('[data-service-card]'));
     if (!cards.length) return;
@@ -42,6 +60,7 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   renderServiceRatings();
+  renderPricingPlans();
 
   const getSession = () => {
     try {
