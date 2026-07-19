@@ -1071,6 +1071,36 @@ app.put('/api/admin/invoices/:id/pay', requireAuth('admin'), async (req, res, ne
   }
 });
 
+app.get('/api/admin/emergencies', requireAuth('admin'), async (req, res, next) => {
+  try {
+    res.json(await store.getEmergencyRequests());
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get('/api/admin/reports/individual/:report/pdf', requireAuth('admin'), async (req, res, next) => {
+  try {
+    const reportNames = {
+      'technician-workload': 'Technician-Workload',
+      'technician-performance': 'Technician-Performance',
+      'low-stock': 'Low-Stock',
+      'inventory-value': 'Inventory-Value',
+      'stock-movements': 'Stock-Movements',
+      'parts-usage': 'Parts-Usage'
+    };
+    const reportName = reportNames[req.params.report];
+    if (!reportName) return res.status(404).json({ message: 'Report not found.' });
+    const pdf = await store.getIndividualReportPdf(req.params.report);
+    res.type('application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="AutoCare-${reportName}-Report.pdf"`);
+    res.setHeader('Cache-Control', 'private, no-store');
+    res.send(pdf);
+  } catch (error) {
+    next(error);
+  }
+});
+
 app.put('/api/admin/emergencies/:id/close', requireAuth('admin'), async (req, res, next) => {
   try {
     const request = await store.updateDocument(store.collections.emergencyRequests, req.params.id, { status: 'Closed' });

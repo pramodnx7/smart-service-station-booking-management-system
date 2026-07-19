@@ -1699,6 +1699,19 @@ async function createEmergency(userId, data) {
   return emergency;
 }
 
+async function getEmergencyRequests() {
+  const emergencies = await all(collections.emergencyRequests);
+  return sortById(emergencies)
+    .reverse()
+    .map(({ id, userId, customerId, location, problem, status }) => ({
+      id,
+      customerId: customerId || userId,
+      location,
+      problem,
+      status
+    }));
+}
+
 async function createFeedback(userId, data) {
   const rating = Number(data.rating);
   if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
@@ -2100,6 +2113,153 @@ async function getOverallSystemReportPdf() {
     ],
     rows
   });
+}
+
+async function getIndividualReportPdf(reportType) {
+  if (reportType === 'technician-workload') {
+    const rows = await getTechnicianWorkload();
+    return createReportPdfBuffer({
+      title: 'TECHNICIAN WORKLOAD',
+      subtitle: 'Current assignments and service-job workload by technician.',
+      metrics: [
+        ['TECHNICIANS', rows.length],
+        ['ACTIVE JOBS', rows.reduce((sum, item) => sum + item.activeJobs, 0)],
+        ['PENDING', rows.reduce((sum, item) => sum + item.pendingJobs, 0)],
+        ['WAITING PARTS', rows.reduce((sum, item) => sum + item.waitingForParts, 0)]
+      ],
+      columns: [
+        { label: 'TECHNICIAN', x: 56, maxLength: 22, bold: true },
+        { label: 'SPECIALIZATION', x: 205, maxLength: 19 },
+        { label: 'ACTIVE', x: 360, maxLength: 6, align: 'right' },
+        { label: 'PENDING', x: 410, maxLength: 6, align: 'right' },
+        { label: 'IN PROGRESS', x: 470, maxLength: 6, align: 'right' },
+        { label: 'WAITING', x: 522, maxLength: 6, align: 'right' },
+        { label: 'DONE', x: 558, maxLength: 6, align: 'right' }
+      ],
+      rows: rows.map((item) => [item.name, item.specialization, item.activeJobs, item.pendingJobs, item.inProgressJobs, item.waitingForParts, item.completedJobs])
+    });
+  }
+
+  if (reportType === 'technician-performance') {
+    const rows = await getTechnicianPerformance();
+    const totalCompleted = rows.reduce((sum, item) => sum + item.jobsCompleted, 0);
+    return createReportPdfBuffer({
+      title: 'TECHNICIAN PERFORMANCE',
+      subtitle: 'Completion, workload, service totals, and customer ratings by technician.',
+      metrics: [
+        ['TECHNICIANS', rows.length],
+        ['COMPLETED JOBS', totalCompleted],
+        ['ACTIVE JOBS', rows.reduce((sum, item) => sum + item.activeJobs, 0)],
+        ['TOTAL SERVICES', rows.reduce((sum, item) => sum + item.totalServicesCompleted, 0)]
+      ],
+      columns: [
+        { label: 'TECHNICIAN', x: 56, maxLength: 24, bold: true },
+        { label: 'COMPLETED', x: 285, maxLength: 8, align: 'right' },
+        { label: 'ACTIVE', x: 355, maxLength: 8, align: 'right' },
+        { label: 'AVG DAYS', x: 425, maxLength: 8, align: 'right' },
+        { label: 'RATING', x: 490, maxLength: 8, align: 'right' },
+        { label: 'SERVICES', x: 558, maxLength: 8, align: 'right' }
+      ],
+      rows: rows.map((item) => [item.name, item.jobsCompleted, item.activeJobs, item.averageCompletionDays, item.customerRating || '-', item.totalServicesCompleted])
+    });
+  }
+
+  const inventory = await getInventoryReports();
+  if (reportType === 'low-stock') {
+    const rows = [...inventory.outOfStock, ...inventory.lowStock];
+    return createReportPdfBuffer({
+      title: 'LOW STOCK REPORT',
+      subtitle: 'Inventory items at or below their configured minimum stock level.',
+      metrics: [
+        ['AFFECTED ITEMS', rows.length],
+        ['LOW STOCK', inventory.lowStock.length],
+        ['OUT OF STOCK', inventory.outOfStock.length],
+        ['UNITS LEFT', rows.reduce((sum, item) => sum + item.stock, 0)]
+      ],
+      columns: [
+        { label: 'ITEM CODE', x: 56, maxLength: 15, bold: true },
+        { label: 'PART', x: 150, maxLength: 27 },
+        { label: 'CATEGORY', x: 350, maxLength: 18 },
+        { label: 'STOCK', x: 470, maxLength: 8, align: 'right' },
+        { label: 'MINIMUM', x: 520, maxLength: 8, align: 'right' },
+        { label: 'STATUS', x: 558, maxLength: 14, align: 'right' }
+      ],
+      rows: rows.map((item) => [item.itemCode, item.partName, item.category, item.stock, item.minimumStockLevel, item.status])
+    });
+  }
+
+  if (reportType === 'inventory-value') {
+    const value = inventory.inventoryValue;
+    return createReportPdfBuffer({
+      title: 'INVENTORY VALUE REPORT',
+      subtitle: 'Purchase cost and expected retail value for every inventory item.',
+      metrics: [
+        ['ITEMS', value.itemCount],
+        ['STOCK UNITS', value.stockUnits],
+        ['PURCHASE VALUE', money(value.totalPurchaseValue)],
+        ['RETAIL VALUE', money(value.totalRetailValue)]
+      ],
+      columns: [
+        { label: 'ITEM CODE', x: 56, maxLength: 15, bold: true },
+        { label: 'PART', x: 145, maxLength: 25 },
+        { label: 'STOCK', x: 350, maxLength: 8, align: 'right' },
+        { label: 'UNIT COST', x: 430, maxLength: 18, align: 'right' },
+        { label: 'COST VALUE', x: 500, maxLength: 18, align: 'right' },
+        { label: 'RETAIL VALUE', x: 558, maxLength: 18, align: 'right' }
+      ],
+      rows: inventory.inventory.map((item) => [item.itemCode, item.partName, item.stock, money(item.purchasePrice), money(item.inventoryValue), money(item.retailValue)])
+    });
+  }
+
+  if (reportType === 'stock-movements') {
+    const rows = inventory.stockMovements;
+    return createReportPdfBuffer({
+      title: 'STOCK MOVEMENT REPORT',
+      subtitle: 'Inventory usage, returns, opening stock, and manual adjustments.',
+      metrics: [
+        ['MOVEMENTS', rows.length],
+        ['TOTAL UNITS', rows.reduce((sum, item) => sum + item.quantity, 0)],
+        ['PARTS USED', rows.filter((item) => item.type.includes('Used')).reduce((sum, item) => sum + item.quantity, 0)],
+        ['TOTAL VALUE', money(rows.reduce((sum, item) => sum + item.totalPrice, 0))]
+      ],
+      columns: [
+        { label: 'PART', x: 56, maxLength: 23, bold: true },
+        { label: 'MOVEMENT', x: 210, maxLength: 22 },
+        { label: 'TECHNICIAN', x: 360, maxLength: 18 },
+        { label: 'JOB', x: 460, maxLength: 10, align: 'right' },
+        { label: 'QTY', x: 500, maxLength: 7, align: 'right' },
+        { label: 'TOTAL', x: 558, maxLength: 18, align: 'right' }
+      ],
+      rows: rows.map((item) => [item.partName, item.type, item.technicianName, item.serviceJobId ? `SJ-${item.serviceJobId}` : '-', item.quantity, money(item.totalPrice)])
+    });
+  }
+
+  if (reportType === 'parts-usage') {
+    const rows = inventory.technicianUsage;
+    return createReportPdfBuffer({
+      title: 'PARTS USAGE REPORT',
+      subtitle: 'Parts consumed by vehicle, technician, job, and condition.',
+      metrics: [
+        ['USAGE RECORDS', rows.length],
+        ['TOTAL UNITS', rows.reduce((sum, item) => sum + item.quantity, 0)],
+        ['TECHNICIANS', new Set(rows.map((item) => item.usedByTechnician).filter(Boolean)).size],
+        ['TOTAL VALUE', money(rows.reduce((sum, item) => sum + item.totalPrice, 0))]
+      ],
+      columns: [
+        { label: 'PART', x: 56, maxLength: 22, bold: true },
+        { label: 'VEHICLE', x: 200, maxLength: 17 },
+        { label: 'TECHNICIAN', x: 330, maxLength: 18 },
+        { label: 'CONDITION', x: 440, maxLength: 15 },
+        { label: 'QTY', x: 500, maxLength: 7, align: 'right' },
+        { label: 'TOTAL', x: 558, maxLength: 18, align: 'right' }
+      ],
+      rows: rows.map((item) => [item.partName, item.vehicleNumber || item.vehicleName, item.technicianName, item.condition, item.quantity, money(item.totalPrice)])
+    });
+  }
+
+  const error = new Error('Unknown report type.');
+  error.status = 404;
+  throw error;
 }
 
 async function employeeNoExists(employeeNo, ignoreId) {
@@ -3322,8 +3482,10 @@ module.exports = {
   getAdminServiceJobDetails,
   getById,
   getCustomerDashboard,
+  getEmergencyRequests,
   getBookingSlots,
   getInventoryReports,
+  getIndividualReportPdf,
   getOverallSalesReportPdf,
   getOverallSystemReportPdf,
   getFileForDownload,
