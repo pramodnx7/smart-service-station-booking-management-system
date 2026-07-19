@@ -426,10 +426,10 @@ dialog {
   }
 
   .toast {
-    right: 12px;
     bottom: 12px;
     left: 12px;
-    width: auto;
+    right: 12px;
+    width: calc(100vw - 24px);
     max-width: none;
   }
 

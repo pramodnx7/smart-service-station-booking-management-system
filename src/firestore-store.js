@@ -913,6 +913,7 @@ async function createUser({ role, name, email, phone = '', passwordHash, status 
 }
 
 async function getCustomerDashboard(userId) {
+  const customerId = Number(userId);
   const [user, vehicles, bookings, invoices, notifications, serviceMap, jobs, parts, usages, images, documents] = await Promise.all([
     getById(collections.users, userId),
     all(collections.vehicles),
@@ -932,7 +933,7 @@ async function getCustomerDashboard(userId) {
     .sort((a, b) => a.name.localeCompare(b.name))
     .map((service) => service.name);
 
-  const customerJobs = jobs.filter((job) => Number(job.customerId) === Number(userId));
+  const customerJobs = jobs.filter((job) => Number(job.customerId) === customerId);
   const customerJobIds = new Set(customerJobs.map((job) => Number(job.id)));
   const context = {
     usersById: new Map([[Number(user.id), user]]),
@@ -944,10 +945,10 @@ async function getCustomerDashboard(userId) {
 
   return {
     profile: { name: user.name, email: user.email, phone: user.phone || '' },
-    vehicles: sortById(vehicles.filter((item) => item.userId === userId)).map(vehicleView),
-    bookings: sortDateDesc(bookings.filter((item) => item.userId === userId).map((item) => bookingView(item, serviceMap)), 'date', 'time'),
-    invoices: sortDateDesc(invoices.filter((item) => item.userId === userId).map((item) => invoiceView(item, serviceMap)), 'date'),
-    notifications: sortById(notifications.filter((item) => item.userId === userId)).reverse().map(({ id, type, message, unread }) => ({ id, type, message, unread })),
+    vehicles: sortById(vehicles.filter((item) => Number(item.userId) === customerId)).map(vehicleView),
+    bookings: sortDateDesc(bookings.filter((item) => Number(item.userId) === customerId).map((item) => bookingView(item, serviceMap)), 'date', 'time'),
+    invoices: sortDateDesc(invoices.filter((item) => Number(item.userId) === customerId).map((item) => invoiceView(item, serviceMap)), 'date'),
+    notifications: sortById(notifications.filter((item) => Number(item.userId) === customerId)).reverse().map(({ id, type, message, unread }) => ({ id, type, message, unread })),
     usedParts: sortById(usages.filter((usage) => customerJobIds.has(Number(usage.serviceJobId)))).reverse().map((usage) => usageView(usage, context)),
     serviceImages: sortById(images.filter((image) => customerJobIds.has(Number(image.serviceJobId)))).reverse().map((image) => fileView(image, 'photo')),
     documents: sortById(documents.filter((document) => Number(document.customerId) === Number(userId) || customerJobIds.has(Number(document.serviceJobId)))).reverse().map((document) => fileView(document, 'document')),

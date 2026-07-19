@@ -9,12 +9,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const loginPasswordToggle = document.getElementById('toggle-login-password');
   const signupName = document.getElementById('signup-name');
   const signupEmail = document.getElementById('signup-email');
-  const signupCode = document.getElementById('signup-code');
   const signupPhone = document.getElementById('signup-phone');
   const signupPassword = document.getElementById('signup-password');
   const signupPasswordToggle = document.getElementById('toggle-signup-password');
-  const sendSignupCode = document.getElementById('send-signup-code');
-  const verificationNote = document.getElementById('verification-note');
   const title = document.getElementById('login-title');
   const copy = document.getElementById('login-copy');
   const submit = document.getElementById('login-submit');
@@ -35,7 +32,6 @@ document.addEventListener('DOMContentLoaded', () => {
   };
   const params = new URLSearchParams(window.location.search);
   let activeRole = ['admin', 'customer', 'technician'].includes(params.get('role')) ? params.get('role') : 'admin';
-  let signupVerification = null;
 
   function setStatus(message, isSuccess = false) {
     status.textContent = message;
@@ -75,18 +71,7 @@ document.addEventListener('DOMContentLoaded', () => {
     loginNote.classList.add('hidden');
     signupNote.classList.remove('hidden');
     setRole('customer');
-    setStatus('Create a customer account after email code verification.', true);
-  }
-
-  function setVerificationNote(message, isSuccess = false) {
-    verificationNote.textContent = message;
-    verificationNote.classList.toggle('is-success', isSuccess);
-  }
-
-  function clearSignupVerification() {
-    signupVerification = null;
-    signupCode.value = '';
-    setVerificationNote('Send a code to verify this customer email before account creation.');
+    setStatus('Create a customer account to manage bookings and vehicles.', true);
   }
 
   function setPasswordVisibility(input, button, isVisible) {
@@ -147,36 +132,6 @@ document.addEventListener('DOMContentLoaded', () => {
     signupPassword.focus();
   });
 
-  signupEmail.addEventListener('input', clearSignupVerification);
-
-  sendSignupCode.addEventListener('click', async () => {
-    const targetEmail = signupEmail.value.trim();
-    if (!targetEmail) {
-      setVerificationNote('Enter the customer email address first.');
-      signupEmail.focus();
-      return;
-    }
-
-    sendSignupCode.disabled = true;
-    setVerificationNote('Sending verification code...', true);
-
-    try {
-      const result = await window.AutoCareApi.requestRegistrationCode({ email: targetEmail });
-      signupVerification = {
-        email: targetEmail,
-        verificationId: result.verificationId
-      };
-      const demoCode = result.devCode ? ` Demo code: ${result.devCode}` : '';
-      setVerificationNote(`Verification code sent. It expires in ${Math.round(result.expiresInSeconds / 60)} minutes.${demoCode}`, true);
-      signupCode.focus();
-    } catch (error) {
-      clearSignupVerification();
-      setVerificationNote(error.message || 'Could not send verification code. Check that the server is running and email settings are configured.');
-    } finally {
-      sendSignupCode.disabled = false;
-    }
-  });
-
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
     setStatus('Checking account...', true);
@@ -204,13 +159,8 @@ document.addEventListener('DOMContentLoaded', () => {
   signupForm.addEventListener('submit', async (event) => {
     event.preventDefault();
     const signupEmailValue = signupEmail.value.trim();
-    if (!signupVerification || signupVerification.email !== signupEmailValue) {
-      setStatus('Please send a verification code to this email first.');
-      signupEmail.focus();
-      return;
-    }
 
-    setStatus('Verifying code and creating customer account...', true);
+    setStatus('Creating customer account...', true);
 
     try {
       const result = await window.AutoCareApi.register({
@@ -218,9 +168,7 @@ document.addEventListener('DOMContentLoaded', () => {
         name: signupName.value.trim(),
         email: signupEmailValue,
         phone: signupPhone.value.trim(),
-        password: signupPassword.value,
-        verificationId: signupVerification.verificationId,
-        verificationCode: signupCode.value.trim()
+        password: signupPassword.value
       });
 
       email.value = signupEmailValue;
@@ -230,9 +178,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
       showLoginView();
       setRole('customer');
-      setStatus('Email verified and account created. Click login.', true);
+      setStatus('Customer account created. Click login.', true);
       signupForm.reset();
-      clearSignupVerification();
       password.focus();
     } catch (error) {
       setStatus(error.message || 'Could not create customer account.');

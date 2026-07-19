@@ -84,12 +84,6 @@
         body: JSON.stringify(credentials)
       });
     },
-    requestRegistrationCode(data) {
-      return request('/api/auth/register/request-code', {
-        method: 'POST',
-        body: JSON.stringify(data)
-      });
-    },
     register(data) {
       return request('/api/auth/register', {
         method: 'POST',

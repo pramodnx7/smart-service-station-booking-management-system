@@ -69,10 +69,30 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  function showToast(message) {
-    els.toast.textContent = message;
-    els.toast.classList.add('is-visible');
-    window.setTimeout(() => els.toast.classList.remove('is-visible'), 2400);
+  function toastType(message) {
+    const text = String(message || '').toLowerCase();
+    if (text.includes('failed') || text.includes('error') || text.includes('not found') || text.includes('cannot') || text.includes('denied')) return 'error';
+    if (text.includes('warning') || text.includes('inactive') || text.includes('pending')) return 'warning';
+    return 'success';
+  }
+
+  function showToast(message, type = toastType(message)) {
+    window.clearTimeout(els.toast.hideTimer);
+    const icon = document.createElement('span');
+    const text = document.createElement('span');
+    const close = document.createElement('button');
+    icon.className = 'toast__icon';
+    icon.textContent = type === 'error' ? '!' : type === 'warning' ? '!' : '✓';
+    text.className = 'toast__message';
+    text.textContent = message;
+    close.className = 'toast__close';
+    close.type = 'button';
+    close.setAttribute('aria-label', 'Close notification');
+    close.textContent = '×';
+    close.addEventListener('click', () => els.toast.classList.remove('is-visible'));
+    els.toast.replaceChildren(icon, text, close);
+    els.toast.className = `toast toast--${type} is-visible`;
+    els.toast.hideTimer = window.setTimeout(() => els.toast.classList.remove('is-visible'), 3600);
   }
 
   async function hydrateFromApi() {

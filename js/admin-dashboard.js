@@ -392,10 +392,30 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  function showToast(message) {
-    selectors.toast.textContent = message;
-    selectors.toast.classList.add('is-visible');
-    window.setTimeout(() => selectors.toast.classList.remove('is-visible'), 2400);
+  function toastType(message) {
+    const text = String(message || '').toLowerCase();
+    if (text.includes('failed') || text.includes('error') || text.includes('not found') || text.includes('cannot') || text.includes('denied')) return 'error';
+    if (text.includes('warning') || text.includes('inactive') || text.includes('pending')) return 'warning';
+    return 'success';
+  }
+
+  function showToast(message, type = toastType(message)) {
+    window.clearTimeout(selectors.toast.hideTimer);
+    const icon = document.createElement('span');
+    const text = document.createElement('span');
+    const close = document.createElement('button');
+    icon.className = 'toast__icon';
+    icon.textContent = type === 'error' ? '!' : type === 'warning' ? '!' : '✓';
+    text.className = 'toast__message';
+    text.textContent = message;
+    close.className = 'toast__close';
+    close.type = 'button';
+    close.setAttribute('aria-label', 'Close notification');
+    close.textContent = '×';
+    close.addEventListener('click', () => selectors.toast.classList.remove('is-visible'));
+    selectors.toast.replaceChildren(icon, text, close);
+    selectors.toast.className = `toast toast--${type} is-visible`;
+    selectors.toast.hideTimer = window.setTimeout(() => selectors.toast.classList.remove('is-visible'), 3600);
   }
 
   function nextId(collection) {
@@ -1004,6 +1024,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const data = Object.fromEntries(new FormData(selectors.modalForm).entries());
     const mode = selectors.modalForm.dataset.mode;
     const id = Number(selectors.modalForm.dataset.id);
+    let successMessage = 'Dashboard data saved successfully.';
 
     if (mode === 'customer') {
       const savedCustomer = await window.AutoCareApi.request(id ? `/api/admin/customers/${id}` : '/api/admin/customers', {
@@ -1066,6 +1087,9 @@ document.addEventListener('DOMContentLoaded', () => {
         body: JSON.stringify(payload)
       });
       id ? Object.assign(state.bookings.find((item) => item.id === id), savedBooking) : state.bookings.push(savedBooking);
+      successMessage = id
+        ? `Booking #BK-${savedBooking.id} updated successfully.`
+        : `Booking #BK-${savedBooking.id} created and customer notified.`;
     }
 
     if (mode === 'serviceJob') {
@@ -1141,7 +1165,7 @@ document.addEventListener('DOMContentLoaded', () => {
     selectors.modal.close();
     saveState();
     renderAll();
-    showToast('Dashboard data saved successfully.');
+    showToast(successMessage);
   }
 
   async function advanceBooking(id) {

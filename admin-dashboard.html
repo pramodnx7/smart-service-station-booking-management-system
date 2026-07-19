@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="css/admin-dashboard.css?v=booking-actions-box-1" />
+  <link rel="stylesheet" href="css/admin-dashboard.css?v=right-toast-1" />
   <link rel="stylesheet" href="css/responsive.css?v=mobile-1" />
 </head>
 <body>
@@ -28,8 +28,7 @@
         <button class="side-nav__item" type="button" data-view="bookings"><span data-icon="calendar"></span>Bookings</button>
         <button class="side-nav__item" type="button" data-view="technicians"><span data-icon="technician"></span>Technicians</button>
         <button class="side-nav__item" type="button" data-view="service-jobs"><span data-icon="tools"></span>Service Jobs</button>
-        <button class="side-nav__item" type="button" data-view="workload"><span data-icon="tools"></span>Workload</button>
-        <button class="side-nav__item" type="button" data-view="performance"><span data-icon="star"></span>Performance</button>
+        <button class="side-nav__item" type="button" data-view="reports"><span data-icon="star"></span>Reports</button>
         <button class="side-nav__item" type="button" data-view="inventory"><span data-icon="invoice"></span>Inventory</button>
         <button class="side-nav__item" type="button" data-view="documents"><span data-icon="calendar"></span>Photos & Docs</button>
         <button class="side-nav__item" type="button" data-view="services"><span data-icon="tools"></span>Services</button>
@@ -72,13 +71,6 @@
 
       <main class="content">
         <section class="view is-active" data-view-panel="overview">
-          <div class="panel__header report-download-actions">
-            <div><h2>Management Reports</h2><p>Download complete sales and operational summaries.</p></div>
-            <div class="row-actions">
-              <button class="btn btn--yellow" type="button" data-action="download-sales-report">Download Sales PDF</button>
-              <button class="btn btn--blue" type="button" data-action="download-overall-report">Download Overall Report PDF</button>
-            </div>
-          </div>
           <div class="metric-grid" id="metric-grid"></div>
 
           <div class="dashboard-grid">
@@ -170,17 +162,41 @@
           </div>
         </section>
 
-        <section class="view" data-view-panel="workload">
+        <section class="view" data-view-panel="reports">
+          <div class="panel report-download-actions">
+            <div class="panel__header">
+              <div><h2>Sales & Operational Reports</h2><p>Download complete financial and operational summaries.</p></div>
+              <div class="row-actions">
+                <button class="btn btn--yellow" type="button" data-action="download-sales-report">Download Sales PDF</button>
+                <button class="btn btn--blue" type="button" data-action="download-overall-report">Download Operational PDF</button>
+              </div>
+            </div>
+          </div>
           <div class="panel">
             <div class="panel__header"><div><h2>Technician Workload</h2><p>Monitor active assignments, pending jobs and jobs waiting for parts.</p></div></div>
             <div class="table-wrap"><table><thead><tr><th>Technician</th><th>Specialization</th><th>Active</th><th>Pending</th><th>In Progress</th><th>Waiting Parts</th><th>Completed</th></tr></thead><tbody id="workload-body"></tbody></table></div>
           </div>
-        </section>
-
-        <section class="view" data-view-panel="performance">
           <div class="panel">
             <div class="panel__header"><div><h2>Technician Performance</h2><p>Track completed jobs, active jobs, completion time and service totals.</p></div></div>
             <div class="table-wrap"><table><thead><tr><th>Technician</th><th>Jobs Completed</th><th>Active Jobs</th><th>Avg Completion</th><th>Customer Rating</th><th>Total Services</th></tr></thead><tbody id="performance-body"></tbody></table></div>
+          </div>
+          <div class="dashboard-grid dashboard-grid--even">
+            <article class="panel">
+              <div class="panel__header"><div><h2>Low Stock Report</h2><p>Items at or below their minimum stock level.</p></div></div>
+              <div class="table-wrap"><table><thead><tr><th>Item</th><th>Stock</th><th>Minimum</th><th>Status</th></tr></thead><tbody id="low-stock-body"></tbody></table></div>
+            </article>
+            <article class="panel">
+              <div class="panel__header"><div><h2>Inventory Value Report</h2><p>Purchase and retail value summary.</p></div></div>
+              <div id="inventory-value" class="progress-list"></div>
+            </article>
+          </div>
+          <div class="panel">
+            <div class="panel__header"><div><h2>Stock Movement Report</h2><p>Audit history for stock usage, returns and adjustments.</p></div></div>
+            <div class="table-wrap"><table><thead><tr><th>Part</th><th>Type</th><th>Quantity</th><th>Technician</th><th>Job</th><th>Total</th></tr></thead><tbody id="stock-movements-body"></tbody></table></div>
+          </div>
+          <div class="panel">
+            <div class="panel__header"><div><h2>Parts Usage Report</h2><p>Technician and vehicle part usage history.</p></div></div>
+            <div class="table-wrap"><table><thead><tr><th>Part</th><th>Vehicle</th><th>Technician</th><th>Condition</th><th>Quantity</th><th>Total</th></tr></thead><tbody id="parts-usage-body"></tbody></table></div>
           </div>
         </section>
 
@@ -192,24 +208,6 @@
             </div>
             <div class="table-tools"><input id="inventory-search" type="search" placeholder="Search inventory..." /></div>
             <div class="table-wrap"><table><thead><tr><th>Item</th><th>Category</th><th>Brand</th><th>Stock</th><th>Prices</th><th>Warranty</th><th>Action</th></tr></thead><tbody id="inventory-body"></tbody></table></div>
-          </div>
-          <div class="dashboard-grid dashboard-grid--even">
-            <article class="panel">
-              <div class="panel__header"><div><h2>Low Stock Alerts</h2><p>Items at or below minimum stock.</p></div></div>
-              <div class="table-wrap"><table><thead><tr><th>Item</th><th>Stock</th><th>Minimum</th><th>Status</th></tr></thead><tbody id="low-stock-body"></tbody></table></div>
-            </article>
-            <article class="panel">
-              <div class="panel__header"><div><h2>Inventory Value</h2><p>Purchase and retail value summary.</p></div></div>
-              <div id="inventory-value" class="progress-list"></div>
-            </article>
-          </div>
-          <div class="panel">
-            <div class="panel__header"><div><h2>Stock Movements</h2><p>Audit log for stock usage, returns and adjustments.</p></div></div>
-            <div class="table-wrap"><table><thead><tr><th>Part</th><th>Type</th><th>Quantity</th><th>Technician</th><th>Job</th><th>Total</th></tr></thead><tbody id="stock-movements-body"></tbody></table></div>
-          </div>
-          <div class="panel">
-            <div class="panel__header"><div><h2>Parts Usage History</h2><p>Technician and vehicle part usage.</p></div></div>
-            <div class="table-wrap"><table><thead><tr><th>Part</th><th>Vehicle</th><th>Technician</th><th>Condition</th><th>Quantity</th><th>Total</th></tr></thead><tbody id="parts-usage-body"></tbody></table></div>
           </div>
         </section>
 
@@ -305,6 +303,6 @@
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
   <script src="js/api.js?v=pdf-open-2"></script>
-  <script src="js/admin-dashboard.js?v=vehicle-remove-warning-1"></script>
+  <script src="js/admin-dashboard.js?v=booking-toast-1"></script>
 </body>
 </html>
