@@ -104,6 +104,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let activeBookingStatus = 'All';
   let activeMessageTab = 'received';
   let pendingBookingDraft = null;
+  let notificationDraftSaveInProgress = false;
   const technicianSpecializations = ['General Service', 'Oil Change', 'Brake Service', 'Electrical Repair', 'Engine Repair', 'Suspension Repair', 'Hybrid/EV Service'];
 
   const selectors = {
@@ -425,11 +426,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
   async function refreshNotifications() {
     if (document.hidden) return;
-    const messageCenter = await window.AutoCareApi.request('/api/admin/message-center');
+    const [messageCenter, emergencies] = await Promise.all([
+      window.AutoCareApi.request('/api/admin/message-center'),
+      window.AutoCareApi.request('/api/admin/emergencies')
+    ]);
     state.notifications = messageCenter.received || [];
     state.sentNotifications = messageCenter.sent || [];
     state.notificationDrafts = messageCenter.drafts || [];
+    state.emergencies = emergencies || [];
     saveState();
+    renderEmergency();
     renderNotifications();
   }
 
@@ -862,6 +868,12 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function renderEmergency() {
+    const activeEmergencies = state.emergencies.filter((item) => item.status !== 'Closed');
+    const emergencyAlert = document.getElementById('emergency-alert');
+    emergencyAlert.hidden = activeEmergencies.length === 0;
+    emergencyAlert.classList.toggle('is-active', activeEmergencies.length > 0);
+    emergencyAlert.setAttribute('aria-label', `${activeEmergencies.length} active emergency request${activeEmergencies.length === 1 ? '' : 's'}. Open emergency requests.`);
+    document.getElementById('emergency-alert-count').textContent = activeEmergencies.length;
     document.getElementById('emergency-grid').innerHTML = state.emergencies.map((item) => `
       <article class="emergency-card">
         <span class="badge badge--${item.status === 'Open' ? 'cancelled' : 'approved'}">${item.status}</span>
@@ -1072,7 +1084,7 @@ document.addEventListener('DOMContentLoaded', () => {
       },
       notification: {
         title: record.id ? 'Edit Notification Draft' : 'New Notification',
-        body: field('userId', 'Recipient', 'select', record.userId || notificationRecipientOptions[0]?.value, notificationRecipientOptions) + field('type', 'Notification Type', 'select', record.type || 'General', ['General', 'Booking', 'Service', 'Payment', 'Inventory', 'Emergency'].map((type) => ({ value: type, label: type }))) + field('deliveryAction', 'Action', 'select', record.deliveryAction || 'send', [{ value: 'send', label: 'Send now' }, { value: 'draft', label: 'Save as draft' }]) + field('message', 'Message', 'textarea', record.message || '')
+        body: field('userId', 'Recipient', 'select', record.userId || notificationRecipientOptions[0]?.value, notificationRecipientOptions) + field('type', 'Notification Type', 'select', record.type || 'General', ['General', 'Booking', 'Service', 'Payment', 'Inventory', 'Emergency'].map((type) => ({ value: type, label: type }))) + field('message', 'Message', 'textarea', record.message || '')
       }
     };
 
@@ -1081,9 +1093,44 @@ document.addEventListener('DOMContentLoaded', () => {
     selectors.modalKicker.textContent = 'Admin Action';
     selectors.modalTitle.textContent = config[mode].title;
     selectors.modalBody.innerHTML = config[mode].body;
+    selectors.modalActions.innerHTML = `
+      <button class="btn btn--ghost" type="button" data-action="close-modal">${mode === 'notification' ? 'Close & Save Draft' : 'Cancel'}</button>
+      <button class="btn btn--blue" type="submit" id="modal-submit">${mode === 'notification' ? 'Send' : 'Save'}</button>
+    `;
+    selectors.modalSubmit = document.getElementById('modal-submit');
     selectors.modalActions.hidden = false;
-    selectors.modalSubmit.textContent = 'Save';
     selectors.modal.showModal();
+  }
+
+  async function closeModalAndSaveDraft() {
+    if (notificationDraftSaveInProgress) return;
+    if (selectors.modalForm.dataset.mode !== 'notification') {
+      selectors.modal.close();
+      return;
+    }
+
+    const data = Object.fromEntries(new FormData(selectors.modalForm).entries());
+    const message = String(data.message || '').trim();
+    if (!message) {
+      selectors.modal.close();
+      return;
+    }
+
+    notificationDraftSaveInProgress = true;
+    try {
+      const draftId = Number(selectors.modalForm.dataset.id) || undefined;
+      await window.AutoCareApi.request('/api/admin/notification-drafts', {
+        method: 'POST',
+        body: JSON.stringify({ userId: Number(data.userId), type: data.type, message, draftId })
+      });
+      activeMessageTab = 'drafts';
+      await refreshNotifications();
+      selectors.modal.close();
+      renderNotifications();
+      showToast(draftId ? 'Draft updated.' : 'Message saved to drafts.');
+    } finally {
+      notificationDraftSaveInProgress = false;
+    }
   }
 
   async function handleModalSubmit(event) {
@@ -1223,21 +1270,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (mode === 'notification') {
       const payload = { ...data, userId: Number(data.userId), draftId: id || undefined };
-      if (data.deliveryAction === 'draft') {
-        await window.AutoCareApi.request('/api/admin/notification-drafts', {
-          method: 'POST',
-          body: JSON.stringify(payload)
-        });
-        activeMessageTab = 'drafts';
-        successMessage = 'Notification saved as a draft.';
-      } else {
-        await window.AutoCareApi.request('/api/admin/notifications', {
-          method: 'POST',
-          body: JSON.stringify(payload)
-        });
-        activeMessageTab = 'sent';
-        successMessage = 'Notification delivered successfully.';
-      }
+      await window.AutoCareApi.request('/api/admin/notifications', {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      });
+      activeMessageTab = 'sent';
+      successMessage = 'Notification delivered successfully.';
       await refreshNotifications();
     }
 
@@ -1301,6 +1339,20 @@ document.addEventListener('DOMContentLoaded', () => {
       previewWindow?.close();
       throw error;
     }
+  }
+
+  async function downloadPdfFile(endpoint, fileName, successMessage) {
+    const blob = await window.AutoCareApi.requestBlob(endpoint);
+    if (blob.type !== 'application/pdf') throw new Error('The server did not return a valid PDF report.');
+    const objectUrl = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = objectUrl;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60000);
+    showToast(successMessage);
   }
 
   function downloadFile(kind, id) {
@@ -1423,17 +1475,25 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     if (action === 'download-invoice-pdf') await downloadInvoicePdf(numericId);
     if (action === 'download-sales-report') {
-      await openPdfFile(
+      await downloadPdfFile(
         '/api/admin/reports/sales/pdf',
         'AutoCare-Overall-Sales-Report.pdf',
         'Overall sales report downloaded.'
       );
     }
     if (action === 'download-overall-report') {
-      await openPdfFile(
+      await downloadPdfFile(
         '/api/admin/reports/overall/pdf',
         'AutoCare-Overall-System-Report.pdf',
         'Overall system report downloaded.'
+      );
+    }
+    if (action === 'download-individual-report') {
+      const report = element.dataset.report;
+      await downloadPdfFile(
+        `/api/admin/reports/individual/${encodeURIComponent(report)}/pdf`,
+        element.dataset.fileName || `AutoCare-${report}-Report.pdf`,
+        `${element.closest('.panel')?.querySelector('h2')?.textContent || 'Report'} downloaded.`
       );
     }
     if (action === 'download-file') downloadFile(element.dataset.kind, numericId);
@@ -1447,6 +1507,9 @@ document.addEventListener('DOMContentLoaded', () => {
       showToast('File deleted.');
     }
     if (action === 'new-emergency' || action === 'open-emergency') openModal('emergency');
+    if (action === 'show-emergency-requests') {
+      document.querySelector('.side-nav__item[data-view="emergency"]')?.click();
+    }
     if (action === 'close-emergency') {
       await window.AutoCareApi.request(`/api/admin/emergencies/${numericId}/close`, { method: 'PUT' });
       state.emergencies.find((item) => item.id === numericId).status = 'Closed';
@@ -1464,7 +1527,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     if (action === 'edit-notification-draft') {
       const draft = state.notificationDrafts.find((item) => item.id === numericId);
-      if (draft) openModal('notification', { ...draft, deliveryAction: 'draft' });
+      if (draft) openModal('notification', draft);
     }
     if (action === 'send-notification-draft') {
       const draft = state.notificationDrafts.find((item) => item.id === numericId);
@@ -1499,9 +1562,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     if (action === 'close-modal') {
       pendingBookingDraft = null;
-      selectors.modal.close();
-      selectors.modalActions.hidden = false;
-      selectors.modalSubmit.textContent = 'Save';
+      await closeModalAndSaveDraft();
     }
     if (action === 'logout') {
       window.AutoCareApi.logout();
@@ -1529,7 +1590,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.getElementById('mobile-menu').addEventListener('click', () => selectors.sidebar.classList.toggle('is-open'));
     selectors.modalForm.addEventListener('submit', (event) => {
-      handleModalSubmit(event).catch((error) => showToast(error.message || 'Save failed.'));
+      handleModalSubmit(event).catch((error) => showToast(error.message || 'Action failed.'));
+    });
+    selectors.modal.addEventListener('cancel', (event) => {
+      if (selectors.modalForm.dataset.mode !== 'notification') return;
+      event.preventDefault();
+      closeModalAndSaveDraft().catch((error) => showToast(error.message || 'Draft could not be saved.'));
     });
     selectors.modalForm.addEventListener('change', (event) => {
       if (selectors.modalForm.dataset.mode === 'booking'

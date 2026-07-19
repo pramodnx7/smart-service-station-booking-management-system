@@ -60,6 +60,10 @@
           <span data-icon="search"></span>
           <input id="global-search" type="search" placeholder="Search customers, vehicles, bookings..." />
         </label>
+        <button class="icon-btn emergency-alert-btn" id="emergency-alert" type="button" data-action="show-emergency-requests" aria-label="Open emergency requests" hidden>
+          <span data-icon="alert"></span>
+          <b id="emergency-alert-count">0</b>
+        </button>
         <button class="icon-btn" type="button" data-action="show-notifications" aria-label="Notifications">
           <span data-icon="bell"></span>
           <b id="notification-count">0</b>
@@ -174,29 +178,29 @@
             </div>
           </div>
           <div class="panel">
-            <div class="panel__header"><div><h2>Technician Workload</h2><p>Monitor active assignments, pending jobs and jobs waiting for parts.</p></div></div>
+            <div class="panel__header"><div><h2>Technician Workload</h2><p>Monitor active assignments, pending jobs and jobs waiting for parts.</p></div><button class="btn btn--ghost" type="button" data-action="download-individual-report" data-report="technician-workload" data-file-name="AutoCare-Technician-Workload-Report.pdf">Download PDF</button></div>
             <div class="table-wrap"><table><thead><tr><th>Technician</th><th>Specialization</th><th>Active</th><th>Pending</th><th>In Progress</th><th>Waiting Parts</th><th>Completed</th></tr></thead><tbody id="workload-body"></tbody></table></div>
           </div>
           <div class="panel">
-            <div class="panel__header"><div><h2>Technician Performance</h2><p>Track completed jobs, active jobs, completion time and service totals.</p></div></div>
+            <div class="panel__header"><div><h2>Technician Performance</h2><p>Track completed jobs, active jobs, completion time and service totals.</p></div><button class="btn btn--ghost" type="button" data-action="download-individual-report" data-report="technician-performance" data-file-name="AutoCare-Technician-Performance-Report.pdf">Download PDF</button></div>
             <div class="table-wrap"><table><thead><tr><th>Technician</th><th>Jobs Completed</th><th>Active Jobs</th><th>Avg Completion</th><th>Customer Rating</th><th>Total Services</th></tr></thead><tbody id="performance-body"></tbody></table></div>
           </div>
           <div class="dashboard-grid dashboard-grid--even">
             <article class="panel">
-              <div class="panel__header"><div><h2>Low Stock Report</h2><p>Items at or below their minimum stock level.</p></div></div>
+              <div class="panel__header"><div><h2>Low Stock Report</h2><p>Items at or below their minimum stock level.</p></div><button class="btn btn--ghost" type="button" data-action="download-individual-report" data-report="low-stock" data-file-name="AutoCare-Low-Stock-Report.pdf">Download PDF</button></div>
               <div class="table-wrap"><table><thead><tr><th>Item</th><th>Stock</th><th>Minimum</th><th>Status</th></tr></thead><tbody id="low-stock-body"></tbody></table></div>
             </article>
             <article class="panel">
-              <div class="panel__header"><div><h2>Inventory Value Report</h2><p>Purchase and retail value summary.</p></div></div>
+              <div class="panel__header"><div><h2>Inventory Value Report</h2><p>Purchase and retail value summary.</p></div><button class="btn btn--ghost" type="button" data-action="download-individual-report" data-report="inventory-value" data-file-name="AutoCare-Inventory-Value-Report.pdf">Download PDF</button></div>
               <div id="inventory-value" class="progress-list"></div>
             </article>
           </div>
           <div class="panel">
-            <div class="panel__header"><div><h2>Stock Movement Report</h2><p>Audit history for stock usage, returns and adjustments.</p></div></div>
+            <div class="panel__header"><div><h2>Stock Movement Report</h2><p>Audit history for stock usage, returns and adjustments.</p></div><button class="btn btn--ghost" type="button" data-action="download-individual-report" data-report="stock-movements" data-file-name="AutoCare-Stock-Movements-Report.pdf">Download PDF</button></div>
             <div class="table-wrap"><table><thead><tr><th>Part</th><th>Type</th><th>Quantity</th><th>Technician</th><th>Job</th><th>Total</th></tr></thead><tbody id="stock-movements-body"></tbody></table></div>
           </div>
           <div class="panel">
-            <div class="panel__header"><div><h2>Parts Usage Report</h2><p>Technician and vehicle part usage history.</p></div></div>
+            <div class="panel__header"><div><h2>Parts Usage Report</h2><p>Technician and vehicle part usage history.</p></div><button class="btn btn--ghost" type="button" data-action="download-individual-report" data-report="parts-usage" data-file-name="AutoCare-Parts-Usage-Report.pdf">Download PDF</button></div>
             <div class="table-wrap"><table><thead><tr><th>Part</th><th>Vehicle</th><th>Technician</th><th>Condition</th><th>Quantity</th><th>Total</th></tr></thead><tbody id="parts-usage-body"></tbody></table></div>
           </div>
         </section>
@@ -314,7 +318,12 @@
   </dialog>
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
+<<<<<<< HEAD
   <script src="js/api.js?v=profile-avatar-1"></script>
   <script src="js/admin-dashboard.js?v=profile-avatar-1"></script>
+=======
+  <script src="js/api.js?v=pdf-open-2"></script>
+  <script src="js/admin-dashboard.js?v=individual-reports-1"></script>
+>>>>>>> f01b1a92751eedf8ad07e739bb51ff317df7b435
 </body>
 </html>
