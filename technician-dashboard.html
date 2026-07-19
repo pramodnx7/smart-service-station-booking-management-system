@@ -10,8 +10,9 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="css/customer-dashboard.css?v=right-toast-1" />
   <link rel="stylesheet" href="css/responsive.css?v=mobile-1" />
+  <link rel="stylesheet" href="css/dashboard-refresh.css?v=refresh-1" />
 </head>
-<body>
+<body class="technician-dashboard">
   <div class="customer-shell">
     <aside class="customer-sidebar" id="technician-sidebar">
       <a class="brand" href="technician-dashboard.html" aria-label="AutoCare technician dashboard">
@@ -29,6 +30,7 @@
         <button class="side-nav__item" type="button" data-view="completed"><span data-icon="calendar"></span>Completed Jobs</button>
         <button class="side-nav__item" type="button" data-view="performance"><span data-icon="invoice"></span>Performance</button>
         <button class="side-nav__item" type="button" data-view="notifications"><span data-icon="bell"></span>Notifications</button>
+        <button class="side-nav__item" type="button" data-view="profile"><span data-icon="user"></span>Profile Settings</button>
         <button class="side-nav__item" type="button" data-action="logout"><span data-icon="logout"></span>Logout</button>
       </nav>
 
@@ -48,7 +50,7 @@
         </div>
         <button class="icon-btn" type="button" data-action="show-technician-notifications" aria-label="Notifications"><span data-icon="bell"></span><b id="notification-count">0</b></button>
         <div class="profile-pill">
-          <span id="profile-initials">TC</span>
+          <span class="profile-avatar"><span id="profile-initials">TC</span><img id="profile-image" alt="Technician profile" hidden /></span>
           <div><strong id="profile-name">Technician</strong><small id="profile-email">tech@autocare.lk</small></div>
         </div>
       </header>
@@ -113,6 +115,23 @@
             <div class="notification-list" id="technician-notification-list"></div>
           </div>
         </section>
+
+        <section class="view" data-view-panel="profile">
+          <div class="panel">
+            <div class="panel__header"><div><h2>Profile Management</h2><p>Update your personal details and profile picture.</p></div></div>
+            <form class="profile-form" id="technician-profile-form">
+              <div class="avatar-editor">
+                <span class="avatar-preview"><span id="technician-avatar-initials">TC</span><img id="technician-avatar-preview" alt="Profile picture preview" hidden /></span>
+                <div><strong>Technician profile picture</strong><small>JPG, PNG or WebP. The image is automatically optimized.</small><label class="avatar-upload">Choose picture<input name="avatar" type="file" accept="image/jpeg,image/png,image/webp" /></label></div>
+              </div>
+              <label><span>Full Name</span><input name="name" id="technician-profile-name" required /></label>
+              <label><span>Email</span><input name="email" id="technician-profile-email" type="email" required /></label>
+              <label><span>Phone</span><input name="phone" id="technician-profile-phone" required /></label>
+              <label><span>Specialization</span><input id="technician-profile-specialization" disabled /></label>
+              <button class="btn btn--yellow" type="submit">Save Profile</button>
+            </form>
+          </div>
+        </section>
       </main>
     </div>
   </div>
@@ -132,7 +151,7 @@
   </dialog>
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
-  <script src="js/api.js"></script>
-  <script src="js/technician-dashboard.js?v=notifications-1"></script>
+  <script src="js/api.js?v=profile-avatar-1"></script>
+  <script src="js/technician-dashboard.js?v=profile-avatar-1"></script>
 </body>
 </html>

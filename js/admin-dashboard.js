@@ -136,6 +136,7 @@ document.addEventListener('DOMContentLoaded', () => {
       .join('') || 'AD';
 
     document.getElementById('profile-initials').textContent = initials;
+    window.AutoCareApi.displayAvatar(session.avatar, document.getElementById('profile-image'), document.getElementById('profile-initials'));
     document.getElementById('profile-name').textContent = session.name;
     document.getElementById('profile-role').textContent = session.role === 'admin' ? 'Manager' : 'Customer';
   }
@@ -156,11 +157,25 @@ document.addEventListener('DOMContentLoaded', () => {
   async function hydrateFromApi() {
     try {
       state = { ...state, ...(await window.AutoCareApi.request('/api/admin/dashboard')) };
+      applyAdminProfile(state.profile || session);
       saveState();
       renderAll();
     } catch (error) {
       showToast(error.message || 'Could not load database data.');
     }
+  }
+
+  function applyAdminProfile(profile) {
+    const name = profile.name || session.name;
+    const avatarInitials = name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0].toUpperCase()).join('') || 'AD';
+    document.getElementById('profile-initials').textContent = avatarInitials;
+    document.getElementById('settings-avatar-initials').textContent = avatarInitials;
+    document.getElementById('profile-name').textContent = name;
+    document.getElementById('admin-profile-name').value = name;
+    document.getElementById('admin-profile-email').value = profile.email || session.email;
+    document.getElementById('admin-profile-phone').value = profile.phone || '';
+    window.AutoCareApi.displayAvatar(profile.avatar, document.getElementById('profile-image'), document.getElementById('profile-initials'));
+    window.AutoCareApi.displayAvatar(profile.avatar, document.getElementById('settings-avatar-preview'), document.getElementById('settings-avatar-initials'));
   }
 
   function customerName(id) {
@@ -1563,14 +1578,39 @@ document.addEventListener('DOMContentLoaded', () => {
       renderDocuments(event.target.value);
     });
 
-    document.getElementById('settings-form').addEventListener('submit', (event) => {
+    document.getElementById('settings-form').addEventListener('submit', async (event) => {
       event.preventDefault();
-      showToast('Settings saved for this browser session.');
+      const form = event.currentTarget;
+      try {
+        const avatarFile = form.elements.profilePicture.files[0];
+        const avatar = avatarFile ? await window.AutoCareApi.optimizeProfileImage(avatarFile) : (state.profile?.avatar || '');
+        const result = await window.AutoCareApi.request('/api/profile', {
+          method: 'PUT',
+          body: JSON.stringify({ name: form.elements.name.value, email: form.elements.email.value, phone: form.elements.phone.value, avatar })
+        });
+        state.profile = result.user;
+        localStorage.setItem(sessionKey, JSON.stringify({ ...getSession(), ...result.user, token: result.token }));
+        form.elements.profilePicture.value = '';
+        applyAdminProfile(state.profile);
+        showToast('Admin profile updated successfully.');
+      } catch (error) {
+        showToast(error.message || 'Profile update failed.');
+      }
+    });
+    document.querySelector('#settings-form [name="profilePicture"]').addEventListener('change', async (event) => {
+      try {
+        const avatar = event.target.files[0] ? await window.AutoCareApi.optimizeProfileImage(event.target.files[0]) : state.profile?.avatar;
+        window.AutoCareApi.displayAvatar(avatar, document.getElementById('settings-avatar-preview'), document.getElementById('settings-avatar-initials'));
+      } catch (error) {
+        event.target.value = '';
+        showToast(error.message);
+      }
     });
   }
 
   injectIcons();
   applySessionProfile();
+  applyAdminProfile(session);
   renderAll();
   bindEvents();
   hydrateFromApi();

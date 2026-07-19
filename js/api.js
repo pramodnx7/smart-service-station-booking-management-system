@@ -74,8 +74,48 @@
     return response.blob();
   }
 
+  function optimizeProfileImage(file) {
+    return new Promise((resolve, reject) => {
+      if (!file || !['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+        reject(new Error('Choose a JPG, PNG or WebP image.'));
+        return;
+      }
+      if (file.size > 8 * 1024 * 1024) {
+        reject(new Error('The selected image must be smaller than 8MB.'));
+        return;
+      }
+      const image = new Image();
+      const objectUrl = URL.createObjectURL(file);
+      image.onload = () => {
+        const maximum = 512;
+        const scale = Math.min(1, maximum / Math.max(image.naturalWidth, image.naturalHeight));
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+        canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+        canvas.getContext('2d').drawImage(image, 0, 0, canvas.width, canvas.height);
+        URL.revokeObjectURL(objectUrl);
+        resolve(canvas.toDataURL('image/jpeg', .82));
+      };
+      image.onerror = () => {
+        URL.revokeObjectURL(objectUrl);
+        reject(new Error('The selected image could not be opened.'));
+      };
+      image.src = objectUrl;
+    });
+  }
+
+  function displayAvatar(avatar, image, initials) {
+    if (!image || !initials) return;
+    image.hidden = !avatar;
+    initials.hidden = Boolean(avatar);
+    if (avatar) image.src = avatar;
+    else image.removeAttribute('src');
+  }
+
   window.AutoCareApi = {
     getSession,
+    displayAvatar,
+    optimizeProfileImage,
     request,
     requestBlob,
     login(credentials) {

@@ -10,8 +10,9 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="css/customer-dashboard.css?v=right-toast-1" />
   <link rel="stylesheet" href="css/responsive.css?v=mobile-1" />
+  <link rel="stylesheet" href="css/dashboard-refresh.css?v=refresh-1" />
 </head>
-<body>
+<body class="customer-dashboard">
   <div class="customer-shell">
     <aside class="customer-sidebar" id="customer-sidebar">
       <a class="brand" href="customer-dashboard.html" aria-label="AutoCare customer dashboard">
@@ -53,7 +54,7 @@
         <button class="btn btn--blue" type="button" data-action="new-booking">Book Appointment</button>
         <button class="icon-btn" type="button" data-view-shortcut="notifications" aria-label="Notifications"><span data-icon="bell"></span><b id="notification-count">0</b></button>
         <div class="profile-pill">
-          <span id="profile-initials">CU</span>
+          <span class="profile-avatar"><span id="profile-initials">CU</span><img id="profile-image" alt="Customer profile" hidden /></span>
           <div><strong id="profile-name">Customer</strong><small id="profile-email">customer@autocare.lk</small></div>
         </div>
       </header>
@@ -160,11 +161,14 @@
           <div class="panel">
             <div class="panel__header"><div><h2>Profile Management</h2><p>Edit personal details, change password and upload profile picture.</p></div></div>
             <form class="profile-form" id="profile-form">
+              <div class="avatar-editor">
+                <span class="avatar-preview"><span id="customer-avatar-initials">CU</span><img id="customer-avatar-preview" alt="Profile picture preview" hidden /></span>
+                <div><strong>Your profile picture</strong><small>JPG, PNG or WebP. The image is automatically optimized.</small><label class="avatar-upload">Choose picture<input name="avatar" type="file" accept="image/jpeg,image/png,image/webp" /></label></div>
+              </div>
               <label><span>Full Name</span><input name="name" id="profile-full-name" required /></label>
               <label><span>Email</span><input name="email" id="profile-email-input" type="email" required /></label>
               <label><span>Phone</span><input name="phone" id="profile-phone" required /></label>
               <label><span>Change Password</span><input name="password" type="password" placeholder="New password" /></label>
-              <label class="file-control"><span>Profile Picture</span><input name="avatar" type="file" accept="image/*" /></label>
               <button class="btn btn--yellow" type="submit">Save Profile</button>
             </form>
           </div>
@@ -225,7 +229,7 @@
   </dialog>
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
-  <script src="js/api.js?v=pdf-open-2"></script>
-  <script src="js/customer-dashboard.js?v=notifications-1"></script>
+  <script src="js/api.js?v=profile-avatar-1"></script>
+  <script src="js/customer-dashboard.js?v=profile-avatar-1"></script>
 </body>
 </html>

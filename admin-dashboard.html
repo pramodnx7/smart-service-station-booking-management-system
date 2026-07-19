@@ -10,8 +10,9 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="css/admin-dashboard.css?v=right-toast-1" />
   <link rel="stylesheet" href="css/responsive.css?v=mobile-1" />
+  <link rel="stylesheet" href="css/dashboard-refresh.css?v=refresh-1" />
 </head>
-<body>
+<body class="admin-dashboard">
   <div class="dashboard-shell">
     <aside class="sidebar" id="sidebar">
       <a class="brand" href="admin-dashboard.html" aria-label="AutoCare admin home">
@@ -64,7 +65,7 @@
           <b id="notification-count">0</b>
         </button>
         <div class="admin-profile">
-          <span id="profile-initials">AD</span>
+          <span class="profile-avatar"><span id="profile-initials">AD</span><img id="profile-image" alt="Admin profile" hidden /></span>
           <div><strong id="profile-name">Admin</strong><small id="profile-role">Manager</small></div>
         </div>
       </header>
@@ -273,13 +274,19 @@
 
         <section class="view" data-view-panel="settings">
           <div class="panel">
-            <div class="panel__header"><div><h2>System Settings</h2><p>Admin profile, password, Supabase connection notes and support contacts.</p></div></div>
+            <div class="panel__header"><div><h2>System Settings</h2><p>Manage your admin profile picture and station preferences.</p></div></div>
             <form class="settings-form" id="settings-form">
+              <div class="avatar-editor">
+                <span class="avatar-preview"><span id="settings-avatar-initials">AD</span><img id="settings-avatar-preview" alt="Profile picture preview" hidden /></span>
+                <div><strong>Admin profile picture</strong><small>JPG, PNG or WebP. The image is automatically optimized.</small><label class="avatar-upload">Choose picture<input name="profilePicture" type="file" accept="image/jpeg,image/png,image/webp" /></label></div>
+              </div>
+              <label><span>Full Name</span><input name="name" id="admin-profile-name" required /></label>
+              <label><span>Email</span><input name="email" id="admin-profile-email" type="email" required /></label>
+              <label><span>Phone</span><input name="phone" id="admin-profile-phone" required /></label>
               <label><span>Station Name</span><input name="stationName" value="AutoCare Service Station" required /></label>
               <label><span>Support Phone</span><input name="supportPhone" value="+94 77 023 4567" required /></label>
               <label><span>Support Email</span><input name="supportEmail" type="email" value="support@autocare.lk" required /></label>
               <label><span>Admin Password</span><input name="password" type="password" placeholder="Change password" /></label>
-              <label class="file-control"><span>Admin Profile Picture</span><input name="profilePicture" type="file" accept="image/*" /></label>
               <div class="database-note">
                 <strong>Database connection</strong>
                 <p>Use the provided Supabase PostgreSQL URLs only in a backend server or migration tool. Browser JavaScript should use secure API endpoints or Supabase anon keys with Row Level Security.</p>
@@ -307,7 +314,7 @@
   </dialog>
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
-  <script src="js/api.js?v=pdf-open-2"></script>
-  <script src="js/admin-dashboard.js?v=message-center-1"></script>
+  <script src="js/api.js?v=profile-avatar-1"></script>
+  <script src="js/admin-dashboard.js?v=profile-avatar-1"></script>
 </body>
 </html>

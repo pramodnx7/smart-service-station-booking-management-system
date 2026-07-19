@@ -148,6 +148,22 @@ function requireFields(body, fields) {
   }
 }
 
+function validateProfileAvatar(avatar) {
+  const value = String(avatar || '');
+  if (!value) return '';
+  if (!/^data:image\/(?:jpeg|png|webp);base64,[a-z0-9+/=]+$/i.test(value)) {
+    const error = new Error('Profile picture must be a JPG, PNG or WebP image.');
+    error.status = 400;
+    throw error;
+  }
+  if (Buffer.byteLength(value, 'utf8') > 700 * 1024) {
+    const error = new Error('Profile picture is too large. Please choose a smaller image.');
+    error.status = 400;
+    throw error;
+  }
+  return value;
+}
+
 function storeUploadedFile(file) {
   const fileName = String(file.fileName || '').trim();
   const extension = fileName.split('.').pop().toLowerCase();
@@ -274,6 +290,20 @@ app.post('/api/auth/logout', (req, res) => {
 
 app.get('/api/auth/session', requireAuth(), (req, res) => {
   res.json({ user: req.user, token: getTokenFromRequest(req) });
+});
+
+app.put('/api/profile', requireAuth(), async (req, res, next) => {
+  try {
+    requireFields(req.body, ['name', 'email', 'phone']);
+    const payload = { ...req.body };
+    if (Object.prototype.hasOwnProperty.call(payload, 'avatar')) payload.avatar = validateProfileAvatar(payload.avatar);
+    const user = await store.updateProfile(req.user.id, payload);
+    const token = signUser(user);
+    sendAuthCookie(res, token);
+    res.json({ user, token });
+  } catch (error) {
+    next(error);
+  }
 });
 
 app.get('/admin-dashboard.html', requireDashboardAccess('admin'), (req, res) => {
@@ -590,7 +620,9 @@ app.post('/api/customer/feedback', requireAuth('customer'), async (req, res, nex
 app.put('/api/customer/profile', requireAuth('customer'), async (req, res, next) => {
   try {
     requireFields(req.body, ['name', 'email', 'phone']);
-    const user = await store.updateProfile(req.user.id, req.body);
+    const payload = { ...req.body };
+    if (Object.prototype.hasOwnProperty.call(payload, 'avatar')) payload.avatar = validateProfileAvatar(payload.avatar);
+    const user = await store.updateProfile(req.user.id, payload);
     res.json({ user });
   } catch (error) {
     next(error);

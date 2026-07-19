@@ -13,13 +13,14 @@ document.addEventListener('DOMContentLoaded', () => {
     tools: '<svg viewBox="0 0 24 24"><path d="m14.7 6.3 3-3a4 4 0 0 1-5 5l-7 7a2 2 0 1 0 3 3l7-7a4 4 0 0 1 5-5l-3 3"/></svg>',
     invoice: '<svg viewBox="0 0 24 24"><path d="M6 2h9l3 3v17l-3-2-3 2-3-2-3 2V2Z"/><path d="M9 9h6M9 13h6M9 17h4"/></svg>',
     bell: '<svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"/><path d="M10 21h4"/></svg>',
+    user: '<svg viewBox="0 0 24 24"><path d="M20 21a8 8 0 0 0-16 0"/><circle cx="12" cy="7" r="4"/></svg>',
     logout: '<svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5M21 12H9"/></svg>',
     menu: '<svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></svg>',
     x: '<svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg>'
   };
 
   let state = {
-    profile: { name: session.name, email: session.email, specialization: '' },
+    profile: { name: session.name, email: session.email, phone: session.phone || '', specialization: '', avatar: session.avatar || '' },
     jobs: [],
     todayJobs: [],
     pendingJobs: 0,
@@ -118,11 +119,19 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function renderProfile() {
-    document.getElementById('profile-initials').textContent = initials(state.profile.name);
+    const profileInitials = initials(state.profile.name);
+    document.getElementById('profile-initials').textContent = profileInitials;
+    document.getElementById('technician-avatar-initials').textContent = profileInitials;
+    window.AutoCareApi.displayAvatar(state.profile.avatar, document.getElementById('profile-image'), document.getElementById('profile-initials'));
+    window.AutoCareApi.displayAvatar(state.profile.avatar, document.getElementById('technician-avatar-preview'), document.getElementById('technician-avatar-initials'));
     document.getElementById('profile-name').textContent = state.profile.name;
     document.getElementById('profile-email').textContent = state.profile.email;
     document.getElementById('sidebar-name').textContent = state.profile.name;
     document.getElementById('sidebar-specialization').textContent = state.profile.specialization || 'Workshop team';
+    document.getElementById('technician-profile-name').value = state.profile.name;
+    document.getElementById('technician-profile-email').value = state.profile.email;
+    document.getElementById('technician-profile-phone').value = state.profile.phone || '';
+    document.getElementById('technician-profile-specialization').value = state.profile.specialization || '';
     document.getElementById('notification-count').textContent = state.notifications.filter((item) => item.unread).length;
   }
 
@@ -515,6 +524,34 @@ document.addEventListener('DOMContentLoaded', () => {
     els.modalForm.addEventListener('change', (event) => {
       if (event.target.type === 'file') {
         renderFilePreview(event.target.files);
+      }
+    });
+    const profileForm = document.getElementById('technician-profile-form');
+    profileForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      try {
+        const avatarFile = profileForm.elements.avatar.files[0];
+        const avatar = avatarFile ? await window.AutoCareApi.optimizeProfileImage(avatarFile) : state.profile.avatar;
+        const result = await window.AutoCareApi.request('/api/profile', {
+          method: 'PUT',
+          body: JSON.stringify({ name: profileForm.elements.name.value, email: profileForm.elements.email.value, phone: profileForm.elements.phone.value, avatar })
+        });
+        state.profile = { ...state.profile, ...result.user };
+        localStorage.setItem(sessionKey, JSON.stringify({ ...getSession(), ...result.user, token: result.token }));
+        profileForm.elements.avatar.value = '';
+        renderProfile();
+        showToast('Technician profile updated successfully.');
+      } catch (error) {
+        showToast(error.message || 'Profile update failed.');
+      }
+    });
+    profileForm.elements.avatar.addEventListener('change', async (event) => {
+      try {
+        const avatar = event.target.files[0] ? await window.AutoCareApi.optimizeProfileImage(event.target.files[0]) : state.profile.avatar;
+        window.AutoCareApi.displayAvatar(avatar, document.getElementById('technician-avatar-preview'), document.getElementById('technician-avatar-initials'));
+      } catch (error) {
+        event.target.value = '';
+        showToast(error.message);
       }
     });
   }

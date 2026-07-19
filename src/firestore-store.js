@@ -557,7 +557,8 @@ function publicUser(user) {
     role: user.role,
     name: user.name,
     email: user.email,
-    phone: user.phone || ''
+    phone: user.phone || '',
+    avatar: user.avatar || ''
   };
 }
 
@@ -567,7 +568,8 @@ function customerView(user) {
     name: user.name,
     email: user.email,
     phone: user.phone || '',
-    status: titleCase(user.status || 'active')
+    status: titleCase(user.status || 'active'),
+    avatar: user.avatar || ''
   };
 }
 
@@ -582,7 +584,8 @@ function technicianView(technician, user) {
     specialization: technician.specialization,
     phone: technician.phone || profile?.phone || '',
     experienceYears: Number(technician.experienceYears || 0),
-    status: titleCase(technician.status || 'active')
+    status: titleCase(technician.status || 'active'),
+    avatar: profile?.avatar || ''
   };
 }
 
@@ -1006,7 +1009,7 @@ async function getCustomerDashboard(userId) {
   };
 
   return {
-    profile: { name: user.name, email: user.email, phone: user.phone || '' },
+    profile: { name: user.name, email: user.email, phone: user.phone || '', avatar: user.avatar || '' },
     vehicles: sortById(vehicles.filter((item) => Number(item.userId) === customerId)).map(vehicleView),
     bookings: sortDateDesc(bookings.filter((item) => Number(item.userId) === customerId).map((item) => bookingView(item, serviceMap)), 'date', 'time'),
     invoices: sortDateDesc(invoices.filter((item) => Number(item.userId) === customerId).map((item) => invoiceView(item, serviceMap)), 'date'),
@@ -1181,6 +1184,7 @@ async function getAdminDashboard(userId) {
   const inventoryReports = buildInventoryReports(inventoryParts, movements, usages, context);
 
   return {
+    profile: publicUser(context.usersById.get(Number(userId))),
     customers: sortById(users.filter((user) => user.role === 'customer')).map(customerView),
     technicians: sortById(technicians).map((technician) => technicianView(technician, context.usersById.get(Number(technician.userId)))),
     vehicles: sortById(vehicles).map(vehicleView),
@@ -1767,12 +1771,14 @@ async function updateProfile(userId, data) {
     throw error;
   }
 
-  const user = await updateDocument(collections.users, userId, {
+  const changes = {
     name: data.name.trim(),
     email: emailKey(data.email),
     emailLower: emailKey(data.email),
     phone: data.phone.trim()
-  });
+  };
+  if (Object.prototype.hasOwnProperty.call(data, 'avatar')) changes.avatar = String(data.avatar || '');
+  const user = await updateDocument(collections.users, userId, changes);
   return publicUser(user);
 }
 

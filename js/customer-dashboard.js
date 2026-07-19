@@ -31,7 +31,7 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   const defaults = {
-    profile: { name: session.name, email: session.email, phone: session.phone || '' },
+    profile: { name: session.name, email: session.email, phone: session.phone || '', avatar: session.avatar || '' },
     vehicles: [],
     bookings: [],
     invoices: [],
@@ -190,7 +190,11 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function renderProfile() {
-    document.getElementById('profile-initials').textContent = initials(state.profile.name);
+    const profileInitials = initials(state.profile.name);
+    document.getElementById('profile-initials').textContent = profileInitials;
+    document.getElementById('customer-avatar-initials').textContent = profileInitials;
+    window.AutoCareApi.displayAvatar(state.profile.avatar, document.getElementById('profile-image'), document.getElementById('profile-initials'));
+    window.AutoCareApi.displayAvatar(state.profile.avatar, document.getElementById('customer-avatar-preview'), document.getElementById('customer-avatar-initials'));
     document.getElementById('profile-name').textContent = state.profile.name;
     document.getElementById('profile-email').textContent = state.profile.email;
     document.getElementById('customer-sidebar-name').textContent = state.profile.name;
@@ -978,20 +982,33 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.getElementById('profile-form').addEventListener('submit', async (event) => {
       event.preventDefault();
-      const data = Object.fromEntries(new FormData(event.currentTarget).entries());
+      const form = event.currentTarget;
+      const data = Object.fromEntries(new FormData(form).entries());
       try {
-        const result = await window.AutoCareApi.request('/api/customer/profile', {
+        const avatarFile = form.elements.avatar.files[0];
+        const avatar = avatarFile ? await window.AutoCareApi.optimizeProfileImage(avatarFile) : state.profile.avatar;
+        const result = await window.AutoCareApi.request('/api/profile', {
           method: 'PUT',
-          body: JSON.stringify({ name: data.name, email: data.email, phone: data.phone })
+          body: JSON.stringify({ name: data.name, email: data.email, phone: data.phone, avatar })
         });
-        state.profile.name = result.user.name;
-        state.profile.email = result.user.email;
-        state.profile.phone = result.user.phone;
+        state.profile = { ...state.profile, ...result.user };
+        localStorage.setItem(sessionKey, JSON.stringify({ ...getSession(), ...result.user, token: result.token }));
+        form.elements.avatar.value = '';
         saveState();
         renderProfile();
         showToast('Profile updated successfully.');
       } catch (error) {
         showToast(error.message || 'Profile update failed.');
+      }
+    });
+
+    document.querySelector('#profile-form [name="avatar"]').addEventListener('change', async (event) => {
+      try {
+        const avatar = event.target.files[0] ? await window.AutoCareApi.optimizeProfileImage(event.target.files[0]) : state.profile.avatar;
+        window.AutoCareApi.displayAvatar(avatar, document.getElementById('customer-avatar-preview'), document.getElementById('customer-avatar-initials'));
+      } catch (error) {
+        event.target.value = '';
+        showToast(error.message);
       }
     });
 

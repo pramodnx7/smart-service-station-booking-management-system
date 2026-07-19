@@ -54,7 +54,8 @@ document.addEventListener('DOMContentLoaded', () => {
     title.textContent = `${activeRole[0].toUpperCase()}${activeRole.slice(1)} Login`;
     copy.textContent = copyByRole[activeRole];
     email.placeholder = demoAccounts[activeRole].email;
-    submit.textContent = `Login as ${activeRole[0].toUpperCase()}${activeRole.slice(1)}`;
+    const submitLabel = submit.querySelector('span');
+    if (submitLabel) submitLabel.textContent = `Login as ${activeRole[0].toUpperCase()}${activeRole.slice(1)}`;
     setStatus('');
   }
 
