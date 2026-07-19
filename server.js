@@ -98,6 +98,51 @@ function signUser(user) {
   return jwt.sign({ id: user.id, role: user.role, email: user.email, name: user.name }, jwtSecret, { expiresIn: '8h' });
 }
 
+const demoAccounts = Object.freeze({
+  admin: { id: 1, role: 'admin', name: 'Admin Manager', email: 'admin@autocare.lk', phone: '+94 77 023 4567', password: 'admin123' },
+  customer: { id: 2, role: 'customer', name: 'Demo Customer', email: 'customer@autocare.lk', phone: '+94 77 345 6789', password: 'customer123' },
+  technician: { id: 3, role: 'technician', name: 'Kasun Technician', email: 'tech@autocare.lk', phone: '+94 77 222 3344', password: 'tech123' }
+});
+
+function isTemporaryFirestoreError(error) {
+  const message = String(error?.message || '').toLowerCase();
+  return Number(error?.code) === 8
+    || Number(error?.code) === 14
+    || message.includes('resource_exhausted')
+    || message.includes('quota exceeded')
+    || message.includes('firestore is currently unavailable');
+}
+
+function safeTextEqual(left, right) {
+  const leftBuffer = Buffer.from(String(left));
+  const rightBuffer = Buffer.from(String(right));
+  return leftBuffer.length === rightBuffer.length && crypto.timingSafeEqual(leftBuffer, rightBuffer);
+}
+
+function getDemoAccount(role, email, password) {
+  if (process.env.NODE_ENV === 'production' || process.env.ALLOW_DEMO_LOGIN_FALLBACK === 'false') return null;
+  const account = demoAccounts[String(role || '').toLowerCase()];
+  if (!account || emailKey(account.email) !== emailKey(email) || !safeTextEqual(account.password, password)) return null;
+  const { password: ignoredPassword, ...user } = account;
+  return user;
+}
+
+async function withDatabaseTimeout(operation, timeoutMs = 5000) {
+  let timer;
+  const timeout = new Promise((resolve, reject) => {
+    timer = setTimeout(() => {
+      const error = new Error('Firestore is currently unavailable.');
+      error.code = 14;
+      reject(error);
+    }, timeoutMs);
+  });
+  try {
+    return await Promise.race([operation, timeout]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 function requireAuth(role) {
   return (req, res, next) => {
     const token = getTokenFromRequest(req);
@@ -291,7 +336,19 @@ app.post('/api/auth/login', async (req, res, next) => {
     const { role, email, password } = req.body;
     requireFields(req.body, ['role', 'email', 'password']);
 
-    const userRecord = await store.findUserByEmailRole(email, role);
+    let userRecord;
+    try {
+      userRecord = await withDatabaseTimeout(store.findUserByEmailRole(email, role));
+    } catch (error) {
+      if (!isTemporaryFirestoreError(error)) throw error;
+      const demoUser = getDemoAccount(role, email, password);
+      if (!demoUser) {
+        return res.status(503).json({ message: 'The database is temporarily busy. Please try again shortly.' });
+      }
+      const token = signUser(demoUser);
+      sendAuthCookie(res, token);
+      return res.json({ user: demoUser, token, databaseDegraded: true });
+    }
     const isValid = userRecord ? await bcrypt.compare(password, userRecord.passwordHash) : false;
 
     if (!isValid) {
@@ -347,6 +404,14 @@ app.use(express.static(path.join(__dirname)));
 app.get('/api/customer/dashboard', requireAuth('customer'), async (req, res, next) => {
   try {
     res.json(await store.getCustomerDashboard(req.user.id));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get('/api/customer/notifications', requireAuth('customer'), async (req, res, next) => {
+  try {
+    res.json(await store.getUserNotifications(req.user.id));
   } catch (error) {
     next(error);
   }
@@ -1200,8 +1265,9 @@ app.use((error, req, res, next) => {
   } else {
     console.error(error);
   }
-  res.status(error.status || 500).json({
-    message: message || 'Server error.'
+  const temporaryDatabaseError = isTemporaryFirestoreError(error);
+  res.status(temporaryDatabaseError ? 503 : (error.status || 500)).json({
+    message: temporaryDatabaseError ? 'The database is temporarily busy. Please try again shortly.' : (message || 'Server error.')
   });
 });
 

@@ -425,6 +425,12 @@ async function all(collection) {
   return snapshot.docs.map((doc) => ({ id: Number(doc.id), ...doc.data() }));
 }
 
+async function allWhere(collection, field, value) {
+  assertFirebaseConfigured();
+  const snapshot = await db.collection(collection).where(field, '==', value).get();
+  return snapshot.docs.map((doc) => ({ id: Number(doc.id), ...doc.data() }));
+}
+
 async function getById(collection, id) {
   assertFirebaseConfigured();
   const snapshot = await docRef(collection, id).get();
@@ -850,15 +856,15 @@ async function markAllCustomerNotificationsRead(userId) {
 }
 
 async function markAllUserNotificationsRead(userId) {
-  const notifications = await all(collections.notifications);
-  const owned = notifications.filter((item) => Number(item.userId) === Number(userId) && item.unread);
+  const notifications = await allWhere(collections.notifications, 'userId', Number(userId));
+  const owned = notifications.filter((item) => item.unread);
   await Promise.all(owned.map((item) => updateDocument(collections.notifications, item.id, { unread: false })));
   return { updated: owned.length };
 }
 
 async function getUserNotifications(userId) {
-  const notifications = await all(collections.notifications);
-  return sortById(notifications.filter((item) => Number(item.userId) === Number(userId)))
+  const notifications = await allWhere(collections.notifications, 'userId', Number(userId));
+  return sortById(notifications)
     .reverse()
     .map(({ id, type, message, unread }) => ({ id, type, message, unread }));
 }
@@ -889,20 +895,23 @@ function notificationDraftView(draft, usersById) {
 }
 
 async function getAdminMessageCenter(userId) {
-  const [notifications, drafts, users] = await Promise.all([
-    all(collections.notifications),
-    all(collections.notificationDrafts),
-    all(collections.users)
+  const numericUserId = Number(userId);
+  const [received, sent, drafts] = await Promise.all([
+    allWhere(collections.notifications, 'userId', numericUserId),
+    allWhere(collections.notifications, 'senderUserId', numericUserId),
+    allWhere(collections.notificationDrafts, 'createdByUserId', numericUserId)
   ]);
+  const recipientIds = [...new Set([...sent, ...drafts].map((item) => Number(item.userId)).filter(Boolean))];
+  const users = (await Promise.all(recipientIds.map((id) => getById(collections.users, id)))).filter(Boolean);
   const usersById = new Map(users.map((user) => [Number(user.id), user]));
   return {
-    received: sortById(notifications.filter((item) => Number(item.userId) === Number(userId)))
+    received: sortById(received)
       .reverse()
       .map(({ id, type, message, unread }) => ({ id, type, message, unread })),
-    sent: sortById(notifications.filter((item) => Number(item.senderUserId) === Number(userId)))
+    sent: sortById(sent)
       .reverse()
       .map((item) => sentNotificationView(item, usersById)),
-    drafts: sortById(drafts.filter((item) => Number(item.createdByUserId) === Number(userId)))
+    drafts: sortById(drafts)
       .reverse()
       .map((item) => notificationDraftView(item, usersById))
   };

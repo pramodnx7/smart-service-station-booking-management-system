@@ -1717,5 +1717,5 @@ document.addEventListener('DOMContentLoaded', () => {
   hydrateFromApi();
   window.setInterval(() => {
     refreshNotifications().catch(() => {});
-  }, 15000);
+  }, 30000);
 });

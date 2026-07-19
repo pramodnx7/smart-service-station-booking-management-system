@@ -122,6 +122,15 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  async function refreshNotifications() {
+    if (document.hidden) return;
+    const notifications = await window.AutoCareApi.request('/api/customer/notifications');
+    state.notifications = Array.isArray(notifications) ? notifications : [];
+    saveState();
+    renderMetrics();
+    renderNotifications();
+  }
+
   function injectIcons() {
     document.querySelectorAll('[data-icon]').forEach((node) => {
       node.innerHTML = icons[node.dataset.icon] || '';
@@ -931,8 +940,8 @@ document.addEventListener('DOMContentLoaded', () => {
   function startNotificationRefresh() {
     window.clearInterval(notificationRefreshTimer);
     notificationRefreshTimer = window.setInterval(() => {
-      hydrateFromApi({ silent: true });
-    }, 15000);
+      refreshNotifications().catch(() => {});
+    }, 30000);
   }
 
   function bindEvents() {
