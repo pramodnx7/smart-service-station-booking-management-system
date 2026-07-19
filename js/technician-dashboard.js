@@ -76,6 +76,12 @@ document.addEventListener('DOMContentLoaded', () => {
     return 'success';
   }
 
+  function escapeHtml(value) {
+    return String(value ?? '').replace(/[&<>'"]/g, (character) => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
+    }[character]));
+  }
+
   function showToast(message, type = toastType(message)) {
     window.clearTimeout(els.toast.hideTimer);
     const icon = document.createElement('span');
@@ -102,6 +108,13 @@ document.addEventListener('DOMContentLoaded', () => {
     } catch (error) {
       showToast(error.message || 'Could not load assigned jobs.');
     }
+  }
+
+  async function refreshNotifications() {
+    if (document.hidden) return;
+    state.notifications = await window.AutoCareApi.request('/api/technician/notifications');
+    renderProfile();
+    renderNotifications();
   }
 
   function renderProfile() {
@@ -258,12 +271,25 @@ document.addEventListener('DOMContentLoaded', () => {
     `;
   }
 
+  function renderNotifications() {
+    const list = document.getElementById('technician-notification-list');
+    list.innerHTML = state.notifications.length ? state.notifications.map((item) => `
+      <article class="notification-item notification-item--${item.unread ? 'unread' : 'read'}">
+        <span data-icon="bell"></span>
+        <div><strong>${escapeHtml(item.type)}</strong><p>${escapeHtml(item.message)}</p></div>
+        ${item.unread ? `<button class="mini-btn" type="button" data-action="mark-technician-notification-read" data-id="${item.id}">Mark Read</button>` : ''}
+      </article>
+    `).join('') : '<article class="notification-empty"><strong>No notifications yet.</strong><p>Admin messages and job assignments will appear here automatically.</p></article>';
+    injectIcons();
+  }
+
   function renderAll() {
     renderProfile();
     renderMetrics();
     renderJobs();
     renderInventory();
     renderPerformance();
+    renderNotifications();
   }
 
   function field(name, label, type = 'text', value = '', options = []) {
@@ -439,6 +465,23 @@ document.addEventListener('DOMContentLoaded', () => {
     if (action === 'upload-photos') openModal('uploadPhotos', job);
     if (action === 'upload-documents') openModal('uploadDocuments', job);
     if (action === 'complete-job') openModal('complete', job);
+    if (action === 'show-technician-notifications') {
+      document.querySelector('.side-nav__item[data-view="notifications"]')?.click();
+    }
+    if (action === 'mark-technician-notification-read') {
+      await window.AutoCareApi.request(`/api/technician/notifications/${Number(id)}/read`, { method: 'PUT' });
+      const notification = state.notifications.find((item) => item.id === Number(id));
+      if (notification) notification.unread = false;
+      renderProfile();
+      renderNotifications();
+    }
+    if (action === 'mark-all-technician-notifications-read') {
+      await window.AutoCareApi.request('/api/technician/notifications/read-all', { method: 'PUT' });
+      state.notifications.forEach((item) => { item.unread = false; });
+      renderProfile();
+      renderNotifications();
+      showToast('All notifications marked as read.');
+    }
     if (action === 'close-modal') {
       els.modal.close();
       els.modalForm.querySelector('button[type="submit"]').textContent = 'Save';
@@ -504,4 +547,7 @@ document.addEventListener('DOMContentLoaded', () => {
   injectIcons();
   bindEvents();
   hydrateFromApi();
+  window.setInterval(() => {
+    refreshNotifications().catch(() => {});
+  }, 15000);
 });

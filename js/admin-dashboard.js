@@ -76,6 +76,8 @@ document.addEventListener('DOMContentLoaded', () => {
       { id: 2, type: 'Payment', message: 'Invoice #1002 payment received.', unread: false },
       { id: 3, type: 'Service', message: 'Honda Civic diagnostics moved to final testing.', unread: true }
     ],
+    sentNotifications: [],
+    notificationDrafts: [],
     feedback: [
       { id: 1, customerId: 1, rating: 5, comment: 'Friendly team and clear service updates.' },
       { id: 2, customerId: 2, rating: 4, comment: 'Quick oil change and fair pricing.' },
@@ -100,6 +102,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   let state = loadState();
   let activeBookingStatus = 'All';
+  let activeMessageTab = 'received';
   let pendingBookingDraft = null;
   const technicianSpecializations = ['General Service', 'Oil Change', 'Brake Service', 'Electrical Repair', 'Engine Repair', 'Suspension Repair', 'Hybrid/EV Service'];
 
@@ -175,6 +178,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function formatMoney(amount) {
     return `LKR ${Number(amount).toLocaleString('en-LK')}`;
+  }
+
+  function escapeHtml(value) {
+    return String(value ?? '').replace(/[&<>'"]/g, (character) => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
+    }[character]));
   }
 
   function buildInvoicePreviewModel(invoice) {
@@ -397,6 +406,16 @@ document.addEventListener('DOMContentLoaded', () => {
     if (text.includes('failed') || text.includes('error') || text.includes('not found') || text.includes('cannot') || text.includes('denied')) return 'error';
     if (text.includes('warning') || text.includes('inactive') || text.includes('pending')) return 'warning';
     return 'success';
+  }
+
+  async function refreshNotifications() {
+    if (document.hidden) return;
+    const messageCenter = await window.AutoCareApi.request('/api/admin/message-center');
+    state.notifications = messageCenter.received || [];
+    state.sentNotifications = messageCenter.sent || [];
+    state.notificationDrafts = messageCenter.drafts || [];
+    saveState();
+    renderNotifications();
   }
 
   function showToast(message, type = toastType(message)) {
@@ -839,13 +858,42 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function renderNotifications() {
-    document.getElementById('notification-count').textContent = state.notifications.filter((item) => item.unread).length;
-    document.getElementById('notification-list').innerHTML = state.notifications.map((item) => `
-      <article class="notification-item">
-        <span data-icon="bell"></span>
-        <div><strong>${item.type}</strong><p>${item.message}</p></div>
-      </article>
-    `).join('');
+    const received = state.notifications || [];
+    const sent = state.sentNotifications || [];
+    const drafts = state.notificationDrafts || [];
+    const unread = received.filter((item) => item.unread).length;
+    document.getElementById('notification-count').textContent = unread;
+    document.getElementById('received-message-count').textContent = received.length;
+    document.getElementById('sent-message-count').textContent = sent.length;
+    document.getElementById('draft-message-count').textContent = drafts.length;
+    document.getElementById('mark-all-admin-read').hidden = activeMessageTab !== 'received' || unread === 0;
+    document.querySelectorAll('#admin-message-tabs button').forEach((button) => {
+      button.classList.toggle('is-active', button.dataset.messageTab === activeMessageTab);
+    });
+
+    let messages = received;
+    if (activeMessageTab === 'sent') messages = sent;
+    if (activeMessageTab === 'drafts') messages = drafts;
+    document.getElementById('notification-list').innerHTML = messages.length ? messages.map((item) => {
+      if (activeMessageTab === 'sent') return `
+        <article class="notification-item notification-item--read">
+          <span data-icon="bell"></span>
+          <div><strong>${escapeHtml(item.type)}</strong><p>${escapeHtml(item.message)}</p><small>Sent to ${escapeHtml(item.recipientName)} (${escapeHtml(item.recipientRole)})</small></div>
+          <span class="badge badge--completed">Delivered</span>
+        </article>`;
+      if (activeMessageTab === 'drafts') return `
+        <article class="notification-item notification-item--read">
+          <span data-icon="invoice"></span>
+          <div><strong>${escapeHtml(item.type)}</strong><p>${escapeHtml(item.message)}</p><small>Draft for ${escapeHtml(item.recipientName)} (${escapeHtml(item.recipientRole)})</small></div>
+          <div class="row-actions"><button class="mini-btn" type="button" data-action="edit-notification-draft" data-id="${item.id}">Edit</button><button class="mini-btn" type="button" data-action="send-notification-draft" data-id="${item.id}">Send</button><button class="mini-btn" type="button" data-action="delete-notification-draft" data-id="${item.id}">Delete</button></div>
+        </article>`;
+      return `
+        <article class="notification-item notification-item--${item.unread ? 'unread' : 'read'}">
+          <span data-icon="bell"></span>
+          <div><strong>${escapeHtml(item.type)}</strong><p>${escapeHtml(item.message)}</p></div>
+          ${item.unread ? `<button class="mini-btn" type="button" data-action="mark-admin-notification-read" data-id="${item.id}">Mark Read</button>` : ''}
+        </article>`;
+    }).join('') : `<article class="notification-empty"><strong>No ${activeMessageTab} messages.</strong><p>${activeMessageTab === 'received' ? 'Bookings, emergencies, completed jobs, and stock alerts appear here.' : 'Messages will appear here when they are created.'}</p></article>`;
     injectIcons();
   }
 
@@ -879,12 +927,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function field(name, label, type = 'text', value = '', options = []) {
     if (type === 'select') {
-      return `<label><span>${label}</span><select name="${name}" required>${options.map((option) => `<option value="${option.value}" ${String(option.value) === String(value) ? 'selected' : ''}>${option.label}</option>`).join('')}</select></label>`;
+      return `<label><span>${escapeHtml(label)}</span><select name="${escapeHtml(name)}" required>${options.map((option) => `<option value="${escapeHtml(option.value)}" ${String(option.value) === String(value) ? 'selected' : ''}>${escapeHtml(option.label)}</option>`).join('')}</select></label>`;
     }
     if (type === 'textarea') {
-      return `<label class="full"><span>${label}</span><textarea name="${name}" required>${value}</textarea></label>`;
+      return `<label class="full"><span>${escapeHtml(label)}</span><textarea name="${escapeHtml(name)}" required>${escapeHtml(value)}</textarea></label>`;
     }
-    return `<label><span>${label}</span><input name="${name}" type="${type}" value="${value}" required /></label>`;
+    return `<label><span>${escapeHtml(label)}</span><input name="${escapeHtml(name)}" type="${escapeHtml(type)}" value="${escapeHtml(value)}" required /></label>`;
   }
 
   function vehicleImageUpload(record = {}) {
@@ -955,6 +1003,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const technicianOptions = state.technicians
       .filter((technician) => technician.status === 'Active' || Number(technician.id) === Number(record.assignedTechnicianId))
       .map((technician) => ({ value: technician.id, label: `${technician.name} - ${technician.specialization}` }));
+    const notificationRecipientOptions = [
+      ...state.customers.map((customer) => ({ value: customer.id, label: `Customer: ${customer.name}` })),
+      ...state.technicians.map((technician) => ({ value: technician.userId, label: `Technician: ${technician.name}` }))
+    ];
     const bookingOptions = state.bookings.map((booking) => ({ value: booking.id, label: `#BK-${booking.id} - ${customerName(booking.customerId)} - ${booking.service}` }));
     const completedJobOptions = state.serviceJobs
       .filter((job) => job.status === 'Completed')
@@ -1004,8 +1056,8 @@ document.addEventListener('DOMContentLoaded', () => {
         body: field('customerId', 'Customer', 'select', record.customerId || customerOptions[0]?.value, customerOptions) + field('location', 'Shared Location', 'text', record.location || '') + field('status', 'Status', 'select', record.status || 'Open', [{ value: 'Open', label: 'Open' }, { value: 'Assigned', label: 'Assigned' }, { value: 'Closed', label: 'Closed' }]) + field('problem', 'Vehicle Problem Details', 'textarea', record.problem || '')
       },
       notification: {
-        title: 'Send Customer Notification',
-        body: field('type', 'Notification Type', 'select', record.type || 'Booking', ['Booking', 'Service', 'Payment'].map((type) => ({ value: type, label: type }))) + field('message', 'Message', 'textarea', record.message || '')
+        title: record.id ? 'Edit Notification Draft' : 'New Notification',
+        body: field('userId', 'Recipient', 'select', record.userId || notificationRecipientOptions[0]?.value, notificationRecipientOptions) + field('type', 'Notification Type', 'select', record.type || 'General', ['General', 'Booking', 'Service', 'Payment', 'Inventory', 'Emergency'].map((type) => ({ value: type, label: type }))) + field('deliveryAction', 'Action', 'select', record.deliveryAction || 'send', [{ value: 'send', label: 'Send now' }, { value: 'draft', label: 'Save as draft' }]) + field('message', 'Message', 'textarea', record.message || '')
       }
     };
 
@@ -1155,11 +1207,23 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     if (mode === 'notification') {
-      await window.AutoCareApi.request('/api/admin/notifications', {
-        method: 'POST',
-        body: JSON.stringify(data)
-      });
-      state.notifications.unshift({ id: nextId(state.notifications), ...data, unread: true });
+      const payload = { ...data, userId: Number(data.userId), draftId: id || undefined };
+      if (data.deliveryAction === 'draft') {
+        await window.AutoCareApi.request('/api/admin/notification-drafts', {
+          method: 'POST',
+          body: JSON.stringify(payload)
+        });
+        activeMessageTab = 'drafts';
+        successMessage = 'Notification saved as a draft.';
+      } else {
+        await window.AutoCareApi.request('/api/admin/notifications', {
+          method: 'POST',
+          body: JSON.stringify(payload)
+        });
+        activeMessageTab = 'sent';
+        successMessage = 'Notification delivered successfully.';
+      }
+      await refreshNotifications();
     }
 
     selectors.modal.close();
@@ -1176,7 +1240,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const next = flow[Math.min(flow.indexOf(booking.status) + 1, flow.length - 1)];
     booking.status = next;
     booking.progress = next === 'Approved' ? 35 : next === 'In Progress' ? 70 : next === 'Completed' ? 100 : booking.progress;
-    state.notifications.unshift({ id: nextId(state.notifications), type: 'Booking', message: `${customerName(booking.customerId)} booking status changed to ${next}.`, unread: true });
     saveState();
     renderAll();
     showToast(`Booking moved to ${next}.`);
@@ -1376,7 +1439,49 @@ document.addEventListener('DOMContentLoaded', () => {
       renderAll();
       showToast('Emergency request resolved.');
     }
-    if (action === 'send-notification' || action === 'show-notifications') openModal('notification');
+    if (action === 'send-notification') openModal('notification');
+    if (action === 'show-notifications') {
+      document.querySelector('.side-nav__item[data-view="notifications"]')?.click();
+    }
+    if (action === 'filter-admin-messages') {
+      activeMessageTab = element.dataset.messageTab;
+      renderNotifications();
+    }
+    if (action === 'edit-notification-draft') {
+      const draft = state.notificationDrafts.find((item) => item.id === numericId);
+      if (draft) openModal('notification', { ...draft, deliveryAction: 'draft' });
+    }
+    if (action === 'send-notification-draft') {
+      const draft = state.notificationDrafts.find((item) => item.id === numericId);
+      if (!draft) return;
+      await window.AutoCareApi.request('/api/admin/notifications', {
+        method: 'POST',
+        body: JSON.stringify({ userId: draft.userId, type: draft.type, message: draft.message, draftId: draft.id })
+      });
+      await refreshNotifications();
+      activeMessageTab = 'sent';
+      renderNotifications();
+      showToast('Draft delivered successfully.');
+    }
+    if (action === 'delete-notification-draft') {
+      await window.AutoCareApi.request(`/api/admin/notification-drafts/${numericId}`, { method: 'DELETE' });
+      await refreshNotifications();
+      showToast('Draft deleted.');
+    }
+    if (action === 'mark-admin-notification-read') {
+      await window.AutoCareApi.request(`/api/admin/notifications/${numericId}/read`, { method: 'PUT' });
+      const notification = state.notifications.find((item) => item.id === numericId);
+      if (notification) notification.unread = false;
+      saveState();
+      renderNotifications();
+    }
+    if (action === 'mark-all-admin-notifications-read') {
+      await window.AutoCareApi.request('/api/admin/notifications/read-all', { method: 'PUT' });
+      state.notifications.forEach((item) => { item.unread = false; });
+      saveState();
+      renderNotifications();
+      showToast('All admin notifications marked as read.');
+    }
     if (action === 'close-modal') {
       pendingBookingDraft = null;
       selectors.modal.close();
@@ -1469,4 +1574,7 @@ document.addEventListener('DOMContentLoaded', () => {
   renderAll();
   bindEvents();
   hydrateFromApi();
+  window.setInterval(() => {
+    refreshNotifications().catch(() => {});
+  }, 15000);
 });

@@ -252,8 +252,13 @@
         <section class="view" data-view-panel="notifications">
           <div class="panel">
             <div class="panel__header">
-              <div><h2>Notifications</h2><p>Booking, service completion and payment updates sent to customers.</p></div>
-              <button class="btn btn--blue" type="button" data-action="send-notification">Send Update</button>
+              <div><h2>Message Center</h2><p>Review received system alerts, delivered messages, and saved drafts separately.</p></div>
+              <div class="row-actions"><button class="btn btn--ghost" id="mark-all-admin-read" type="button" data-action="mark-all-admin-notifications-read">Mark All Read</button><button class="btn btn--blue" type="button" data-action="send-notification">New Message</button></div>
+            </div>
+            <div class="status-tabs" id="admin-message-tabs">
+              <button class="is-active" type="button" data-action="filter-admin-messages" data-message-tab="received">Received <b id="received-message-count">0</b></button>
+              <button type="button" data-action="filter-admin-messages" data-message-tab="sent">Sent <b id="sent-message-count">0</b></button>
+              <button type="button" data-action="filter-admin-messages" data-message-tab="drafts">Drafts <b id="draft-message-count">0</b></button>
             </div>
             <div class="notification-list" id="notification-list"></div>
           </div>
@@ -303,6 +308,6 @@
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
   <script src="js/api.js?v=pdf-open-2"></script>
-  <script src="js/admin-dashboard.js?v=booking-toast-1"></script>
+  <script src="js/admin-dashboard.js?v=message-center-1"></script>
 </body>
 </html>

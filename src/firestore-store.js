@@ -9,6 +9,7 @@ const collections = {
   invoices: 'invoices',
   emergencyRequests: 'emergencyRequests',
   notifications: 'notifications',
+  notificationDrafts: 'notificationDrafts',
   feedback: 'feedback',
   technicians: 'technicians',
   serviceJobs: 'serviceJobs',
@@ -623,16 +624,17 @@ function partView(part) {
     location: part.location || '',
     warrantyPeriod: part.warrantyPeriod || '',
     warrantyProvider: part.warrantyProvider || part.supplier || '',
-    status: stock <= 0 ? 'Out of Stock' : stock <= lowStockThreshold ? 'Low Stock' : (part.status === 'Inactive' ? 'Inactive' : 'Active'),
+    status: inventoryStockStatus(stock, part.status, minimumStockLevel),
     inventoryValue: stock * purchasePrice,
     retailValue: stock * sellingPrice
   };
 }
 
-function inventoryStockStatus(stock, currentStatus = 'Active') {
+function inventoryStockStatus(stock, currentStatus = 'Active', minimumStockLevel = 0) {
   if (currentStatus === 'Inactive') return 'Inactive';
   if (Number(stock) <= 0) return 'Out of Stock';
-  if (Number(stock) <= lowStockThreshold) return 'Low Stock';
+  const alertLevel = Number(minimumStockLevel) > 0 ? Number(minimumStockLevel) : lowStockThreshold;
+  if (Number(stock) <= alertLevel) return 'Low Stock';
   return 'Active';
 }
 
@@ -781,16 +783,76 @@ function bookingNotificationMessage(action, booking, service, vehicle) {
 }
 
 async function markCustomerNotificationRead(userId, notificationId) {
+  return markUserNotificationRead(userId, notificationId);
+}
+
+async function markUserNotificationRead(userId, notificationId) {
   const notification = await getById(collections.notifications, notificationId);
   if (!notification || Number(notification.userId) !== Number(userId)) return null;
   return updateDocument(collections.notifications, notificationId, { unread: false });
 }
 
 async function markAllCustomerNotificationsRead(userId) {
+  return markAllUserNotificationsRead(userId);
+}
+
+async function markAllUserNotificationsRead(userId) {
   const notifications = await all(collections.notifications);
   const owned = notifications.filter((item) => Number(item.userId) === Number(userId) && item.unread);
   await Promise.all(owned.map((item) => updateDocument(collections.notifications, item.id, { unread: false })));
   return { updated: owned.length };
+}
+
+async function getUserNotifications(userId) {
+  const notifications = await all(collections.notifications);
+  return sortById(notifications.filter((item) => Number(item.userId) === Number(userId)))
+    .reverse()
+    .map(({ id, type, message, unread }) => ({ id, type, message, unread }));
+}
+
+function sentNotificationView(notification, usersById) {
+  const recipient = usersById.get(Number(notification.userId));
+  return {
+    id: notification.id,
+    userId: notification.userId,
+    recipientName: recipient?.name || 'Unknown recipient',
+    recipientRole: notification.recipientRole || recipient?.role || '',
+    type: notification.type,
+    message: notification.message,
+    delivered: true
+  };
+}
+
+function notificationDraftView(draft, usersById) {
+  const recipient = usersById.get(Number(draft.userId));
+  return {
+    id: draft.id,
+    userId: draft.userId,
+    recipientName: recipient?.name || 'Unknown recipient',
+    recipientRole: draft.recipientRole || recipient?.role || '',
+    type: draft.type,
+    message: draft.message
+  };
+}
+
+async function getAdminMessageCenter(userId) {
+  const [notifications, drafts, users] = await Promise.all([
+    all(collections.notifications),
+    all(collections.notificationDrafts),
+    all(collections.users)
+  ]);
+  const usersById = new Map(users.map((user) => [Number(user.id), user]));
+  return {
+    received: sortById(notifications.filter((item) => Number(item.userId) === Number(userId)))
+      .reverse()
+      .map(({ id, type, message, unread }) => ({ id, type, message, unread })),
+    sent: sortById(notifications.filter((item) => Number(item.senderUserId) === Number(userId)))
+      .reverse()
+      .map((item) => sentNotificationView(item, usersById)),
+    drafts: sortById(drafts.filter((item) => Number(item.createdByUserId) === Number(userId)))
+      .reverse()
+      .map((item) => notificationDraftView(item, usersById))
+  };
 }
 
 async function notifyAdmins(type, message) {
@@ -1084,8 +1146,8 @@ function buildInventoryReports(parts, movements, usages, context = {}) {
   };
 }
 
-async function getAdminDashboard() {
-  const [users, vehicles, bookings, packages, invoices, emergencies, notifications, feedback, technicians, serviceJobs, inventoryParts, suppliers, categories, movements, usages, photos, documents, serviceMap] = await Promise.all([
+async function getAdminDashboard(userId) {
+  const [users, vehicles, bookings, packages, invoices, emergencies, notifications, notificationDrafts, feedback, technicians, serviceJobs, inventoryParts, suppliers, categories, movements, usages, photos, documents, serviceMap] = await Promise.all([
     all(collections.users),
     all(collections.vehicles),
     all(collections.bookings),
@@ -1093,6 +1155,7 @@ async function getAdminDashboard() {
     all(collections.invoices),
     all(collections.emergencyRequests),
     all(collections.notifications),
+    all(collections.notificationDrafts),
     all(collections.feedback),
     all(collections.technicians),
     all(collections.serviceJobs),
@@ -1136,7 +1199,9 @@ async function getAdminDashboard() {
     packages: sortById(packages).map(({ id, name, price, duration, description }) => ({ id, name, price: Number(price), duration, description })),
     invoices: sortDateDesc(invoices.map((item) => invoiceView(item, serviceMap)), 'date'),
     emergencies: sortById(emergencies).reverse().map(({ id, userId, customerId, location, problem, status }) => ({ id, customerId: customerId || userId, location, problem, status })),
-    notifications: sortById(notifications).reverse().slice(0, 20).map(({ id, type, message, unread }) => ({ id, type, message, unread })),
+    notifications: sortById(notifications.filter((item) => Number(item.userId) === Number(userId))).reverse().map(({ id, type, message, unread }) => ({ id, type, message, unread })),
+    sentNotifications: sortById(notifications.filter((item) => Number(item.senderUserId) === Number(userId))).reverse().map((item) => sentNotificationView(item, context.usersById)),
+    notificationDrafts: sortById(notificationDrafts.filter((item) => Number(item.createdByUserId) === Number(userId))).reverse().map((item) => notificationDraftView(item, context.usersById)),
     feedback: sortById(feedback).reverse().map(({ id, userId, customerId, rating, comment }) => ({ id, customerId: customerId || userId, rating, comment }))
   };
 }
@@ -1494,6 +1559,11 @@ async function createBooking(userId, data, status = 'Pending') {
   });
 
   await createUserNotification(userId, 'Booking Created', bookingNotificationMessage('Booking created', booking, service, vehicle));
+  const customer = await getById(collections.users, userId);
+  await notifyAdmins(
+    'New Booking',
+    `${customer?.name || 'A customer'} booked ${service.name} for ${vehicleNotificationLabel(vehicle)} (${vehicle.plateNumber}) on ${booking.bookingDate} at ${booking.bookingTime}.`
+  );
 
   return bookingView(booking, new Map([[service.id, service]]));
 }
@@ -1609,7 +1679,11 @@ async function advanceBooking(id) {
     Completed: ['Completed', 100]
   };
   const [status, progress] = flow[current.status] || ['Approved', 35];
-  return updateDocument(collections.bookings, id, { status, progress });
+  const booking = await updateDocument(collections.bookings, id, { status, progress });
+  if (status !== current.status) {
+    await createUserNotification(current.userId, 'Booking Status Updated', `Your booking #BK-${id} is now ${status}.`);
+  }
+  return booking;
 }
 
 async function createEmergency(userId, data) {
@@ -1620,6 +1694,8 @@ async function createEmergency(userId, data) {
     status: 'Open'
   });
   await createUserNotification(userId, 'Emergency Request Sent', `Emergency request sent from ${emergency.location}: ${emergency.problem}.`);
+  const customer = await getById(collections.users, userId);
+  await notifyAdmins('New Emergency Request', `${customer?.name || 'A customer'} requested emergency assistance at ${emergency.location}: ${emergency.problem}.`);
   return emergency;
 }
 
@@ -1725,14 +1801,15 @@ async function deleteCustomer(id) {
   const customer = await getById(collections.users, id);
   if (!customer || customer.role !== 'customer') return false;
 
-  const [vehicles, bookings, invoices, jobs, emergencies, feedback, notifications] = await Promise.all([
+  const [vehicles, bookings, invoices, jobs, emergencies, feedback, notifications, notificationDrafts] = await Promise.all([
     all(collections.vehicles),
     all(collections.bookings),
     all(collections.invoices),
     all(collections.serviceJobs),
     all(collections.emergencyRequests),
     all(collections.feedback),
-    all(collections.notifications)
+    all(collections.notifications),
+    all(collections.notificationDrafts)
   ]);
   const customerId = Number(id);
   const dependencies = [
@@ -1751,7 +1828,11 @@ async function deleteCustomer(id) {
   }
 
   const customerNotifications = notifications.filter((item) => Number(item.userId) === customerId);
-  await Promise.all(customerNotifications.map((item) => deleteDocument(collections.notifications, item.id)));
+  const customerDrafts = notificationDrafts.filter((item) => Number(item.userId) === customerId);
+  await Promise.all([
+    ...customerNotifications.map((item) => deleteDocument(collections.notifications, item.id)),
+    ...customerDrafts.map((item) => deleteDocument(collections.notificationDrafts, item.id))
+  ]);
   await deleteDocument(collections.users, id);
   return true;
 }
@@ -1805,7 +1886,7 @@ function normalizeInventoryPayload(data) {
     location: String(data.location || '').trim(),
     warrantyPeriod: String(data.warrantyPeriod || '').trim(),
     warrantyProvider: String(data.warrantyProvider || data.supplier || '').trim(),
-    status: inventoryStockStatus(stock, String(data.status || 'Active').trim())
+    status: inventoryStockStatus(stock, String(data.status || 'Active').trim(), minimumStockLevel)
   };
 }
 
@@ -1824,6 +1905,7 @@ async function createInventoryItem(data) {
     unitPrice: payload.purchasePrice,
     note: 'Inventory item created.'
   });
+  await maybeCreateLowStockAlert(part);
   return partView(part);
 }
 
@@ -1847,6 +1929,9 @@ async function updateInventoryItem(id, data) {
       note: 'Admin stock adjustment.'
     });
   }
+  const wasLow = ['Low Stock', 'Out of Stock'].includes(partView(current).status);
+  const isLow = ['Low Stock', 'Out of Stock'].includes(partView(part).status);
+  if (isLow && (!wasLow || stockDelta !== 0)) await maybeCreateLowStockAlert(part);
   return partView(part);
 }
 
@@ -1902,7 +1987,7 @@ async function createInventoryMovement(data) {
 
 async function maybeCreateLowStockAlert(part) {
   const view = partView(part);
-  if (view.stock > lowStockThreshold) return;
+  if (!['Low Stock', 'Out of Stock'].includes(view.status)) return;
   const message = view.stock <= 0
     ? `${view.partName} is out of stock.`
     : `${view.partName} is low in stock (${view.stock} left).`;
@@ -2098,10 +2183,18 @@ async function deleteTechnician(id) {
     throw error;
   }
 
-  const notifications = await all(collections.notifications);
-  await Promise.all(notifications
-    .filter((notification) => Number(notification.userId) === Number(technician.userId))
-    .map((notification) => deleteDocument(collections.notifications, notification.id)));
+  const [notifications, notificationDrafts] = await Promise.all([
+    all(collections.notifications),
+    all(collections.notificationDrafts)
+  ]);
+  await Promise.all([
+    ...notifications
+      .filter((notification) => Number(notification.userId) === Number(technician.userId))
+      .map((notification) => deleteDocument(collections.notifications, notification.id)),
+    ...notificationDrafts
+      .filter((draft) => Number(draft.userId) === Number(technician.userId))
+      .map((draft) => deleteDocument(collections.notificationDrafts, draft.id))
+  ]);
   await deleteDocument(collections.technicians, id);
   await deleteDocument(collections.users, technician.userId);
   return true;
@@ -2277,7 +2370,7 @@ async function getTechnicianDashboard(userId) {
     inventoryParts: inventoryParts.map(partView),
     servicePhotos: sortById(photos.filter((photo) => assignedJobIds.has(Number(photo.serviceJobId)))).reverse().map((photo) => fileView(photo, 'photo')),
     documents: sortById(documents.filter((document) => assignedJobIds.has(Number(document.serviceJobId)))).reverse().map((document) => fileView(document, 'document')),
-    notifications: sortById(notifications.filter((item) => item.userId === userId)).reverse().map(({ id, type, message, unread }) => ({ id, type, message, unread }))
+    notifications: sortById(notifications.filter((item) => Number(item.userId) === Number(userId))).reverse().map(({ id, type, message, unread }) => ({ id, type, message, unread }))
   };
 }
 
@@ -2464,6 +2557,11 @@ async function updateTechnicianProgress(userId, data) {
     error.status = 403;
     throw error;
   }
+  if (job.status === 'Completed') {
+    const error = new Error('A completed job cannot be updated again.');
+    error.status = 409;
+    throw error;
+  }
 
   const progress = Number(data.progressPercentage);
   if (!Number.isFinite(progress) || progress < 0 || progress > 100) {
@@ -2497,7 +2595,7 @@ async function updateTechnicianProgress(userId, data) {
   await notifyAdmins('Service Status Updated', `Service job #SJ-${data.serviceJobId} changed to ${status}.`);
 
   if (status === 'Completed') {
-    await createUserNotification(job.customerId, 'Service Completed', `Your ${job.serviceType} service job has been completed.`);
+    await createUserNotification(job.customerId, 'Work Completed', `Your ${job.serviceType} work is complete. Your vehicle is ready for final admin review.`);
   }
 
   const context = await dashboardContext();
@@ -2604,7 +2702,7 @@ async function addUsedPart(userId, data) {
       transaction.set(partRef, {
         stock: remaining,
         stockQuantity: remaining,
-        status: inventoryStockStatus(remaining, part.status),
+        status: inventoryStockStatus(remaining, part.status, part.minimumStockLevel),
         updatedAt: fieldValue()
       }, { merge: true });
     }
@@ -2686,7 +2784,7 @@ async function returnUnusedPart(userId, data) {
     transaction.set(partRef, {
       stock,
       stockQuantity: stock,
-      status: inventoryStockStatus(stock, part.status),
+      status: inventoryStockStatus(stock, part.status, part.minimumStockLevel),
       updatedAt: fieldValue()
     }, { merge: true });
 
@@ -2764,6 +2862,10 @@ async function completeTechnicianJob(userId, serviceJobId) {
     error.status = 403;
     throw error;
   }
+  if (job.status === 'Completed') {
+    const context = await dashboardContext();
+    return serviceJobView(job, context);
+  }
 
   const progressEntries = await all(collections.technicianProgress);
   const latestProgress = progressEntries
@@ -2781,7 +2883,7 @@ async function completeTechnicianJob(userId, serviceJobId) {
     completionDate: today()
   });
   await notifyAdmins('Service Job Completed', `Service job #SJ-${serviceJobId} is ready for admin review.`);
-  await createUserNotification(job.customerId, 'Service Completed', `Your ${job.serviceType} service job has been completed.`);
+  await createUserNotification(job.customerId, 'Work Completed', `Your ${job.serviceType} work is complete. Your vehicle is ready for final admin review.`);
 
   const context = await dashboardContext();
   return serviceJobView(updated, context);
@@ -2854,20 +2956,70 @@ async function createInvoice(data) {
   return invoiceView(invoice, new Map([[service.id, service]]));
 }
 
-async function createNotification(data) {
-  const customers = sortById((await all(collections.users)).filter((user) => user.role === 'customer'));
-  if (!customers[0]) {
-    const error = new Error('No customer account available.');
+async function notificationRecipient(userId) {
+  const recipient = await getById(collections.users, userId);
+  if (!recipient || !['customer', 'technician'].includes(recipient.role)) {
+    const error = new Error('Select a valid customer or technician recipient.');
     error.status = 400;
     throw error;
   }
+  return recipient;
+}
 
-  return createDocument(collections.notifications, {
-    userId: customers[0].id,
+async function createNotification(data, senderUserId = null) {
+  const userId = asId(data.userId);
+  const recipient = await notificationRecipient(userId);
+  let draft = null;
+  if (data.draftId) {
+    draft = await getById(collections.notificationDrafts, data.draftId);
+    if (!draft || Number(draft.createdByUserId) !== Number(senderUserId)) {
+      const error = new Error('Notification draft not found.');
+      error.status = 404;
+      throw error;
+    }
+  }
+
+  const notification = await createDocument(collections.notifications, {
+    userId: recipient.id,
+    recipientRole: recipient.role,
+    senderUserId: senderUserId ? asId(senderUserId) : null,
     type: data.type.trim(),
     message: data.message.trim(),
     unread: true
   });
+  if (draft) await deleteDocument(collections.notificationDrafts, draft.id);
+  return sentNotificationView(notification, new Map([[Number(recipient.id), recipient]]));
+}
+
+async function createNotificationDraft(userId, data) {
+  const recipient = await notificationRecipient(asId(data.userId));
+  const payload = {
+    createdByUserId: asId(userId),
+    userId: recipient.id,
+    recipientRole: recipient.role,
+    type: data.type.trim(),
+    message: data.message.trim()
+  };
+  const draftId = data.draftId ? asId(data.draftId) : null;
+  if (draftId) {
+    const current = await getById(collections.notificationDrafts, draftId);
+    if (!current || Number(current.createdByUserId) !== Number(userId)) {
+      const error = new Error('Notification draft not found.');
+      error.status = 404;
+      throw error;
+    }
+    const updated = await updateDocument(collections.notificationDrafts, draftId, payload);
+    return notificationDraftView(updated, new Map([[Number(recipient.id), recipient]]));
+  }
+  const draft = await createDocument(collections.notificationDrafts, payload);
+  return notificationDraftView(draft, new Map([[Number(recipient.id), recipient]]));
+}
+
+async function deleteNotificationDraft(userId, draftId) {
+  const draft = await getById(collections.notificationDrafts, draftId);
+  if (!draft || Number(draft.createdByUserId) !== Number(userId)) return false;
+  await deleteDocument(collections.notificationDrafts, draftId);
+  return true;
 }
 
 async function getInvoicePdf(id, requester) {
@@ -3152,18 +3304,21 @@ module.exports = {
   createInventoryItem,
   createInventorySupplier,
   createNotification,
+  createNotificationDraft,
   createService,
   createServiceJob,
   createTechnician,
   createUser,
   createVehicle,
   deleteInventoryItem,
+  deleteNotificationDraft,
   deleteCustomer,
   deleteTechnician,
   deleteVehicle,
   ensureSeedData,
   findUserByEmailRole,
   getAdminDashboard,
+  getAdminMessageCenter,
   getAdminServiceJobDetails,
   getById,
   getCustomerDashboard,
@@ -3178,6 +3333,7 @@ module.exports = {
   getTechnicianDashboard,
   getTechnicianPerformance,
   getTechnicianWorkload,
+  getUserNotifications,
   publicUser,
   recordReplacedPart,
   recordStoredDocument,
@@ -3187,7 +3343,9 @@ module.exports = {
   deleteStoredFile,
   markInvoiceEmailed,
   markAllCustomerNotificationsRead,
+  markAllUserNotificationsRead,
   markCustomerNotificationRead,
+  markUserNotificationRead,
   completeTechnicianJob,
   updateBooking,
   updateCustomer,

@@ -164,6 +164,12 @@ document.addEventListener('DOMContentLoaded', () => {
     return 'success';
   }
 
+  function escapeHtml(value) {
+    return String(value ?? '').replace(/[&<>'"]/g, (character) => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
+    }[character]));
+  }
+
   function showToast(message, type = toastType(message)) {
     window.clearTimeout(els.toast.hideTimer);
     const icon = document.createElement('span');
@@ -351,8 +357,8 @@ document.addEventListener('DOMContentLoaded', () => {
       <article class="notification-item notification-item--${item.unread ? 'unread' : 'read'}">
         <span data-icon="bell"></span>
         <div>
-          <strong>${item.type}</strong>
-          <p>${item.message}</p>
+          <strong>${escapeHtml(item.type)}</strong>
+          <p>${escapeHtml(item.message)}</p>
           <small>${item.unread ? 'New update' : 'Read'}</small>
         </div>
         ${item.unread ? `<button class="mini-btn" type="button" data-action="mark-notification-read" data-id="${item.id}">Mark Read</button>` : ''}

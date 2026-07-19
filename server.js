@@ -318,7 +318,7 @@ app.put('/api/customer/notifications/read-all', requireAuth('customer'), async (
 
 app.get('/api/admin/dashboard', requireAuth('admin'), async (req, res, next) => {
   try {
-    res.json(await store.getAdminDashboard());
+    res.json(await store.getAdminDashboard(req.user.id));
   } catch (error) {
     next(error);
   }
@@ -327,6 +327,32 @@ app.get('/api/admin/dashboard', requireAuth('admin'), async (req, res, next) => 
 app.get('/api/technician/dashboard', requireAuth('technician'), async (req, res, next) => {
   try {
     res.json(await store.getTechnicianDashboard(req.user.id));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.put('/api/technician/notifications/:id/read', requireAuth('technician'), async (req, res, next) => {
+  try {
+    const notification = await store.markUserNotificationRead(req.user.id, req.params.id);
+    if (!notification) return res.status(404).json({ message: 'Notification not found.' });
+    res.json({ ok: true });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get('/api/technician/notifications', requireAuth('technician'), async (req, res, next) => {
+  try {
+    res.json(await store.getUserNotifications(req.user.id));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.put('/api/technician/notifications/read-all', requireAuth('technician'), async (req, res, next) => {
+  try {
+    res.json(await store.markAllUserNotificationsRead(req.user.id));
   } catch (error) {
     next(error);
   }
@@ -645,9 +671,62 @@ app.delete('/api/customer/bookings/:id', requireAuth('customer'), async (req, re
 
 app.post('/api/admin/notifications', requireAuth('admin'), async (req, res, next) => {
   try {
-    requireFields(req.body, ['type', 'message']);
-    await store.createNotification(req.body);
-    res.status(201).json({ ok: true });
+    requireFields(req.body, ['userId', 'type', 'message']);
+    const notification = await store.createNotification(req.body, req.user.id);
+    res.status(201).json(notification);
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.put('/api/admin/notifications/:id/read', requireAuth('admin'), async (req, res, next) => {
+  try {
+    const notification = await store.markUserNotificationRead(req.user.id, req.params.id);
+    if (!notification) return res.status(404).json({ message: 'Notification not found.' });
+    res.json({ ok: true });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get('/api/admin/notifications', requireAuth('admin'), async (req, res, next) => {
+  try {
+    res.json(await store.getUserNotifications(req.user.id));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get('/api/admin/message-center', requireAuth('admin'), async (req, res, next) => {
+  try {
+    res.json(await store.getAdminMessageCenter(req.user.id));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post('/api/admin/notification-drafts', requireAuth('admin'), async (req, res, next) => {
+  try {
+    requireFields(req.body, ['userId', 'type', 'message']);
+    res.status(201).json(await store.createNotificationDraft(req.user.id, req.body));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.delete('/api/admin/notification-drafts/:id', requireAuth('admin'), async (req, res, next) => {
+  try {
+    const deleted = await store.deleteNotificationDraft(req.user.id, req.params.id);
+    if (!deleted) return res.status(404).json({ message: 'Notification draft not found.' });
+    res.status(204).end();
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.put('/api/admin/notifications/read-all', requireAuth('admin'), async (req, res, next) => {
+  try {
+    res.json(await store.markAllUserNotificationsRead(req.user.id));
   } catch (error) {
     next(error);
   }
