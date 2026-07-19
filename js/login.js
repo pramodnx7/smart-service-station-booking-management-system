@@ -147,10 +147,11 @@ document.addEventListener('DOMContentLoaded', () => {
       localStorage.setItem(sessionKey, JSON.stringify({
         ...result.user,
         token: result.token,
+        databaseDegraded: Boolean(result.databaseDegraded),
         loggedInAt: new Date().toISOString()
       }));
 
-      setStatus('Login successful. Redirecting...', true);
+      setStatus(result.databaseDegraded ? 'Database quota reached. Opening the dashboard in demo mode...' : 'Login successful. Redirecting...', true);
       window.setTimeout(() => redirectForRole(result.user.role), 350);
     } catch (error) {
       setStatus(error.message || 'Login failed. Check the backend server and Firebase connection.');

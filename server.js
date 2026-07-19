@@ -1267,18 +1267,18 @@ app.use((error, req, res, next) => {
   }
   const temporaryDatabaseError = isTemporaryFirestoreError(error);
   res.status(temporaryDatabaseError ? 503 : (error.status || 500)).json({
-    message: temporaryDatabaseError ? 'The database is temporarily busy. Please try again shortly.' : (message || 'Server error.')
+    message: temporaryDatabaseError ? 'The database usage limit has been reached temporarily. Demo accounts can still sign in; live data will resume when the quota resets.' : (message || 'Server error.'),
+    code: temporaryDatabaseError ? 'DATABASE_QUOTA_EXCEEDED' : undefined
   });
 });
 
-store.ensureSeedData()
-  .then(() => {
-    console.log('Firestore seed data is ready.');
-  })
-  .catch((error) => {
-    const message = String(error.message || '');
-    console.warn(`Firestore seed skipped: ${message}`);
-  });
+if (process.env.AUTO_SEED_ON_START === 'true') {
+  store.ensureSeedData()
+    .then(() => console.log('Firestore seed data is ready.'))
+    .catch((error) => console.warn(`Firestore seed skipped: ${String(error.message || '')}`));
+} else {
+  console.log('Automatic Firestore seeding is disabled to conserve quota.');
+}
 
 app.listen(port, () => {
   console.log(`AutoCare server running at http://localhost:${port}`);
