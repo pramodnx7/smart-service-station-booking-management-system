@@ -1,10 +1,9 @@
 document.addEventListener('DOMContentLoaded', () => {
-  const storageKey = 'autocare-admin-dashboard-state';
   const sessionKey = 'autocare-session';
   const statusLabels = ['All', 'Pending', 'Approved', 'In Progress', 'Completed', 'Cancelled'];
   const session = getSession();
 
-  if (!session || session.role !== 'admin' || !session.token) {
+  if (!session || session.role !== 'admin' || !session.authenticated) {
     window.location.replace('index.html');
     return;
   }
@@ -31,82 +30,45 @@ document.addEventListener('DOMContentLoaded', () => {
     logout: '<svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5M21 12H9"/></svg>'
   };
 
-  const defaults = {
-    customers: [
-      { id: 1, name: 'Seril Suten', email: 'seril@example.com', phone: '+94 77 111 2233', status: 'Active' },
-      { id: 2, name: 'Nimal Perera', email: 'nimal@example.com', phone: '+94 76 555 7788', status: 'Active' },
-      { id: 3, name: 'Anjali Silva', email: 'anjali@example.com', phone: '+94 71 234 9000', status: 'Pending' }
-    ],
-    vehicles: [
-      { id: 1, customerId: 1, make: 'Toyota Corolla', model: 'Axio', plate: 'ABC-854', year: '2019', image: 'assets/images/newsletter-red-sports-car.png' },
-      { id: 2, customerId: 1, make: 'Honda Civic', model: 'EX', plate: 'XZ-5676', year: '2019', image: 'assets/images/hero-blue-workshop.png' },
-      { id: 3, customerId: 2, make: 'Suzuki Swift', model: 'RS', plate: 'DEF-0012', year: '2020', image: 'assets/images/service-wheel-closeup.png' }
-    ],
-    technicians: [
-      { id: 1, userId: 3, name: 'Kasun Technician', email: 'tech@autocare.lk', employeeNo: 'TECH-001', specialization: 'General Service', phone: '+94 77 222 3344', experienceYears: 4, status: 'Active' }
-    ],
-    bookings: [
-      { id: 1, customerId: 1, vehicleId: 1, service: 'General Service', date: '2026-05-25', time: '10:00', status: 'Pending', queue: 3, progress: 20 },
-      { id: 2, customerId: 2, vehicleId: 3, service: 'Oil Change', date: '2026-05-26', time: '14:30', status: 'Approved', queue: 5, progress: 35 },
-      { id: 3, customerId: 1, vehicleId: 2, service: 'Engine Diagnostics', date: '2026-05-23', time: '09:00', status: 'In Progress', queue: 1, progress: 70 },
-      { id: 4, customerId: 3, vehicleId: 3, service: 'Brake Service', date: '2026-05-20', time: '11:15', status: 'Completed', queue: 0, progress: 100 }
-    ],
-    packages: [
-      { id: 1, name: 'Oil Change', price: 6000, duration: '45 min', description: 'Engine oil, filter replacement and quick inspection.' },
-      { id: 2, name: 'Brake Service', price: 7500, duration: '1 hr', description: 'Brake pads, fluid check and safety testing.' },
-      { id: 3, name: 'Full Service', price: 18500, duration: '3 hr', description: 'Complete inspection, fluids, diagnostics and tune-up.' },
-      { id: 4, name: 'Engine Diagnostics', price: 12000, duration: '1.5 hr', description: 'Computer scan, issue report and repair estimate.' },
-      { id: 5, name: 'General Service', price: 8500, duration: '1 hr', description: 'Standard maintenance service and inspection.' },
-      { id: 6, name: 'Electrical Repair', price: 14000, duration: '2 hr', description: 'Electrical fault diagnosis and repair.' },
-      { id: 7, name: 'Engine Repair', price: 22000, duration: '3 hr', description: 'Engine repair, tuning and mechanical correction.' },
-      { id: 8, name: 'Suspension Repair', price: 16000, duration: '2 hr', description: 'Suspension inspection, repair and alignment checks.' },
-      { id: 9, name: 'Hybrid/EV Service', price: 26000, duration: '2 hr', description: 'Hybrid and electric vehicle safety inspection and service.' }
-    ],
+  const emptyState = {
+    customers: [],
+    vehicles: [],
+    technicians: [],
+    bookings: [],
+    packages: [],
     pricingPlans: [],
-    invoices: [
-      { id: 1001, customerId: 1, service: 'General Service', amount: 8500, payment: 'Unpaid', date: '2026-05-25' },
-      { id: 1002, customerId: 2, service: 'Oil Change', amount: 6000, payment: 'Paid', date: '2026-05-18' },
-      { id: 1003, customerId: 3, service: 'Brake Service', amount: 7500, payment: 'Paid', date: '2026-05-10' }
-    ],
-    emergencies: [
-      { id: 1, customerId: 2, location: 'Colombo 05', problem: 'Vehicle will not start after battery warning light.', status: 'Open' },
-      { id: 2, customerId: 1, location: 'Nugegoda', problem: 'Flat tyre and customer shared roadside location.', status: 'Assigned' }
-    ],
-    notifications: [
-      { id: 1, type: 'Booking', message: 'Booking approved for Seril Suten on 25 May 2026.', unread: true },
-      { id: 2, type: 'Payment', message: 'Invoice #1002 payment received.', unread: false },
-      { id: 3, type: 'Service', message: 'Honda Civic diagnostics moved to final testing.', unread: true }
-    ],
+    invoices: [],
+    emergencies: [],
+    notifications: [],
     sentNotifications: [],
     notificationDrafts: [],
-    feedback: [
-      { id: 1, customerId: 1, rating: 5, comment: 'Friendly team and clear service updates.' },
-      { id: 2, customerId: 2, rating: 4, comment: 'Quick oil change and fair pricing.' },
-      { id: 3, customerId: 3, rating: 5, comment: 'Emergency support reached me fast.' }
-    ],
-    serviceJobs: [
-      { id: 1, bookingId: 1, customerId: 1, vehicleId: 1, assignedTechnicianId: 1, serviceType: 'General Service', priority: 'Normal', status: 'Assigned', progress: 35, assignedDate: '2026-05-24', technicianName: 'Kasun Technician', customerName: 'Seril Suten', vehicleNumber: 'ABC-854', vehicleName: 'Toyota Corolla Axio' }
-    ],
-    inventoryParts: [
-      { id: 1, name: 'Engine Oil 5W-30', stock: 24, unitPrice: 6000 },
-      { id: 2, name: 'Brake Pad Set', stock: 12, unitPrice: 7500 }
-    ],
+    feedback: [],
+    serviceJobs: [],
+    inventoryParts: [],
     inventorySuppliers: [],
+    inventoryCategories: [],
     inventoryReports: { lowStock: [], outOfStock: [], stockMovements: [], technicianUsage: [], inventoryValue: {} },
     stockMovements: [],
     partUsageHistory: [],
     servicePhotos: [],
     documents: [],
     technicianWorkload: [],
-    technicianPerformance: []
+    technicianPerformance: [],
+    landingStats: {
+      happyCustomers: 20000,
+      expertTechnicians: 10,
+      registeredCustomers: 0,
+      activeTechnicians: 0,
+      completedServices: 0
+    },
+    landingContent: { recentWork: [], news: [] }
   };
 
-  let state = loadState();
+  let state = structuredClone(emptyState);
   let activeBookingStatus = 'All';
   let activeMessageTab = 'received';
   let pendingBookingDraft = null;
   let notificationDraftSaveInProgress = false;
-  const technicianSpecializations = ['General Service', 'Oil Change', 'Brake Service', 'Electrical Repair', 'Engine Repair', 'Suspension Repair', 'Hybrid/EV Service'];
 
   const selectors = {
     sidebar: document.getElementById('sidebar'),
@@ -143,22 +105,13 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('profile-role').textContent = session.role === 'admin' ? 'Manager' : 'Customer';
   }
 
-  function loadState() {
-    try {
-      const saved = JSON.parse(localStorage.getItem(storageKey));
-      return saved ? { ...defaults, ...saved } : structuredClone(defaults);
-    } catch (error) {
-      return JSON.parse(JSON.stringify(defaults));
-    }
-  }
-
   function saveState() {
-    localStorage.setItem(storageKey, JSON.stringify(state));
+    // Dashboard records stay in memory; Firestore remains the only persistent source.
   }
 
   async function hydrateFromApi() {
     try {
-      state = { ...state, ...(await window.AutoCareApi.request('/api/admin/dashboard')) };
+      state = { ...structuredClone(emptyState), ...(await window.AutoCareApi.request('/api/admin/dashboard')) };
       applyAdminProfile(state.profile || session);
       saveState();
       renderAll();
@@ -667,6 +620,10 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('parts-usage-body').innerHTML = (state.partUsageHistory || []).slice(0, 20).map((item) => `
       <tr><td>${item.partName}<span class="row-sub">${item.brand || '-'}</span></td><td>${item.vehicleNumber || '-'}</td><td>${item.technicianName || '-'}</td><td>${item.condition}</td><td>${item.quantity}</td><td>${formatMoney(item.totalPrice || 0)}</td></tr>
     `).join('');
+
+    document.getElementById('supplier-body').innerHTML = (state.inventorySuppliers || []).map((supplier) => `
+      <tr><td>${escapeHtml(supplier.name)}</td><td>${escapeHtml(supplier.email || '-')}</td><td>${escapeHtml(supplier.phone || '-')}</td><td>${escapeHtml(supplier.status || 'Active')}</td><td><div class="row-actions"><button class="mini-btn" type="button" data-action="edit-supplier" data-id="${supplier.id}">Edit</button><button class="mini-btn mini-btn--red" type="button" data-action="delete-supplier" data-id="${supplier.id}">Delete</button></div></td></tr>
+    `).join('');
   }
 
   function renderDocuments(filter = '') {
@@ -847,10 +804,11 @@ document.addEventListener('DOMContentLoaded', () => {
   function renderPackages() {
     document.getElementById('package-grid').innerHTML = state.packages.map((item) => `
       <article class="package-card">
-        <h3>${item.name}</h3>
-        <p>${item.description}</p>
+        <img class="package-card__image" src="${escapeHtml(item.image)}" alt="${escapeHtml(item.name)}" />
+        <h3>${escapeHtml(item.name)}</h3>
+        <p>${escapeHtml(item.description)}</p>
         <strong>${formatMoney(item.price)}</strong>
-        <div class="card-meta"><span>${item.duration}</span><button class="mini-btn" type="button" data-action="edit-service" data-id="${item.id}">Edit</button></div>
+        <div class="card-meta"><span>${item.duration}</span><div class="row-actions"><button class="mini-btn" type="button" data-action="edit-service" data-id="${item.id}">Edit</button><button class="mini-btn mini-btn--red" type="button" data-action="delete-service" data-id="${item.id}">Delete</button></div></div>
       </article>
     `).join('');
   }
@@ -946,6 +904,31 @@ document.addEventListener('DOMContentLoaded', () => {
     `).join('');
   }
 
+  function renderLandingStats() {
+    document.querySelectorAll('[data-landing-stat]').forEach((form) => {
+      const value = state.landingStats?.[form.dataset.landingStat];
+      if (Number.isSafeInteger(Number(value))) form.elements.value.value = Number(value);
+    });
+  }
+
+  function landingContentCard(section, item, index) {
+    const isNews = section === 'news';
+    return `
+      <form class="landing-content-card" data-content-section="${section}" data-content-slot="${index}">
+        <img src="${escapeHtml(item.image)}" alt="" />
+        <label><span>${isNews ? 'Headline' : 'Work Caption'}</span><input name="title" maxlength="${isNews ? 140 : 100}" value="${escapeHtml(item.title)}" required /></label>
+        ${isNews ? `<div class="landing-content-fields"><label><span>Date</span><input name="date" type="date" value="${escapeHtml(item.date)}" required /></label><label><span>Category</span><input name="category" maxlength="50" value="${escapeHtml(item.category)}" required /></label></div>` : ''}
+        <label><span>Replace Photo</span><input name="contentImage" type="file" accept="image/jpeg,image/png,image/webp" /></label>
+        <label><span>Visibility</span><select name="active"><option value="true" ${item.active !== false ? 'selected' : ''}>Visible</option><option value="false" ${item.active === false ? 'selected' : ''}>Hidden</option></select></label>
+        <button class="btn btn--blue" type="submit">Save ${isNews ? 'News' : 'Recent Work'}</button>
+      </form>`;
+  }
+
+  function renderLandingContentAdmin() {
+    document.getElementById('recent-work-admin-grid').innerHTML = (state.landingContent?.recentWork || []).map((item, index) => landingContentCard('recentWork', item, index)).join('');
+    document.getElementById('news-admin-grid').innerHTML = (state.landingContent?.news || []).map((item, index) => landingContentCard('news', item, index)).join('');
+  }
+
   function renderAll() {
     renderMetrics();
     renderOverview();
@@ -963,16 +946,19 @@ document.addEventListener('DOMContentLoaded', () => {
     renderEmergency();
     renderNotifications();
     renderFeedback();
+    renderLandingStats();
+    renderLandingContentAdmin();
   }
 
-  function field(name, label, type = 'text', value = '', options = []) {
+  function field(name, label, type = 'text', value = '', options = [], required = true) {
+    const requiredAttribute = required ? ' required' : '';
     if (type === 'select') {
-      return `<label><span>${escapeHtml(label)}</span><select name="${escapeHtml(name)}" required>${options.map((option) => `<option value="${escapeHtml(option.value)}" ${String(option.value) === String(value) ? 'selected' : ''}>${escapeHtml(option.label)}</option>`).join('')}</select></label>`;
+      return `<label><span>${escapeHtml(label)}</span><select name="${escapeHtml(name)}"${requiredAttribute}>${options.map((option) => `<option value="${escapeHtml(option.value)}" ${String(option.value) === String(value) ? 'selected' : ''}>${escapeHtml(option.label)}</option>`).join('')}</select></label>`;
     }
     if (type === 'textarea') {
-      return `<label class="full"><span>${escapeHtml(label)}</span><textarea name="${escapeHtml(name)}" required>${escapeHtml(value)}</textarea></label>`;
+      return `<label class="full"><span>${escapeHtml(label)}</span><textarea name="${escapeHtml(name)}"${requiredAttribute}>${escapeHtml(value)}</textarea></label>`;
     }
-    return `<label><span>${escapeHtml(label)}</span><input name="${escapeHtml(name)}" type="${escapeHtml(type)}" value="${escapeHtml(value)}" required /></label>`;
+    return `<label><span>${escapeHtml(label)}</span><input name="${escapeHtml(name)}" type="${escapeHtml(type)}" value="${escapeHtml(value)}"${requiredAttribute} /></label>`;
   }
 
   function vehicleImageUpload(record = {}) {
@@ -1051,13 +1037,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const completedJobOptions = state.serviceJobs
       .filter((job) => job.status === 'Completed')
       .map((job) => ({ value: job.id, label: `#SJ-${job.id} - ${job.serviceType} - ${job.customerName || customerName(job.customerId)}` }));
-    const categoryOptions = ['Engine Parts', 'Brake System', 'Electrical', 'Suspension', 'Cooling System', 'Filters', 'Fluids & Lubricants', 'Batteries', 'Tires & Wheels', 'Accessories'].map((category) => ({ value: category, label: category }));
+    const categoryOptions = (state.inventoryCategories || []).map((category) => ({ value: category.name, label: category.name }));
+    const technicianSpecializations = state.packages.map((service) => service.name);
     const supplierOptions = (state.inventorySuppliers || []).map((supplier) => ({ value: supplier.id, label: supplier.name }));
     const paymentOptions = ['Unpaid', 'Paid'].map((payment) => ({ value: payment, label: payment }));
     const config = {
       customer: {
         title: record.id ? 'Edit Customer' : 'Register Customer',
-        body: field('name', 'Full Name', 'text', record.name || '') + field('email', 'Email', 'email', record.email || '') + field('phone', 'Phone', 'tel', record.phone || '') + field('status', 'Status', 'select', record.status || 'Active', [{ value: 'Active', label: 'Active' }, { value: 'Pending', label: 'Pending' }, { value: 'Inactive', label: 'Inactive' }])
+        body: field('name', 'Full Name', 'text', record.name || '') + field('email', 'Email', 'email', record.email || '') + field('phone', 'Phone', 'tel', record.phone || '') + field('password', record.id ? 'Reset Password (optional)' : 'Temporary Password', 'password', '', [], !record.id) + field('status', 'Status', 'select', record.status || 'Active', [{ value: 'Active', label: 'Active' }, { value: 'Pending', label: 'Pending' }, { value: 'Inactive', label: 'Inactive' }])
       },
       vehicle: {
         title: record.id ? 'Edit Vehicle' : 'Add Vehicle',
@@ -1065,7 +1052,7 @@ document.addEventListener('DOMContentLoaded', () => {
       },
       technician: {
         title: record.id ? 'Edit Technician' : 'Create Technician',
-        body: field('name', 'Full Name', 'text', record.name || '') + field('email', 'Email', 'email', record.email || '') + field('phone', 'Phone', 'tel', record.phone || '') + field('employeeNo', 'Employee No', 'text', record.employeeNo || '') + field('specialization', 'Specialization', 'select', record.specialization || technicianSpecializations[0], technicianSpecializations.map((item) => ({ value: item, label: item }))) + field('experienceYears', 'Experience Years', 'number', record.experienceYears || '0') + field('status', 'Status', 'select', record.status || 'Active', [{ value: 'Active', label: 'Active' }, { value: 'Inactive', label: 'Inactive' }])
+        body: field('name', 'Full Name', 'text', record.name || '') + field('email', 'Email', 'email', record.email || '') + field('phone', 'Phone', 'tel', record.phone || '') + field('password', record.id ? 'Reset Password (optional)' : 'Temporary Password', 'password', '', [], !record.id) + field('employeeNo', 'Employee No', 'text', record.employeeNo || '') + field('specialization', 'Specialization', 'select', record.specialization || technicianSpecializations[0], technicianSpecializations.map((item) => ({ value: item, label: item }))) + field('experienceYears', 'Experience Years', 'number', record.experienceYears || '0') + field('status', 'Status', 'select', record.status || 'Active', [{ value: 'Active', label: 'Active' }, { value: 'Inactive', label: 'Inactive' }])
       },
       booking: {
         title: record.id ? 'Reschedule Booking' : 'Book Service Appointment',
@@ -1083,9 +1070,13 @@ document.addEventListener('DOMContentLoaded', () => {
         title: record.id ? 'Edit Inventory Item' : 'Add Inventory Item',
         body: field('itemCode', 'Item Code', 'text', record.itemCode || record.sku || '') + field('partName', 'Part Name', 'text', record.partName || record.name || '') + field('category', 'Category', 'select', record.category || categoryOptions[0]?.value, categoryOptions) + field('brand', 'Brand', 'text', record.brand || '') + field('manufacturer', 'Manufacturer', 'text', record.manufacturer || '') + field('supplierId', 'Supplier', 'select', record.supplierId || supplierOptions[0]?.value, supplierOptions) + field('purchasePrice', 'Purchase Price', 'number', record.purchasePrice || '0') + field('sellingPrice', 'Selling Price', 'number', record.sellingPrice || record.unitPrice || '0') + field('stockQuantity', 'Stock Quantity', 'number', record.stock ?? record.stockQuantity ?? '0') + field('minimumStockLevel', 'Minimum Stock Level', 'number', record.minimumStockLevel || '0') + field('location', 'Location', 'text', record.location || '') + field('warrantyPeriod', 'Warranty Period', 'text', record.warrantyPeriod || '') + field('description', 'Description', 'textarea', record.description || '')
       },
+      supplier: {
+        title: record.id ? 'Edit Supplier' : 'Add Supplier',
+        body: field('name', 'Supplier Name', 'text', record.name || '') + field('email', 'Email', 'email', record.email || '', [], false) + field('phone', 'Phone', 'tel', record.phone || '', [], false) + field('address', 'Address', 'textarea', record.address || '', [], false) + field('status', 'Status', 'select', record.status || 'Active', [{ value: 'Active', label: 'Active' }, { value: 'Inactive', label: 'Inactive' }])
+      },
       service: {
         title: record.id ? 'Edit Service Package' : 'Add Service Package',
-        body: field('name', 'Package Name', 'text', record.name || '') + field('price', 'Price', 'number', record.price || '') + field('duration', 'Duration', 'text', record.duration || '') + field('description', 'Description', 'textarea', record.description || '')
+        body: field('name', 'Package Name', 'text', record.name || '') + field('price', 'Price', 'number', record.price || '') + field('duration', 'Duration', 'text', record.duration || '') + field('image', 'Current Image Path', 'text', record.image || 'assets/images/service-wheel-closeup.png') + '<label class="full"><span>Upload New Service Photo (optional)</span><input name="serviceImage" type="file" accept="image/jpeg,image/png,image/webp" /></label>' + field('description', 'Description', 'textarea', record.description || '')
       },
       pricingPlan: {
         title: record.id ? 'Edit Landing Plan' : 'Add Landing Plan',
@@ -1264,8 +1255,19 @@ document.addEventListener('DOMContentLoaded', () => {
       id ? Object.assign(state.inventoryParts.find((item) => item.id === id), savedItem) : state.inventoryParts.push(savedItem);
     }
 
+    if (mode === 'supplier') {
+      const savedSupplier = await window.AutoCareApi.request(id ? `/api/admin/inventory/suppliers/${id}` : '/api/admin/inventory/suppliers', {
+        method: id ? 'PUT' : 'POST',
+        body: JSON.stringify(data)
+      });
+      id ? Object.assign(state.inventorySuppliers.find((item) => item.id === id), savedSupplier) : state.inventorySuppliers.push(savedSupplier);
+    }
+
     if (mode === 'service') {
-      const payload = { ...data, price: Number(data.price) };
+      const imageFile = selectors.modalForm.elements.serviceImage.files[0];
+      const image = imageFile ? await window.AutoCareApi.optimizeProfileImage(imageFile) : data.image;
+      const payload = { ...data, image, price: Number(data.price) };
+      delete payload.serviceImage;
       const savedService = await window.AutoCareApi.request(id ? `/api/admin/services/${id}` : '/api/admin/services', {
         method: id ? 'PUT' : 'POST',
         body: JSON.stringify(payload)
@@ -1476,8 +1478,24 @@ document.addEventListener('DOMContentLoaded', () => {
       renderAll();
       showToast('Inventory item deleted.');
     }
+    if (action === 'new-supplier') openModal('supplier');
+    if (action === 'edit-supplier') openModal('supplier', state.inventorySuppliers.find((item) => item.id === numericId));
+    if (action === 'delete-supplier') {
+      if (!window.confirm('Delete this supplier?')) return;
+      await window.AutoCareApi.request(`/api/admin/inventory/suppliers/${numericId}`, { method: 'DELETE' });
+      state.inventorySuppliers = state.inventorySuppliers.filter((item) => item.id !== numericId);
+      renderAll();
+      showToast('Supplier deleted.');
+    }
     if (action === 'new-service') openModal('service');
     if (action === 'edit-service') openModal('service', state.packages.find((item) => item.id === numericId));
+    if (action === 'delete-service') {
+      if (!window.confirm('Delete this service package?')) return;
+      await window.AutoCareApi.request(`/api/admin/services/${numericId}`, { method: 'DELETE' });
+      state.packages = state.packages.filter((item) => item.id !== numericId);
+      renderAll();
+      showToast('Service package deleted.');
+    }
     if (action === 'new-pricing-plan') openModal('pricingPlan');
     if (action === 'edit-pricing-plan') openModal('pricingPlan', state.pricingPlans.find((item) => item.id === numericId));
     if (action === 'delete-pricing-plan') {
@@ -1604,6 +1622,36 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  async function saveLandingContentForm(form) {
+    const section = form.dataset.contentSection;
+    const slot = Number(form.dataset.contentSlot);
+    const currentItem = state.landingContent?.[section]?.[slot];
+    if (!currentItem) throw new Error('Landing content slot is unavailable.');
+    const submitButton = form.querySelector('button[type="submit"]');
+    submitButton.disabled = true;
+    try {
+      const imageFile = form.elements.contentImage.files[0];
+      const payload = {
+        title: form.elements.title.value.trim(),
+        image: imageFile ? await window.AutoCareApi.optimizeProfileImage(imageFile) : currentItem.image,
+        active: form.elements.active.value === 'true'
+      };
+      if (section === 'news') {
+        payload.date = form.elements.date.value;
+        payload.category = form.elements.category.value.trim();
+      }
+      const result = await window.AutoCareApi.request(`/api/admin/landing-content/${encodeURIComponent(section)}/${slot}`, {
+        method: 'PUT',
+        body: JSON.stringify(payload)
+      });
+      state.landingContent[section][slot] = result.item;
+      renderLandingContentAdmin();
+      showToast(`${section === 'news' ? 'News' : 'Recent work'} updated successfully.`);
+    } finally {
+      submitButton.disabled = false;
+    }
+  }
+
   function bindEvents() {
     document.querySelectorAll('.side-nav__item').forEach((button) => {
       button.addEventListener('click', () => {
@@ -1690,13 +1738,41 @@ document.addEventListener('DOMContentLoaded', () => {
           body: JSON.stringify({ name: form.elements.name.value, email: form.elements.email.value, phone: form.elements.phone.value, avatar })
         });
         state.profile = result.user;
-        localStorage.setItem(sessionKey, JSON.stringify({ ...getSession(), ...result.user, token: result.token }));
+        localStorage.setItem(sessionKey, JSON.stringify({ ...getSession(), ...result.user, authenticated: true }));
         form.elements.profilePicture.value = '';
         applyAdminProfile(state.profile);
         showToast('Admin profile updated successfully.');
       } catch (error) {
         showToast(error.message || 'Profile update failed.');
       }
+    });
+
+    document.addEventListener('submit', (event) => {
+      const form = event.target.closest('[data-content-section]');
+      if (!form) return;
+      event.preventDefault();
+      saveLandingContentForm(form).catch((error) => showToast(error.message || 'Landing content update failed.'));
+    });
+    document.querySelectorAll('[data-landing-stat]').forEach((form) => {
+      form.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const fieldName = form.dataset.landingStat;
+        const submitButton = form.querySelector('button[type="submit"]');
+        submitButton.disabled = true;
+        try {
+          const result = await window.AutoCareApi.request(`/api/admin/landing-stats/${encodeURIComponent(fieldName)}`, {
+            method: 'PUT',
+            body: JSON.stringify({ value: Number(form.elements.value.value) })
+          });
+          state.landingStats[fieldName] = result.value;
+          renderLandingStats();
+          showToast('Landing page statistic updated successfully.');
+        } catch (error) {
+          showToast(error.message || 'Statistic update failed.');
+        } finally {
+          submitButton.disabled = false;
+        }
+      });
     });
     document.querySelector('#settings-form [name="profilePicture"]').addEventListener('change', async (event) => {
       try {

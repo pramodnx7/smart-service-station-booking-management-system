@@ -24,10 +24,32 @@ const collections = {
   replacedParts: 'replacedParts',
   serviceImages: 'servicePhotos',
   documents: 'documents',
-  uploadAuditLogs: 'uploadAuditLogs'
+  uploadAuditLogs: 'uploadAuditLogs',
+  newsletterSubscriptions: 'newsletterSubscriptions',
+  appSettings: 'appSettings'
+};
+
+const landingStatsDocument = 'landing-stats';
+const landingContentDocumentPrefix = 'landing-content';
+const landingStatDefaults = {
+  happyCustomers: 20000,
+  expertTechnicians: 10
+};
+const landingContentDefaults = {
+  recentWork: [
+    { title: 'Suspension Inspection', image: 'assets/images/service-wheel-closeup.png', active: true },
+    { title: 'Exhaust System Repair', image: 'assets/images/workshop-lift-mechanic.png', active: true },
+    { title: 'Engine Diagnostics', image: 'assets/images/about-mechanic-red-car.png', active: true }
+  ],
+  news: [
+    { date: '2026-01-23', category: 'Maintenance', title: 'A well-maintained car is like a well tuned instrument.', image: 'assets/images/about-mechanic-red-car.png', active: true },
+    { date: '2026-01-11', category: 'Auto Service', title: 'The best car service is the one that keeps you moving forward.', image: 'assets/images/workshop-lift-mechanic.png', active: true },
+    { date: '2026-01-07', category: 'Car Care', title: 'We provide peace of mind with top-notch car service.', image: 'assets/images/hero-blue-workshop.png', active: true }
+  ]
 };
 
 const defaultImage = 'assets/images/hero-blue-workshop.png';
+const defaultServiceImage = 'assets/images/service-wheel-closeup.png';
 const serviceJobStatuses = ['Pending', 'Assigned', 'In Progress', 'Waiting For Parts', 'Quality Check', 'Completed', 'Cancelled'];
 const inventoryCategories = ['Engine Parts', 'Brake System', 'Electrical', 'Suspension', 'Cooling System', 'Filters', 'Fluids & Lubricants', 'Batteries', 'Tires & Wheels', 'Accessories'];
 const partConditions = ['Brand New', 'Used', 'Refurbished', 'Reconditioned', 'Customer Supplied'];
@@ -40,19 +62,6 @@ const serviceBayCount = Number(process.env.SERVICE_BAY_COUNT || 8);
 const serviceDayStartHour = Number(process.env.SERVICE_DAY_START_HOUR || 8);
 const serviceDayEndHour = Number(process.env.SERVICE_DAY_END_HOUR || 17);
 const serviceSlotMinutes = Number(process.env.SERVICE_SLOT_MINUTES || 60);
-const serviceSpecializations = [
-  'General Service',
-  'Oil Change',
-  'Brake Service',
-  'Electrical Repair',
-  'Engine Repair',
-  'Suspension Repair',
-  'Hybrid/EV Service'
-];
-const serviceAliases = {
-  'Full Service': 'General Service',
-  'Engine Diagnostics': 'Engine Repair'
-};
 
 function fieldValue() {
   return admin.firestore.FieldValue.serverTimestamp();
@@ -429,6 +438,12 @@ async function allWhere(collection, field, value) {
   assertFirebaseConfigured();
   const snapshot = await db.collection(collection).where(field, '==', value).get();
   return snapshot.docs.map((doc) => ({ id: Number(doc.id), ...doc.data() }));
+}
+
+async function allWhereAny(collection, field, values) {
+  const uniqueValues = [...new Set(values.map(Number).filter(Number.isFinite))];
+  if (!uniqueValues.length) return [];
+  return (await Promise.all(uniqueValues.map((value) => allWhere(collection, field, value)))).flat();
 }
 
 async function getById(collection, id) {
@@ -816,7 +831,7 @@ async function dashboardContext() {
 }
 
 async function adminUsers() {
-  return (await all(collections.users)).filter((user) => user.role === 'admin');
+  return allWhere(collections.users, 'role', 'admin');
 }
 
 async function createUserNotification(userId, type, message) {
@@ -923,8 +938,8 @@ async function notifyAdmins(type, message) {
 }
 
 async function getTechnicianByUserId(userId) {
-  const technicians = await all(collections.technicians);
-  return technicians.find((technician) => Number(technician.userId) === Number(userId)) || null;
+  const technicians = await allWhere(collections.technicians, 'userId', Number(userId));
+  return technicians[0] || null;
 }
 
 async function assertTechnician(id, requireActive = true) {
@@ -953,11 +968,32 @@ function assertServiceJobStatus(status) {
 }
 
 async function findServiceByName(name, activeOnly = false) {
-  const services = await all(collections.servicePackages);
-  return services.find((service) => {
-    const isSameName = String(service.name).toLowerCase() === String(name).toLowerCase();
-    return isSameName && (!activeOnly || service.active !== false);
-  });
+  const services = await allWhere(collections.servicePackages, 'name', String(name || '').trim());
+  return services.find((service) => !activeOnly || service.active !== false) || null;
+}
+
+function landingContentView(settings = {}) {
+  return Object.fromEntries(Object.entries(landingContentDefaults).map(([section, defaults]) => {
+    const savedItems = Array.isArray(settings[section]) ? settings[section] : [];
+    return [section, defaults.map((fallback, index) => ({
+      ...fallback,
+      ...(savedItems[index] || {}),
+      slot: index
+    }))];
+  }));
+}
+
+async function getLandingContentSettings() {
+  assertFirebaseConfigured();
+  const entries = Object.entries(landingContentDefaults).flatMap(([section, items]) => items.map((_, slot) => ({ section, slot })));
+  const snapshots = await Promise.all(entries.map(({ section, slot }) => (
+    db.collection(collections.appSettings).doc(`${landingContentDocumentPrefix}-${section}-${slot}`).get()
+  )));
+  return entries.reduce((settings, entry, index) => {
+    if (!settings[entry.section]) settings[entry.section] = [];
+    if (snapshots[index].exists) settings[entry.section][entry.slot] = snapshots[index].data();
+    return settings;
+  }, {});
 }
 
 async function findUserByEmailRole(email, role) {
@@ -1038,18 +1074,14 @@ async function createUser({ role, name, email, phone = '', passwordHash, status 
 
 async function getCustomerDashboard(userId) {
   const customerId = Number(userId);
-  const [user, vehicles, bookings, invoices, notifications, serviceMap, jobs, parts, usages, images, documents] = await Promise.all([
+  const [user, vehicles, bookings, invoices, notifications, serviceMap, jobs] = await Promise.all([
     getById(collections.users, userId),
-    all(collections.vehicles),
-    all(collections.bookings),
-    all(collections.invoices),
-    all(collections.notifications),
+    allWhere(collections.vehicles, 'userId', customerId),
+    allWhere(collections.bookings, 'userId', customerId),
+    allWhere(collections.invoices, 'userId', customerId),
+    allWhere(collections.notifications, 'userId', customerId),
     servicesById(),
-    all(collections.serviceJobs),
-    all(collections.inventoryParts),
-    all(collections.serviceJobParts),
-    all(collections.serviceImages),
-    all(collections.documents)
+    allWhere(collections.serviceJobs, 'customerId', customerId)
   ]);
 
   const packages = Array.from(serviceMap.values())
@@ -1057,8 +1089,23 @@ async function getCustomerDashboard(userId) {
     .sort((a, b) => a.name.localeCompare(b.name))
     .map((service) => service.name);
 
-  const customerJobs = jobs.filter((job) => Number(job.customerId) === customerId);
+  if (!user || user.role !== 'customer') {
+    const error = new Error('Customer profile not found.');
+    error.status = 404;
+    throw error;
+  }
+
+  const customerJobs = jobs;
   const customerJobIds = new Set(customerJobs.map((job) => Number(job.id)));
+  const [usages, images, jobDocuments, customerDocuments] = await Promise.all([
+    allWhereAny(collections.serviceJobParts, 'serviceJobId', [...customerJobIds]),
+    allWhereAny(collections.serviceImages, 'serviceJobId', [...customerJobIds]),
+    allWhereAny(collections.documents, 'serviceJobId', [...customerJobIds]),
+    allWhere(collections.documents, 'customerId', customerId)
+  ]);
+  const documents = [...new Map([...jobDocuments, ...customerDocuments].map((document) => [document.id, document])).values()];
+  const partIds = usages.map((usage) => Number(usage.partId));
+  const parts = (await Promise.all([...new Set(partIds)].map((id) => getById(collections.inventoryParts, id)))).filter(Boolean);
   const context = {
     usersById: new Map([[Number(user.id), user]]),
     vehiclesById: new Map(vehicles.map((vehicle) => [Number(vehicle.id), vehicle])),
@@ -1069,13 +1116,13 @@ async function getCustomerDashboard(userId) {
 
   return {
     profile: { name: user.name, email: user.email, phone: user.phone || '', avatar: user.avatar || '' },
-    vehicles: sortById(vehicles.filter((item) => Number(item.userId) === customerId)).map(vehicleView),
-    bookings: sortDateDesc(bookings.filter((item) => Number(item.userId) === customerId).map((item) => bookingView(item, serviceMap)), 'date', 'time'),
-    invoices: sortDateDesc(invoices.filter((item) => Number(item.userId) === customerId).map((item) => invoiceView(item, serviceMap)), 'date'),
-    notifications: sortById(notifications.filter((item) => Number(item.userId) === customerId)).reverse().map(({ id, type, message, unread }) => ({ id, type, message, unread })),
-    usedParts: sortById(usages.filter((usage) => customerJobIds.has(Number(usage.serviceJobId)))).reverse().map((usage) => usageView(usage, context)),
-    serviceImages: sortById(images.filter((image) => customerJobIds.has(Number(image.serviceJobId)))).reverse().map((image) => fileView(image, 'photo')),
-    documents: sortById(documents.filter((document) => Number(document.customerId) === Number(userId) || customerJobIds.has(Number(document.serviceJobId)))).reverse().map((document) => fileView(document, 'document')),
+    vehicles: sortById(vehicles).map(vehicleView),
+    bookings: sortDateDesc(bookings.map((item) => bookingView(item, serviceMap)), 'date', 'time'),
+    invoices: sortDateDesc(invoices.map((item) => invoiceView(item, serviceMap)), 'date'),
+    notifications: sortById(notifications).reverse().map(({ id, type, message, unread }) => ({ id, type, message, unread })),
+    usedParts: sortById(usages).reverse().map((usage) => usageView(usage, context)),
+    serviceImages: sortById(images).reverse().map((image) => fileView(image, 'photo')),
+    documents: sortById(documents).reverse().map((document) => fileView(document, 'document')),
     packages
   };
 }
@@ -1209,7 +1256,8 @@ function buildInventoryReports(parts, movements, usages, context = {}) {
 }
 
 async function getAdminDashboard(userId) {
-  const [users, vehicles, bookings, packages, pricingPlans, invoices, emergencies, notifications, notificationDrafts, feedback, technicians, serviceJobs, inventoryParts, suppliers, categories, movements, usages, photos, documents, serviceMap] = await Promise.all([
+  assertFirebaseConfigured();
+  const [users, vehicles, bookings, packages, pricingPlans, invoices, emergencies, notifications, notificationDrafts, feedback, technicians, serviceJobs, inventoryParts, suppliers, categories, movements, usages, photos, documents, serviceMap, landingStatsSnapshot, landingContentSettings] = await Promise.all([
     all(collections.users),
     all(collections.vehicles),
     all(collections.bookings),
@@ -1229,7 +1277,9 @@ async function getAdminDashboard(userId) {
     all(collections.serviceJobParts),
     all(collections.serviceImages),
     all(collections.documents),
-    servicesById()
+    servicesById(),
+    db.collection(collections.appSettings).doc(landingStatsDocument).get(),
+    getLandingContentSettings()
   ]);
 
   const context = {
@@ -1260,14 +1310,16 @@ async function getAdminDashboard(userId) {
     inventoryReports,
     technicianWorkload: buildTechnicianWorkload(technicians, jobViews, context.usersById),
     technicianPerformance: buildTechnicianPerformance(technicians, jobViews, context.usersById),
-    packages: sortById(packages).map(({ id, name, price, duration, description }) => ({ id, name, price: Number(price), duration, description })),
+    packages: sortById(packages).map(({ id, name, price, duration, description, image }) => ({ id, name, price: Number(price), duration, description, image: image || defaultServiceImage })),
     pricingPlans: pricingPlans.map(pricingPlanView).sort((a, b) => a.displayOrder - b.displayOrder || a.id - b.id),
     invoices: sortDateDesc(invoices.map((item) => invoiceView(item, serviceMap)), 'date'),
     emergencies: sortById(emergencies).reverse().map(({ id, userId, customerId, location, problem, status }) => ({ id, customerId: customerId || userId, location, problem, status })),
     notifications: sortById(notifications.filter((item) => Number(item.userId) === Number(userId))).reverse().map(({ id, type, message, unread }) => ({ id, type, message, unread })),
     sentNotifications: sortById(notifications.filter((item) => Number(item.senderUserId) === Number(userId))).reverse().map((item) => sentNotificationView(item, context.usersById)),
     notificationDrafts: sortById(notificationDrafts.filter((item) => Number(item.createdByUserId) === Number(userId))).reverse().map((item) => notificationDraftView(item, context.usersById)),
-    feedback: sortById(feedback).reverse().map(({ id, userId, customerId, rating, comment }) => ({ id, customerId: customerId || userId, rating, comment }))
+    feedback: sortById(feedback).reverse().map(({ id, userId, customerId, rating, comment }) => ({ id, customerId: customerId || userId, rating, comment })),
+    landingStats: landingStatsView(landingStatsSnapshot.exists ? landingStatsSnapshot.data() : {}, users, technicians, serviceJobs),
+    landingContent: landingContentView(landingContentSettings)
   };
 }
 
@@ -1358,9 +1410,18 @@ async function updateVehicle(id, userId, data, enforceOwner = true) {
 
 async function deleteVehicle(id, userId, enforceOwner = true) {
   const current = await getById(collections.vehicles, id);
-  if (current && (!enforceOwner || current.userId === userId)) {
-    await deleteDocument(collections.vehicles, id);
+  if (!current || (enforceOwner && Number(current.userId) !== Number(userId))) return false;
+  const [bookings, jobs] = await Promise.all([
+    allWhere(collections.bookings, 'vehicleId', Number(id)),
+    allWhere(collections.serviceJobs, 'vehicleId', Number(id))
+  ]);
+  if (bookings.length || jobs.length) {
+    const error = new Error('Vehicle cannot be removed while linked booking or service job records exist.');
+    error.status = 409;
+    throw error;
   }
+  await deleteDocument(collections.vehicles, id);
+  return true;
 }
 
 function bookingProgress(status) {
@@ -1368,11 +1429,7 @@ function bookingProgress(status) {
 }
 
 function normalizeServiceType(value) {
-  const text = String(value || '').trim();
-  const known = serviceSpecializations.find((item) => item.toLowerCase() === text.toLowerCase());
-  if (known) return known;
-  const alias = Object.entries(serviceAliases).find(([name]) => name.toLowerCase() === text.toLowerCase());
-  return alias ? alias[1] : text;
+  return String(value || '').trim();
 }
 
 function technicianSpecializations(technician) {
@@ -1382,15 +1439,17 @@ function technicianSpecializations(technician) {
     .filter(Boolean);
 }
 
-function normalizeTechnicianSpecialization(value) {
+async function normalizeTechnicianSpecialization(value) {
   const specializations = technicianSpecializations({ specialization: value });
-  const invalid = specializations.find((item) => !serviceSpecializations.includes(item));
+  const services = await all(collections.servicePackages);
+  const servicesByName = new Map(services.map((service) => [String(service.name).toLowerCase(), service.name]));
+  const invalid = specializations.find((item) => !servicesByName.has(item.toLowerCase()));
   if (!specializations.length || invalid) {
-    const error = new Error(`Technician specialization must be one of: ${serviceSpecializations.join(', ')}.`);
+    const error = new Error('Technician specialization must match an active service package.');
     error.status = 400;
     throw error;
   }
-  return [...new Set(specializations)].join(', ');
+  return [...new Set(specializations.map((item) => servicesByName.get(item.toLowerCase())))].join(', ');
 }
 
 function technicianCanDoService(technician, serviceName) {
@@ -1729,6 +1788,12 @@ async function deleteBooking(id, userId = null, enforceOwner = true) {
   const current = await getById(collections.bookings, id);
   if (!current) return false;
   if (enforceOwner && userId && Number(current.userId) !== Number(userId)) return false;
+  const jobs = await allWhere(collections.serviceJobs, 'bookingId', Number(id));
+  if (jobs.length) {
+    const error = new Error('Booking cannot be removed because a linked service job exists. Cancel it instead.');
+    error.status = 409;
+    throw error;
+  }
   await deleteDocument(collections.bookings, id);
   return true;
 }
@@ -1762,6 +1827,16 @@ async function createEmergency(userId, data) {
   const customer = await getById(collections.users, userId);
   await notifyAdmins('New Emergency Request', `${customer?.name || 'A customer'} requested emergency assistance at ${emergency.location}: ${emergency.problem}.`);
   return emergency;
+}
+
+async function closeEmergency(id) {
+  const emergency = await getById(collections.emergencyRequests, id);
+  if (!emergency) return null;
+  if (emergency.status !== 'Closed') {
+    await updateDocument(collections.emergencyRequests, id, { status: 'Closed' });
+    await createUserNotification(emergency.userId, 'Emergency Request Resolved', `Emergency request #ER-${id} has been resolved.`);
+  }
+  return { ...emergency, status: 'Closed' };
 }
 
 async function getEmergencyRequests() {
@@ -1832,10 +1907,97 @@ async function getPublicServiceRatings() {
       return {
         id: service.id,
         name: service.name,
+        price: Number(service.price || 0),
+        duration: service.duration || '',
+        description: service.description || '',
+        image: service.image || defaultServiceImage,
         averageRating: reviews.length ? Number((total / reviews.length).toFixed(1)) : 0,
         reviewCount: reviews.length
       };
     });
+}
+
+function landingStatsView(settings, users, technicians, jobs) {
+  const fallbackStats = {
+    ...landingStatDefaults,
+    registeredCustomers: users.filter((user) => user.role === 'customer').length,
+    activeTechnicians: technicians.filter((technician) => String(technician.status || '').toLowerCase() === 'active').length,
+    completedServices: jobs.filter((job) => job.status === 'Completed').length
+  };
+  return {
+    happyCustomers: Number.isSafeInteger(settings.happyCustomers) ? settings.happyCustomers : fallbackStats.happyCustomers,
+    expertTechnicians: Number.isSafeInteger(settings.expertTechnicians) ? settings.expertTechnicians : fallbackStats.expertTechnicians,
+    registeredCustomers: Number.isSafeInteger(settings.registeredCustomers) ? settings.registeredCustomers : fallbackStats.registeredCustomers,
+    activeTechnicians: Number.isSafeInteger(settings.activeTechnicians) ? settings.activeTechnicians : fallbackStats.activeTechnicians,
+    completedServices: Number.isSafeInteger(settings.completedServices) ? settings.completedServices : fallbackStats.completedServices
+  };
+}
+
+async function getPublicStats() {
+  assertFirebaseConfigured();
+  const [users, technicians, jobs, settingsSnapshot] = await Promise.all([
+    all(collections.users),
+    all(collections.technicians),
+    all(collections.serviceJobs),
+    db.collection(collections.appSettings).doc(landingStatsDocument).get()
+  ]);
+  const settings = settingsSnapshot.exists ? settingsSnapshot.data() : {};
+  return landingStatsView(settings, users, technicians, jobs);
+}
+
+async function getPublicLandingContent() {
+  const content = landingContentView(await getLandingContentSettings());
+  return {
+    recentWork: content.recentWork.filter((item) => item.active),
+    news: content.news.filter((item) => item.active)
+  };
+}
+
+async function updateLandingContentItem(section, slot, data) {
+  assertFirebaseConfigured();
+  if (!Object.hasOwn(landingContentDefaults, section) || !Number.isInteger(slot) || slot < 0 || slot >= landingContentDefaults[section].length) {
+    const error = new Error('Unknown landing content slot.');
+    error.status = 400;
+    throw error;
+  }
+  const ref = db.collection(collections.appSettings).doc(`${landingContentDocumentPrefix}-${section}-${slot}`);
+  await ref.set({ ...data, slot, updatedAt: fieldValue() }, { merge: true });
+  return { ...data, slot };
+}
+
+async function updateLandingStat(field, value) {
+  assertFirebaseConfigured();
+  const allowedFields = ['happyCustomers', 'expertTechnicians', 'registeredCustomers', 'activeTechnicians', 'completedServices'];
+  if (!allowedFields.includes(field)) {
+    const error = new Error('Unknown landing statistic.');
+    error.status = 400;
+    throw error;
+  }
+
+  const numericValue = Number(value);
+  if (!Number.isSafeInteger(numericValue) || numericValue < 0 || numericValue > 999999999) {
+    const error = new Error('Statistic value must be a whole number between 0 and 999,999,999.');
+    error.status = 400;
+    throw error;
+  }
+
+  await db.collection(collections.appSettings).doc(landingStatsDocument).set({
+    [field]: numericValue,
+    updatedAt: fieldValue()
+  }, { merge: true });
+  return { field, value: numericValue };
+}
+
+async function createNewsletterSubscription(email) {
+  const normalizedEmail = emailKey(email);
+  const existing = await allWhere(collections.newsletterSubscriptions, 'emailLower', normalizedEmail);
+  if (existing.length) return { id: existing[0].id, email: normalizedEmail, alreadySubscribed: true };
+  const subscription = await createDocument(collections.newsletterSubscriptions, {
+    email: normalizedEmail,
+    emailLower: normalizedEmail,
+    status: 'Active'
+  });
+  return { id: subscription.id, email: normalizedEmail, alreadySubscribed: false };
 }
 
 async function updateProfile(userId, data) {
@@ -1852,6 +2014,7 @@ async function updateProfile(userId, data) {
     phone: data.phone.trim()
   };
   if (Object.prototype.hasOwnProperty.call(data, 'avatar')) changes.avatar = String(data.avatar || '');
+  if (data.passwordHash) changes.passwordHash = data.passwordHash;
   const user = await updateDocument(collections.users, userId, changes);
   return publicUser(user);
 }
@@ -1866,13 +2029,15 @@ async function updateCustomer(id, data) {
     throw error;
   }
 
-  const user = await updateDocument(collections.users, id, {
+  const changes = {
     name: data.name.trim(),
     email: emailKey(data.email),
     emailLower: emailKey(data.email),
     phone: data.phone.trim(),
     status: String(data.status || 'active').toLowerCase()
-  });
+  };
+  if (data.passwordHash) changes.passwordHash = data.passwordHash;
+  const user = await updateDocument(collections.users, id, changes);
 
   return customerView(user);
 }
@@ -1930,12 +2095,6 @@ function normalizeInventoryPayload(data) {
     error.status = 400;
     throw error;
   }
-  if (!inventoryCategories.includes(data.category)) {
-    const error = new Error('Invalid inventory category.');
-    error.status = 400;
-    throw error;
-  }
-
   const stock = Number(data.stockQuantity ?? data.stock ?? 0);
   const minimumStockLevel = Number(data.minimumStockLevel ?? 0);
   const purchasePrice = Number(data.purchasePrice ?? 0);
@@ -1971,6 +2130,12 @@ function normalizeInventoryPayload(data) {
 }
 
 async function createInventoryItem(data) {
+  const categories = await allWhere(collections.inventoryCategories, 'name', data.category);
+  if (!categories.some((category) => category.status !== 'Inactive')) {
+    const error = new Error('Select an active inventory category from the database.');
+    error.status = 400;
+    throw error;
+  }
   const payload = normalizeInventoryPayload(data);
   if (await itemCodeExists(payload.itemCode)) {
     const error = new Error('An inventory item with this item code already exists.');
@@ -1992,6 +2157,12 @@ async function createInventoryItem(data) {
 async function updateInventoryItem(id, data) {
   const current = await getById(collections.inventoryParts, id);
   if (!current) return null;
+  const categories = await allWhere(collections.inventoryCategories, 'name', data.category);
+  if (!categories.some((category) => category.status !== 'Inactive')) {
+    const error = new Error('Select an active inventory category from the database.');
+    error.status = 400;
+    throw error;
+  }
   const payload = normalizeInventoryPayload(data);
   if (await itemCodeExists(payload.itemCode, id)) {
     const error = new Error('An inventory item with this item code already exists.');
@@ -2016,12 +2187,18 @@ async function updateInventoryItem(id, data) {
 }
 
 async function deleteInventoryItem(id) {
-  const usages = await all(collections.serviceJobParts);
-  if (usages.some((usage) => Number(usage.partId) === Number(id))) {
-    const error = new Error('Inventory item has service usage history and cannot be deleted.');
+  const part = await getById(collections.inventoryParts, id);
+  if (!part) return false;
+  const [usages, movements] = await Promise.all([
+    allWhere(collections.serviceJobParts, 'partId', Number(id)),
+    allWhere(collections.inventoryMovements, 'partId', Number(id))
+  ]);
+  if (usages.length || movements.some((movement) => movement.type !== 'Opening Stock')) {
+    const error = new Error('Inventory item has stock or service history and cannot be deleted. Set it inactive instead.');
     error.status = 409;
     throw error;
   }
+  await Promise.all(movements.map((movement) => deleteDocument(collections.inventoryMovements, movement.id)));
   await deleteDocument(collections.inventoryParts, id);
   return true;
 }
@@ -2044,6 +2221,19 @@ async function updateInventorySupplier(id, data) {
     address: String(data.address || '').trim(),
     status: data.status || 'Active'
   });
+}
+
+async function deleteInventorySupplier(id) {
+  const supplier = await getById(collections.inventorySuppliers, id);
+  if (!supplier) return false;
+  const parts = await allWhere(collections.inventoryParts, 'supplierId', Number(id));
+  if (parts.length) {
+    const error = new Error('Supplier cannot be removed while inventory items reference it.');
+    error.status = 409;
+    throw error;
+  }
+  await deleteDocument(collections.inventorySuppliers, id);
+  return true;
 }
 
 async function createInventoryMovement(data) {
@@ -2356,7 +2546,7 @@ async function createTechnician(data, passwordHash) {
   const technician = await createDocument(collections.technicians, {
     userId: user.id,
     employeeNo: String(data.employeeNo).trim().toUpperCase(),
-    specialization: normalizeTechnicianSpecialization(data.specialization),
+    specialization: await normalizeTechnicianSpecialization(data.specialization),
     phone: String(data.phone || '').trim(),
     experienceYears: Number(data.experienceYears || 0),
     status: String(data.status || 'active').toLowerCase()
@@ -2379,17 +2569,19 @@ async function updateTechnician(id, data) {
     throw error;
   }
 
-  const user = await updateDocument(collections.users, current.userId, {
+  const userChanges = {
     name: data.name.trim(),
     email: emailKey(data.email),
     emailLower: emailKey(data.email),
     phone: String(data.phone || '').trim(),
     status: String(data.status || 'active').toLowerCase()
-  });
+  };
+  if (data.passwordHash) userChanges.passwordHash = data.passwordHash;
+  const user = await updateDocument(collections.users, current.userId, userChanges);
 
   const technician = await updateDocument(collections.technicians, id, {
     employeeNo: String(data.employeeNo).trim().toUpperCase(),
-    specialization: normalizeTechnicianSpecialization(data.specialization),
+    specialization: await normalizeTechnicianSpecialization(data.specialization),
     phone: String(data.phone || '').trim(),
     experienceYears: Number(data.experienceYears || 0),
     status: String(data.status || 'active').toLowerCase()
@@ -2564,22 +2756,22 @@ async function getTechnicianDashboard(userId) {
     throw error;
   }
 
-  const [jobs, notes, progressEntries, partsUsed, inventoryParts, notifications, photos, documents, context] = await Promise.all([
-    all(collections.serviceJobs),
-    all(collections.technicianNotes),
-    all(collections.technicianProgress),
-    all(collections.serviceJobParts),
+  const [jobs, notes, progressEntries, partsUsed, inventoryParts, notifications, context] = await Promise.all([
+    allWhere(collections.serviceJobs, 'assignedTechnicianId', Number(technician.id)),
+    allWhere(collections.technicianNotes, 'technicianId', Number(technician.id)),
+    allWhere(collections.technicianProgress, 'technicianId', Number(technician.id)),
+    allWhere(collections.serviceJobParts, 'usedByTechnician', Number(technician.id)),
     all(collections.inventoryParts),
-    all(collections.notifications),
-    all(collections.serviceImages),
-    all(collections.documents),
+    allWhere(collections.notifications, 'userId', Number(userId)),
     dashboardContext()
   ]);
 
-  const assignedJobs = jobs
-    .filter((job) => Number(job.assignedTechnicianId) === Number(technician.id))
-    .map((job) => serviceJobView(job, context));
+  const assignedJobs = jobs.map((job) => serviceJobView(job, context));
   const assignedJobIds = new Set(assignedJobs.map((job) => Number(job.id)));
+  const [photos, documents] = await Promise.all([
+    allWhereAny(collections.serviceImages, 'serviceJobId', [...assignedJobIds]),
+    allWhereAny(collections.documents, 'serviceJobId', [...assignedJobIds])
+  ]);
   const todayText = today();
 
   return {
@@ -2591,13 +2783,13 @@ async function getTechnicianDashboard(userId) {
     completedJobs: assignedJobs.filter((job) => job.status === 'Completed').length,
     activeJobs: assignedJobs.filter((job) => !['Completed', 'Cancelled'].includes(job.status)).length,
     performance: buildTechnicianPerformance([technician], assignedJobs, context.usersById)[0],
-    notes: notes.filter((note) => Number(note.technicianId) === Number(technician.id)),
-    progress: progressEntries.filter((entry) => Number(entry.technicianId) === Number(technician.id)),
-    partsUsed: partsUsed.filter((part) => Number(part.usedByTechnician) === Number(technician.id)),
+    notes,
+    progress: progressEntries,
+    partsUsed,
     inventoryParts: inventoryParts.map(partView),
-    servicePhotos: sortById(photos.filter((photo) => assignedJobIds.has(Number(photo.serviceJobId)))).reverse().map((photo) => fileView(photo, 'photo')),
-    documents: sortById(documents.filter((document) => assignedJobIds.has(Number(document.serviceJobId)))).reverse().map((document) => fileView(document, 'document')),
-    notifications: sortById(notifications.filter((item) => Number(item.userId) === Number(userId))).reverse().map(({ id, type, message, unread }) => ({ id, type, message, unread }))
+    servicePhotos: sortById(photos).reverse().map((photo) => fileView(photo, 'photo')),
+    documents: sortById(documents).reverse().map((document) => fileView(document, 'document')),
+    notifications: sortById(notifications).reverse().map(({ id, type, message, unread }) => ({ id, type, message, unread }))
   };
 }
 
@@ -3122,9 +3314,10 @@ async function createService(data) {
     price: Number(data.price),
     duration: data.duration.trim(),
     description: data.description.trim(),
+    image: data.image || defaultServiceImage,
     active: true
   });
-  return { id: service.id, name: service.name, price: service.price, duration: service.duration, description: service.description };
+  return { id: service.id, name: service.name, price: service.price, duration: service.duration, description: service.description, image: service.image };
 }
 
 async function updateService(id, data) {
@@ -3132,9 +3325,27 @@ async function updateService(id, data) {
     name: data.name.trim(),
     price: Number(data.price),
     duration: data.duration.trim(),
-    description: data.description.trim()
+    description: data.description.trim(),
+    image: data.image || defaultServiceImage
   });
-  return service ? { id: service.id, name: service.name, price: service.price, duration: service.duration, description: service.description } : null;
+  return service ? { id: service.id, name: service.name, price: service.price, duration: service.duration, description: service.description, image: service.image } : null;
+}
+
+async function deleteService(id) {
+  const service = await getById(collections.servicePackages, id);
+  if (!service) return false;
+  const [bookings, invoices, feedback] = await Promise.all([
+    allWhere(collections.bookings, 'servicePackageId', Number(id)),
+    allWhere(collections.invoices, 'servicePackageId', Number(id)),
+    allWhere(collections.feedback, 'servicePackageId', Number(id))
+  ]);
+  if (bookings.length || invoices.length || feedback.length) {
+    const error = new Error('Service package has booking, invoice, or feedback history and cannot be deleted.');
+    error.status = 409;
+    throw error;
+  }
+  await deleteDocument(collections.servicePackages, id);
+  return true;
 }
 
 async function createInvoice(data) {
@@ -3185,7 +3396,7 @@ async function createInvoice(data) {
 
 async function notificationRecipient(userId) {
   const recipient = await getById(collections.users, userId);
-  if (!recipient || !['customer', 'technician'].includes(recipient.role)) {
+  if (!recipient || !['customer', 'technician'].includes(recipient.role) || String(recipient.status || '').toLowerCase() !== 'active') {
     const error = new Error('Select a valid customer or technician recipient.');
     error.status = 400;
     throw error;
@@ -3210,8 +3421,8 @@ async function createNotification(data, senderUserId = null) {
     userId: recipient.id,
     recipientRole: recipient.role,
     senderUserId: senderUserId ? asId(senderUserId) : null,
-    type: data.type.trim(),
-    message: data.message.trim(),
+    type: String(data.type).trim().slice(0, 80),
+    message: String(data.message).trim().slice(0, 2000),
     unread: true
   });
   if (draft) await deleteDocument(collections.notificationDrafts, draft.id);
@@ -3224,8 +3435,8 @@ async function createNotificationDraft(userId, data) {
     createdByUserId: asId(userId),
     userId: recipient.id,
     recipientRole: recipient.role,
-    type: data.type.trim(),
-    message: data.message.trim()
+    type: String(data.type).trim().slice(0, 80),
+    message: String(data.message).trim().slice(0, 2000)
   };
   const draftId = data.draftId ? asId(data.draftId) : null;
   if (draftId) {
@@ -3296,226 +3507,6 @@ async function markInvoiceEmailed(id, adminUserId) {
   return true;
 }
 
-async function syncCounters() {
-  const counterData = {};
-  await Promise.all(Object.values(collections).map(async (collection) => {
-    const items = await all(collection);
-    counterData[collection] = Math.max(0, ...items.map((item) => Number(item.id) || 0));
-  }));
-  await db.collection('meta').doc('counters').set(counterData, { merge: true });
-}
-
-async function writeIfMissing(collection, id, data) {
-  assertFirebaseConfigured();
-  const ref = docRef(collection, id);
-  const snapshot = await ref.get();
-  if (!snapshot.exists) {
-    await ref.set({ ...data, id, createdAt: fieldValue() });
-  }
-}
-
-async function ensureSeedData() {
-  const [adminHash, customerHash] = await Promise.all([
-    bcrypt.hash('admin123', 12),
-    bcrypt.hash('customer123', 12)
-  ]);
-  const techHash = await bcrypt.hash('tech123', 12);
-
-  await writeIfMissing(collections.users, 1, {
-    role: 'admin',
-    name: 'Admin Manager',
-    email: 'admin@autocare.lk',
-    emailLower: 'admin@autocare.lk',
-    phone: '+94 77 023 4567',
-    passwordHash: adminHash,
-    status: 'active'
-  });
-
-  await writeIfMissing(collections.users, 2, {
-    role: 'customer',
-    name: 'Demo Customer',
-    email: 'customer@autocare.lk',
-    emailLower: 'customer@autocare.lk',
-    phone: '+94 77 345 6789',
-    passwordHash: customerHash,
-    status: 'active'
-  });
-
-  const technicianUser = await ensureUserByEmailRole({
-    id: 3,
-    role: 'technician',
-    name: 'Kasun Technician',
-    email: 'tech@autocare.lk',
-    phone: '+94 77 222 3344',
-    passwordHash: techHash,
-    status: 'active',
-    syncPassword: true
-  });
-
-  await writeIfMissing(collections.technicians, 1, {
-    userId: technicianUser.id,
-    employeeNo: 'TECH-001',
-    specialization: 'General Service',
-    phone: '+94 77 222 3344',
-    experienceYears: 4,
-    status: 'active'
-  });
-  await updateDocument(collections.technicians, 1, {
-    userId: technicianUser.id,
-    employeeNo: 'TECH-001',
-    specialization: 'General Service',
-    phone: '+94 77 222 3344',
-    experienceYears: 4,
-    status: 'active'
-  });
-
-  const services = [
-    [1, 'Oil Change', 6000, '45 min', 'Engine oil, filter replacement and quick inspection.'],
-    [2, 'Brake Service', 7500, '1 hr', 'Brake pads, fluid check and safety testing.'],
-    [3, 'Full Service', 18500, '3 hr', 'Complete inspection, fluids, diagnostics and tune-up.'],
-    [4, 'Engine Diagnostics', 12000, '1.5 hr', 'Computer scan, issue report and repair estimate.'],
-    [5, 'General Service', 8500, '1 hr', 'Standard maintenance service and inspection.'],
-    [6, 'Electrical Repair', 14000, '2 hr', 'Electrical fault diagnosis and repair.'],
-    [7, 'Engine Repair', 22000, '3 hr', 'Engine repair, tuning and mechanical correction.'],
-    [8, 'Suspension Repair', 16000, '2 hr', 'Suspension inspection, repair and alignment checks.'],
-    [9, 'Hybrid/EV Service', 26000, '2 hr', 'Hybrid and electric vehicle safety inspection and service.']
-  ];
-
-  await Promise.all(services.map(([id, name, price, duration, description]) => (
-    writeIfMissing(collections.servicePackages, id, { name, price, duration, description, active: true })
-  )));
-
-  await writeIfMissing(collections.vehicles, 1, {
-    userId: 2,
-    make: 'Toyota Corolla',
-    model: 'Axio',
-    plateNumber: 'ABC-854',
-    year: '2019',
-    imageUrl: 'assets/images/newsletter-red-sports-car.png'
-  });
-
-  await writeIfMissing(collections.vehicles, 2, {
-    userId: 2,
-    make: 'Honda Civic',
-    model: 'EX',
-    plateNumber: 'XZ-5676',
-    year: '2019',
-    imageUrl: defaultImage
-  });
-
-  await writeIfMissing(collections.bookings, 1, {
-    userId: 2,
-    vehicleId: 1,
-    servicePackageId: 5,
-    bookingDate: today(2),
-    bookingTime: '10:00',
-    status: 'Approved',
-    queuePosition: 3,
-    progress: 35
-  });
-
-  await writeIfMissing(collections.serviceJobs, 1, {
-    bookingId: 1,
-    vehicleId: 1,
-    customerId: 2,
-    assignedTechnicianId: 1,
-    serviceType: 'General Service',
-    priority: 'Normal',
-    status: 'Assigned',
-    progress: 35,
-    startDate: today(),
-    expectedCompletionDate: today(1),
-    completionDate: '',
-    assignedDate: today()
-  });
-
-  await Promise.all(inventoryCategories.map((name, index) => (
-    writeIfMissing(collections.inventoryCategories, index + 1, { name, status: 'Active' })
-  )));
-
-  await writeIfMissing(collections.inventorySuppliers, 1, {
-    name: 'AutoParts Lanka',
-    phone: '+94 77 555 1122',
-    email: 'sales@autopartslanka.lk',
-    address: 'Colombo',
-    status: 'Active'
-  });
-
-  const inventorySeed = [
-    [1, 'OIL-5W30', 'Engine Oil 5W30', 'Fluids & Lubricants', 'Castrol', 'Castrol', 1, 3200, 4500, 24, 6, 'A1', '6 months'],
-    [2, 'OIL-10W40', 'Engine Oil 10W40', 'Fluids & Lubricants', 'Mobil', 'Mobil', 1, 3000, 4200, 18, 6, 'A1', '6 months'],
-    [3, 'FLT-OIL', 'Oil Filter', 'Filters', 'Bosch', 'Bosch', 1, 900, 1500, 20, 5, 'B1', '3 months'],
-    [4, 'FLT-AIR', 'Air Filter', 'Filters', 'Toyota Genuine', 'Toyota', 1, 1400, 2400, 15, 5, 'B1', '3 months'],
-    [5, 'FLT-FUEL', 'Fuel Filter', 'Filters', 'Denso', 'Denso', 1, 1800, 2900, 10, 4, 'B2', '3 months'],
-    [6, 'BRK-FPAD', 'Front Brake Pad', 'Brake System', 'Brembo', 'Brembo', 1, 5200, 7500, 12, 4, 'C1', '12 months'],
-    [7, 'BRK-RPAD', 'Rear Brake Pad', 'Brake System', 'Brembo', 'Brembo', 1, 4800, 7000, 10, 4, 'C1', '12 months'],
-    [8, 'BRK-FLUID', 'Brake Fluid', 'Brake System', 'Bosch', 'Bosch', 1, 1100, 1900, 16, 5, 'C2', '6 months'],
-    [9, 'BAT-12V', 'Car Battery 12V', 'Batteries', 'Exide', 'Exide', 1, 21500, 29500, 7, 2, 'D1', '18 months'],
-    [10, 'SPK-PLUG', 'Spark Plug', 'Engine Parts', 'NGK', 'NGK', 1, 850, 1400, 40, 10, 'E1', '6 months'],
-    [11, 'ALT-BELT', 'Alternator Belt', 'Engine Parts', 'Mitsuboshi', 'Mitsuboshi', 1, 2400, 3800, 8, 3, 'E2', '6 months'],
-    [12, 'LED-HL', 'LED Headlight Bulb', 'Electrical', 'Philips', 'Philips', 1, 3600, 5200, 14, 4, 'F1', '12 months'],
-    [13, 'COOLANT', 'Coolant', 'Cooling System', 'Toyota Genuine', 'Toyota', 1, 1500, 2600, 22, 6, 'G1', '6 months'],
-    [14, 'RAD-HOSE', 'Radiator Hose', 'Cooling System', 'Gates', 'Gates', 1, 1900, 3200, 9, 3, 'G2', '6 months'],
-    [15, 'SHK-FRONT', 'Front Shock Absorber', 'Suspension', 'KYB', 'KYB', 1, 9800, 14500, 6, 2, 'H1', '12 months'],
-    [16, 'SHK-REAR', 'Rear Shock Absorber', 'Suspension', 'KYB', 'KYB', 1, 8900, 13200, 6, 2, 'H1', '12 months'],
-    [17, 'TIRE-VALVE', 'Tire Valve', 'Tires & Wheels', 'TR413', 'Schrader', 1, 250, 500, 60, 15, 'I1', '1 month'],
-    [18, 'WHL-BEAR', 'Wheel Bearing', 'Tires & Wheels', 'Koyo', 'Koyo', 1, 4200, 6800, 8, 3, 'I2', '12 months'],
-    [19, 'WIPER', 'Wiper Blade', 'Accessories', 'Bosch', 'Bosch', 1, 1300, 2200, 20, 5, 'J1', '3 months'],
-    [20, 'FLT-CABIN', 'Cabin Air Filter', 'Filters', 'Denso', 'Denso', 1, 1200, 2100, 16, 5, 'B3', '3 months']
-  ];
-
-  await Promise.all(inventorySeed.map(async ([id, itemCode, partName, category, brand, manufacturer, supplierId, purchasePrice, sellingPrice, stock, minimumStockLevel, location, warrantyPeriod]) => {
-    const data = {
-      itemCode,
-      sku: itemCode,
-      partName,
-      name: partName,
-      category,
-      brand,
-      manufacturer,
-      supplierId,
-      supplier: 'AutoParts Lanka',
-      description: `${brand} ${partName}`,
-      purchasePrice,
-      sellingPrice,
-      unitPrice: sellingPrice,
-      stock,
-      stockQuantity: stock,
-      minimumStockLevel,
-      location,
-      warrantyPeriod,
-      warrantyProvider: brand,
-      status: inventoryStockStatus(stock)
-    };
-    await writeIfMissing(collections.inventoryParts, id, data);
-    await updateDocument(collections.inventoryParts, id, data);
-  }));
-
-  await writeIfMissing(collections.invoices, 1, {
-    userId: 2,
-    servicePackageId: 1,
-    amount: 6000,
-    paymentStatus: 'Paid',
-    invoiceDate: today(-5)
-  });
-
-  const defaultPricingPlans = [
-    { id: 1, name: 'Basic Plan', badge: 'Essential care', price: 16000, billingPeriod: 'month', image: 'assets/images/workshop-lift-mechanic.png', features: ['Oil, filter and fluid check', 'Brake inspection', 'Quick health report', 'Basic support'], buttonText: 'Choose Basic', featured: false, active: true, displayOrder: 1 },
-    { id: 2, name: 'Popular Plan', badge: 'Most popular', price: 20000, billingPeriod: 'month', image: 'assets/images/about-mechanic-red-car.png', features: ['Starter plan features', 'Engine diagnostics', 'Battery and AC check', 'Priority service slot'], buttonText: 'Choose Popular', featured: true, active: true, displayOrder: 2 },
-    { id: 3, name: 'Premium Plan', badge: 'Extra protection', price: 18000, billingPeriod: 'month', image: 'assets/images/service-wheel-closeup.png', features: ['Popular plan features', 'Wheel alignment', 'Transmission inspection', 'Extended warranty'], buttonText: 'Choose Premium', featured: false, active: true, displayOrder: 3 }
-  ];
-  await Promise.all(defaultPricingPlans.map(({ id, ...plan }) => writeIfMissing(collections.pricingPlans, id, plan)));
-
-  await writeIfMissing(collections.notifications, 1, {
-    userId: 2,
-    type: 'Booking Approved',
-    message: 'Your General Service booking has been approved.',
-    unread: true
-  });
-
-  await syncCounters();
-}
-
 async function checkConnection() {
   assertFirebaseConfigured();
   await db.collection(collections.users).limit(1).get();
@@ -3529,6 +3520,7 @@ module.exports = {
   assignTechnician,
   cancelBooking,
   checkConnection,
+  closeEmergency,
   collections,
   createBooking,
   createCustomer: async (data, passwordHash) => createUser({ role: 'customer', ...data, passwordHash }),
@@ -3540,18 +3532,20 @@ module.exports = {
   createInventorySupplier,
   createNotification,
   createNotificationDraft,
+  createNewsletterSubscription,
   createService,
   createServiceJob,
   createTechnician,
   createUser,
   createVehicle,
   deleteInventoryItem,
+  deleteInventorySupplier,
   deletePricingPlan,
+  deleteService,
   deleteNotificationDraft,
   deleteCustomer,
   deleteTechnician,
   deleteVehicle,
-  ensureSeedData,
   findUserByEmailRole,
   getAdminDashboard,
   getAdminMessageCenter,
@@ -3567,7 +3561,9 @@ module.exports = {
   getFileForDownload,
   getInvoicePdf,
   getPartUsagePhotoForDownload,
+  getPublicLandingContent,
   getPublicServiceRatings,
+  getPublicStats,
   getPublicPricingPlans,
   getTechnicianDashboard,
   getTechnicianPerformance,
@@ -3591,6 +3587,8 @@ module.exports = {
   updateDocument,
   updateInventoryItem,
   updateInventorySupplier,
+  updateLandingContentItem,
+  updateLandingStat,
   updateProfile,
   updatePricingPlan,
   updateService,

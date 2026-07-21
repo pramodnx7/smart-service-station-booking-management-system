@@ -4,7 +4,6 @@ const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
 const express = require('express');
-const cors = require('cors');
 const helmet = require('helmet');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
@@ -13,9 +12,13 @@ const store = require('./src/firestore-store');
 const app = express();
 const port = process.env.PORT || 3000;
 const jwtSecret = process.env.JWT_SECRET || 'development-only-secret-change-me';
+const databaseTimeoutMs = Math.max(1000, Number(process.env.DATABASE_TIMEOUT_MS) || 15000);
+
+if (process.env.NODE_ENV === 'production' && (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32)) {
+  throw new Error('JWT_SECRET must be configured with at least 32 characters in production.');
+}
 
 app.use(helmet({ contentSecurityPolicy: false }));
-app.use(cors());
 app.use(express.json({ limit: '12mb' }));
 
 const uploadRoot = path.join(__dirname, 'uploads', 'service-files');
@@ -98,12 +101,6 @@ function signUser(user) {
   return jwt.sign({ id: user.id, role: user.role, email: user.email, name: user.name }, jwtSecret, { expiresIn: '8h' });
 }
 
-const demoAccounts = Object.freeze({
-  admin: { id: 1, role: 'admin', name: 'Admin Manager', email: 'admin@autocare.lk', phone: '+94 77 023 4567', password: 'admin123' },
-  customer: { id: 2, role: 'customer', name: 'Demo Customer', email: 'customer@autocare.lk', phone: '+94 77 345 6789', password: 'customer123' },
-  technician: { id: 3, role: 'technician', name: 'Kasun Technician', email: 'tech@autocare.lk', phone: '+94 77 222 3344', password: 'tech123' }
-});
-
 function isTemporaryFirestoreError(error) {
   const message = String(error?.message || '').toLowerCase();
   return Number(error?.code) === 8
@@ -113,21 +110,7 @@ function isTemporaryFirestoreError(error) {
     || message.includes('firestore is currently unavailable');
 }
 
-function safeTextEqual(left, right) {
-  const leftBuffer = Buffer.from(String(left));
-  const rightBuffer = Buffer.from(String(right));
-  return leftBuffer.length === rightBuffer.length && crypto.timingSafeEqual(leftBuffer, rightBuffer);
-}
-
-function getDemoAccount(role, email, password) {
-  if (process.env.NODE_ENV === 'production' || process.env.ALLOW_DEMO_LOGIN_FALLBACK === 'false') return null;
-  const account = demoAccounts[String(role || '').toLowerCase()];
-  if (!account || emailKey(account.email) !== emailKey(email) || !safeTextEqual(account.password, password)) return null;
-  const { password: ignoredPassword, ...user } = account;
-  return user;
-}
-
-async function withDatabaseTimeout(operation, timeoutMs = 5000) {
+async function withDatabaseTimeout(operation, timeoutMs = databaseTimeoutMs) {
   let timer;
   const timeout = new Promise((resolve, reject) => {
     timer = setTimeout(() => {
@@ -144,42 +127,64 @@ async function withDatabaseTimeout(operation, timeoutMs = 5000) {
 }
 
 function requireAuth(role) {
-  return (req, res, next) => {
+  return async (req, res, next) => {
     const token = getTokenFromRequest(req);
 
     if (!token) {
       return res.status(401).json({ message: 'Authentication required.' });
     }
 
+    let session;
     try {
-      req.user = jwt.verify(token, jwtSecret);
+      session = jwt.verify(token, jwtSecret);
+    } catch (error) {
+      return res.status(401).json({ message: 'Invalid or expired session.' });
+    }
+
+    try {
+      const userRecord = await withDatabaseTimeout(store.getById(store.collections.users, session.id));
+      if (!userRecord || String(userRecord.status || '').toLowerCase() !== 'active' || userRecord.role !== session.role) {
+        clearSessionCookie(res);
+        return res.status(401).json({ message: 'Account is inactive or no longer exists.' });
+      }
+      req.user = store.publicUser(userRecord);
       if (role && req.user.role !== role) {
         return res.status(403).json({ message: 'Access denied.' });
       }
       return next();
     } catch (error) {
-      return res.status(401).json({ message: 'Invalid or expired session.' });
+      return next(error);
     }
   };
 }
 
 function requireDashboardAccess(role) {
-  return (req, res, next) => {
+  return async (req, res, next) => {
     const token = getTokenFromRequest(req);
 
     if (!token) {
       return res.redirect('/index.html');
     }
 
+    let session;
     try {
-      const session = jwt.verify(token, jwtSecret);
+      session = jwt.verify(token, jwtSecret);
       if (session.role !== role) {
         return res.redirect('/index.html');
       }
-
-      return next();
     } catch (error) {
       return res.redirect('/index.html');
+    }
+
+    try {
+      const userRecord = await withDatabaseTimeout(store.getById(store.collections.users, session.id));
+      if (!userRecord || String(userRecord.status || '').toLowerCase() !== 'active' || userRecord.role !== role) {
+        clearSessionCookie(res);
+        return res.redirect('/index.html');
+      }
+      return next();
+    } catch (error) {
+      return next(error);
     }
   };
 }
@@ -191,6 +196,37 @@ function requireFields(body, fields) {
     error.status = 400;
     throw error;
   }
+}
+
+function validateEmail(email) {
+  const value = emailKey(email);
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value) || value.length > 254) {
+    const error = new Error('Enter a valid email address.');
+    error.status = 400;
+    throw error;
+  }
+  return value;
+}
+
+function validatePassword(password, required = true) {
+  const value = String(password || '');
+  if (!value && !required) return '';
+  if (value.length < 8 || value.length > 128) {
+    const error = new Error('Password must contain between 8 and 128 characters.');
+    error.status = 400;
+    throw error;
+  }
+  return value;
+}
+
+function validateRole(role) {
+  const value = String(role || '').toLowerCase();
+  if (!['admin', 'customer', 'technician'].includes(value)) {
+    const error = new Error('Invalid account role.');
+    error.status = 400;
+    throw error;
+  }
+  return value;
 }
 
 function validateProfileAvatar(avatar) {
@@ -274,7 +310,7 @@ async function handleFileUpload(req, res, next, kind) {
 
 app.get('/api/health', async (req, res, next) => {
   try {
-    res.json(await store.checkConnection());
+    res.json(await withDatabaseTimeout(store.checkConnection()));
   } catch (error) {
     next(error);
   }
@@ -282,26 +318,53 @@ app.get('/api/health', async (req, res, next) => {
 
 app.get('/api/public/service-ratings', async (req, res, next) => {
   try {
-    res.json({ services: await store.getPublicServiceRatings() });
+    res.json({ services: await withDatabaseTimeout(store.getPublicServiceRatings()) });
   } catch (error) {
     next(error);
   }
 });
 
 app.get('/api/public/pricing-plans', async (req, res, next) => {
-  try { res.json({ plans: await store.getPublicPricingPlans() }); } catch (error) { next(error); }
+  try { res.json({ plans: await withDatabaseTimeout(store.getPublicPricingPlans()) }); } catch (error) { next(error); }
 });
 
-function pricingPlanPayload(body) {
-  requireFields(body, ['name', 'badge', 'price', 'image', 'buttonText']);
-  const image = String(body.image || '').trim();
+app.get('/api/public/stats', async (req, res, next) => {
+  try {
+    res.json(await withDatabaseTimeout(store.getPublicStats()));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get('/api/public/landing-content', async (req, res, next) => {
+  try { res.json(await withDatabaseTimeout(store.getPublicLandingContent())); } catch (error) { next(error); }
+});
+
+app.post('/api/public/newsletter-subscriptions', async (req, res, next) => {
+  try {
+    requireFields(req.body, ['email']);
+    const subscription = await store.createNewsletterSubscription(validateEmail(req.body.email));
+    res.status(subscription.alreadySubscribed ? 200 : 201).json(subscription);
+  } catch (error) {
+    next(error);
+  }
+});
+
+function landingImage(value, label) {
+  const image = String(value || '').trim();
   const isSafePath = /^(?:assets|uploads)\/[-a-z0-9_./]+$/i.test(image);
   const isImageData = /^data:image\/(?:jpeg|png|webp);base64,[a-z0-9+/=]+$/i.test(image) && Buffer.byteLength(image, 'utf8') <= 700 * 1024;
   if (!isSafePath && !isImageData) {
-    const error = new Error('Plan image must be a valid uploaded image or project image path.');
+    const error = new Error(`${label} must be a valid JPG, PNG, WebP, or project image.`);
     error.status = 400;
     throw error;
   }
+  return image;
+}
+
+function pricingPlanPayload(body) {
+  requireFields(body, ['name', 'badge', 'price', 'image', 'buttonText']);
+  const image = landingImage(body.image, 'Plan image');
   const features = Array.isArray(body.features) ? body.features : String(body.features || '').split(/\r?\n/);
   const cleanedFeatures = features.map((item) => String(item).trim()).filter(Boolean).slice(0, 10);
   if (!cleanedFeatures.length) {
@@ -310,6 +373,34 @@ function pricingPlanPayload(body) {
     throw error;
   }
   return { ...body, image, features: cleanedFeatures, featured: body.featured === true, active: body.active !== false };
+}
+
+function servicePayload(body) {
+  requireFields(body, ['name', 'price', 'duration', 'description']);
+  return { ...body, image: landingImage(body.image || 'assets/images/service-wheel-closeup.png', 'Service photo') };
+}
+
+function landingContentPayload(section, body) {
+  if (!['recentWork', 'news'].includes(section)) {
+    const error = new Error('Unknown landing content section.');
+    error.status = 400;
+    throw error;
+  }
+  const common = { image: landingImage(body.image, 'Content photo'), active: body.active !== false };
+  if (section === 'recentWork') {
+    requireFields(body, ['title', 'image']);
+    return { ...common, title: String(body.title).trim().slice(0, 100) };
+  }
+  if (section === 'news') {
+    requireFields(body, ['date', 'category', 'title', 'image']);
+    const parsedDate = new Date(`${body.date}T00:00:00Z`);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(body.date) || Number.isNaN(parsedDate.getTime()) || parsedDate.toISOString().slice(0, 10) !== body.date) {
+      const error = new Error('News date must use YYYY-MM-DD format.');
+      error.status = 400;
+      throw error;
+    }
+    return { ...common, date: body.date, category: String(body.category).trim().slice(0, 50), title: String(body.title).trim().slice(0, 140) };
+  }
 }
 
 app.post('/api/auth/register', async (req, res, next) => {
@@ -321,11 +412,11 @@ app.post('/api/auth/register', async (req, res, next) => {
       return res.status(400).json({ message: 'Public registration is available for customers only.' });
     }
 
-    const passwordHash = await bcrypt.hash(password, 12);
-    const user = await store.createUser({ role, name, email, phone, passwordHash });
+    const passwordHash = await bcrypt.hash(validatePassword(password), 12);
+    const user = await store.createUser({ role, name, email: validateEmail(email), phone, passwordHash });
     const token = signUser(user);
     sendAuthCookie(res, token);
-    res.status(201).json({ user, token });
+    res.status(201).json({ user });
   } catch (error) {
     next(error);
   }
@@ -335,30 +426,18 @@ app.post('/api/auth/login', async (req, res, next) => {
   try {
     const { role, email, password } = req.body;
     requireFields(req.body, ['role', 'email', 'password']);
-
-    let userRecord;
-    try {
-      userRecord = await withDatabaseTimeout(store.findUserByEmailRole(email, role));
-    } catch (error) {
-      if (!isTemporaryFirestoreError(error)) throw error;
-      const demoUser = getDemoAccount(role, email, password);
-      if (!demoUser) {
-        return res.status(503).json({ message: 'The database is temporarily busy. Please try again shortly.' });
-      }
-      const token = signUser(demoUser);
-      sendAuthCookie(res, token);
-      return res.json({ user: demoUser, token, databaseDegraded: true });
-    }
+    const validatedRole = validateRole(role);
+    const userRecord = await withDatabaseTimeout(store.findUserByEmailRole(validateEmail(email), validatedRole));
     const isValid = userRecord ? await bcrypt.compare(password, userRecord.passwordHash) : false;
 
-    if (!isValid) {
+    if (!isValid || String(userRecord.status || '').toLowerCase() !== 'active') {
       return res.status(401).json({ message: 'Invalid email, password or selected role.' });
     }
 
     const user = store.publicUser(userRecord);
     const token = signUser(user);
     sendAuthCookie(res, token);
-    res.json({ user, token });
+    res.json({ user });
   } catch (error) {
     next(error);
   }
@@ -370,7 +449,7 @@ app.post('/api/auth/logout', (req, res) => {
 });
 
 app.get('/api/auth/session', requireAuth(), (req, res) => {
-  res.json({ user: req.user, token: getTokenFromRequest(req) });
+  res.json({ user: req.user });
 });
 
 app.put('/api/profile', requireAuth(), async (req, res, next) => {
@@ -378,10 +457,12 @@ app.put('/api/profile', requireAuth(), async (req, res, next) => {
     requireFields(req.body, ['name', 'email', 'phone']);
     const payload = { ...req.body };
     if (Object.prototype.hasOwnProperty.call(payload, 'avatar')) payload.avatar = validateProfileAvatar(payload.avatar);
+    if (payload.password) payload.passwordHash = await bcrypt.hash(validatePassword(payload.password), 12);
+    delete payload.password;
     const user = await store.updateProfile(req.user.id, payload);
     const token = signUser(user);
     sendAuthCookie(res, token);
-    res.json({ user, token });
+    res.json({ user });
   } catch (error) {
     next(error);
   }
@@ -398,6 +479,8 @@ app.get('/customer-dashboard.html', requireDashboardAccess('customer'), (req, re
 app.get('/technician-dashboard.html', requireDashboardAccess('technician'), (req, res) => {
   res.sendFile(path.join(__dirname, 'technician-dashboard.html'));
 });
+
+app.get('/favicon.ico', (req, res) => res.status(204).end());
 
 app.use(express.static(path.join(__dirname)));
 
@@ -438,6 +521,24 @@ app.put('/api/customer/notifications/read-all', requireAuth('customer'), async (
 app.get('/api/admin/dashboard', requireAuth('admin'), async (req, res, next) => {
   try {
     res.json(await store.getAdminDashboard(req.user.id));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.put('/api/admin/landing-stats/:field', requireAuth('admin'), async (req, res, next) => {
+  try {
+    res.json(await store.updateLandingStat(req.params.field, req.body.value));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.put('/api/admin/landing-content/:section/:slot', requireAuth('admin'), async (req, res, next) => {
+  try {
+    const slot = Number(req.params.slot);
+    const item = await store.updateLandingContentItem(req.params.section, slot, landingContentPayload(req.params.section, req.body));
+    res.json({ item });
   } catch (error) {
     next(error);
   }
@@ -636,7 +737,7 @@ app.put('/api/customer/vehicles/:id', requireAuth('customer'), async (req, res, 
 
 app.delete('/api/customer/vehicles/:id', requireAuth('customer'), async (req, res, next) => {
   try {
-    await store.deleteVehicle(req.params.id, req.user.id, true);
+    if (!(await store.deleteVehicle(req.params.id, req.user.id, true))) return res.status(404).json({ message: 'Vehicle not found.' });
     res.status(204).end();
   } catch (error) {
     next(error);
@@ -701,18 +802,6 @@ app.post('/api/customer/feedback', requireAuth('customer'), async (req, res, nex
     requireFields(req.body, ['service', 'rating', 'feedback']);
     await store.createFeedback(req.user.id, req.body);
     res.status(201).json({ ok: true });
-  } catch (error) {
-    next(error);
-  }
-});
-
-app.put('/api/customer/profile', requireAuth('customer'), async (req, res, next) => {
-  try {
-    requireFields(req.body, ['name', 'email', 'phone']);
-    const payload = { ...req.body };
-    if (Object.prototype.hasOwnProperty.call(payload, 'avatar')) payload.avatar = validateProfileAvatar(payload.avatar);
-    const user = await store.updateProfile(req.user.id, payload);
-    res.json({ user });
   } catch (error) {
     next(error);
   }
@@ -855,8 +944,8 @@ app.put('/api/admin/notifications/read-all', requireAuth('admin'), async (req, r
 
 app.post('/api/admin/customers', requireAuth('admin'), async (req, res, next) => {
   try {
-    requireFields(req.body, ['name', 'email', 'phone']);
-    const passwordHash = await bcrypt.hash(req.body.password || 'customer123', 12);
+    requireFields(req.body, ['name', 'email', 'phone', 'password']);
+    const passwordHash = await bcrypt.hash(validatePassword(req.body.password), 12);
     const user = await store.createCustomer({
       name: req.body.name,
       email: req.body.email,
@@ -872,7 +961,10 @@ app.post('/api/admin/customers', requireAuth('admin'), async (req, res, next) =>
 app.put('/api/admin/customers/:id', requireAuth('admin'), async (req, res, next) => {
   try {
     requireFields(req.body, ['name', 'email', 'phone']);
-    const user = await store.updateCustomer(req.params.id, req.body);
+    const payload = { ...req.body, email: validateEmail(req.body.email) };
+    if (payload.password) payload.passwordHash = await bcrypt.hash(validatePassword(payload.password), 12);
+    delete payload.password;
+    const user = await store.updateCustomer(req.params.id, payload);
     if (!user) return res.status(404).json({ message: 'Customer not found.' });
     res.json(user);
   } catch (error) {
@@ -892,8 +984,8 @@ app.delete('/api/admin/customers/:id', requireAuth('admin'), async (req, res, ne
 
 app.post('/api/admin/technicians', requireAuth('admin'), async (req, res, next) => {
   try {
-    requireFields(req.body, ['name', 'email', 'phone', 'employeeNo', 'specialization', 'experienceYears']);
-    const passwordHash = await bcrypt.hash(req.body.password || 'tech123', 12);
+    requireFields(req.body, ['name', 'email', 'phone', 'password', 'employeeNo', 'specialization', 'experienceYears']);
+    const passwordHash = await bcrypt.hash(validatePassword(req.body.password), 12);
     res.status(201).json(await store.createTechnician(req.body, passwordHash));
   } catch (error) {
     next(error);
@@ -903,7 +995,10 @@ app.post('/api/admin/technicians', requireAuth('admin'), async (req, res, next) 
 app.put('/api/admin/technicians/:id', requireAuth('admin'), async (req, res, next) => {
   try {
     requireFields(req.body, ['name', 'email', 'phone', 'employeeNo', 'specialization', 'experienceYears', 'status']);
-    const technician = await store.updateTechnician(req.params.id, req.body);
+    const payload = { ...req.body, email: validateEmail(req.body.email) };
+    if (payload.password) payload.passwordHash = await bcrypt.hash(validatePassword(payload.password), 12);
+    delete payload.password;
+    const technician = await store.updateTechnician(req.params.id, payload);
     if (!technician) return res.status(404).json({ message: 'Technician not found.' });
     res.json(technician);
   } catch (error) {
@@ -1014,7 +1109,7 @@ app.put('/api/admin/inventory/items/:id', requireAuth('admin'), async (req, res,
 
 app.delete('/api/admin/inventory/items/:id', requireAuth('admin'), async (req, res, next) => {
   try {
-    await store.deleteInventoryItem(req.params.id);
+    if (!(await store.deleteInventoryItem(req.params.id))) return res.status(404).json({ message: 'Inventory item not found.' });
     res.status(204).end();
   } catch (error) {
     next(error);
@@ -1036,6 +1131,15 @@ app.put('/api/admin/inventory/suppliers/:id', requireAuth('admin'), async (req, 
     const supplier = await store.updateInventorySupplier(req.params.id, req.body);
     if (!supplier) return res.status(404).json({ message: 'Supplier not found.' });
     res.json(supplier);
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.delete('/api/admin/inventory/suppliers/:id', requireAuth('admin'), async (req, res, next) => {
+  try {
+    if (!(await store.deleteInventorySupplier(req.params.id))) return res.status(404).json({ message: 'Supplier not found.' });
+    res.status(204).end();
   } catch (error) {
     next(error);
   }
@@ -1085,7 +1189,7 @@ app.put('/api/admin/vehicles/:id', requireAuth('admin'), async (req, res, next) 
 
 app.delete('/api/admin/vehicles/:id', requireAuth('admin'), async (req, res, next) => {
   try {
-    await store.deleteVehicle(req.params.id, req.user.id, false);
+    if (!(await store.deleteVehicle(req.params.id, req.user.id, false))) return res.status(404).json({ message: 'Vehicle not found.' });
     res.status(204).end();
   } catch (error) {
     next(error);
@@ -1094,8 +1198,7 @@ app.delete('/api/admin/vehicles/:id', requireAuth('admin'), async (req, res, nex
 
 app.post('/api/admin/services', requireAuth('admin'), async (req, res, next) => {
   try {
-    requireFields(req.body, ['name', 'price', 'duration', 'description']);
-    res.status(201).json(await store.createService(req.body));
+    res.status(201).json(await store.createService(servicePayload(req.body)));
   } catch (error) {
     next(error);
   }
@@ -1103,10 +1206,18 @@ app.post('/api/admin/services', requireAuth('admin'), async (req, res, next) => 
 
 app.put('/api/admin/services/:id', requireAuth('admin'), async (req, res, next) => {
   try {
-    requireFields(req.body, ['name', 'price', 'duration', 'description']);
-    const service = await store.updateService(req.params.id, req.body);
+    const service = await store.updateService(req.params.id, servicePayload(req.body));
     if (!service) return res.status(404).json({ message: 'Service package not found.' });
     res.json(service);
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.delete('/api/admin/services/:id', requireAuth('admin'), async (req, res, next) => {
+  try {
+    if (!(await store.deleteService(req.params.id))) return res.status(404).json({ message: 'Service package not found.' });
+    res.status(204).end();
   } catch (error) {
     next(error);
   }
@@ -1243,7 +1354,7 @@ app.get('/api/admin/reports/individual/:report/pdf', requireAuth('admin'), async
 
 app.put('/api/admin/emergencies/:id/close', requireAuth('admin'), async (req, res, next) => {
   try {
-    const request = await store.updateDocument(store.collections.emergencyRequests, req.params.id, { status: 'Closed' });
+    const request = await store.closeEmergency(req.params.id);
     if (!request) return res.status(404).json({ message: 'Emergency request not found.' });
     res.json({ ok: true });
   } catch (error) {
@@ -1267,18 +1378,10 @@ app.use((error, req, res, next) => {
   }
   const temporaryDatabaseError = isTemporaryFirestoreError(error);
   res.status(temporaryDatabaseError ? 503 : (error.status || 500)).json({
-    message: temporaryDatabaseError ? 'The database usage limit has been reached temporarily. Demo accounts can still sign in; live data will resume when the quota resets.' : (message || 'Server error.'),
+    message: temporaryDatabaseError ? 'The database is temporarily unavailable. Please try again shortly.' : (message || 'Server error.'),
     code: temporaryDatabaseError ? 'DATABASE_QUOTA_EXCEEDED' : undefined
   });
 });
-
-if (process.env.AUTO_SEED_ON_START === 'true') {
-  store.ensureSeedData()
-    .then(() => console.log('Firestore seed data is ready.'))
-    .catch((error) => console.warn(`Firestore seed skipped: ${String(error.message || '')}`));
-} else {
-  console.log('Automatic Firestore seeding is disabled to conserve quota.');
-}
 
 app.listen(port, () => {
   console.log(`AutoCare server running at http://localhost:${port}`);

@@ -25,11 +25,6 @@ document.addEventListener('DOMContentLoaded', () => {
     && /^customer-dashboard\.html(?:#[a-z0-9_-]+)?$/i.test(requestedNextTarget)
     ? requestedNextTarget
     : null;
-  const demoAccounts = {
-    admin: { email: 'admin@autocare.lk', password: 'admin123' },
-    customer: { email: 'customer@autocare.lk', password: 'customer123' },
-    technician: { email: 'tech@autocare.lk', password: 'tech123' }
-  };
   const params = new URLSearchParams(window.location.search);
   let activeRole = ['admin', 'customer', 'technician'].includes(params.get('role')) ? params.get('role') : 'admin';
 
@@ -53,7 +48,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
     title.textContent = `${activeRole[0].toUpperCase()}${activeRole.slice(1)} Login`;
     copy.textContent = copyByRole[activeRole];
-    email.placeholder = demoAccounts[activeRole].email;
+    email.placeholder = 'name@example.com';
     const submitLabel = submit.querySelector('span');
     if (submitLabel) submitLabel.textContent = `Login as ${activeRole[0].toUpperCase()}${activeRole.slice(1)}`;
     setStatus('');
@@ -103,16 +98,6 @@ document.addEventListener('DOMContentLoaded', () => {
     button.addEventListener('click', () => setRole(button.dataset.role));
   });
 
-  document.querySelectorAll('[data-demo-role]').forEach((button) => {
-    button.addEventListener('click', () => {
-      const role = button.dataset.demoRole;
-      setRole(role);
-      email.value = demoAccounts[role].email;
-      password.value = demoAccounts[role].password;
-      setStatus(`${role === 'admin' ? 'Admin' : 'Customer'} demo filled. Click login.`, true);
-    });
-  });
-
   openSignup.addEventListener('click', () => {
     showSignupView();
     signupName.focus();
@@ -146,12 +131,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
       localStorage.setItem(sessionKey, JSON.stringify({
         ...result.user,
-        token: result.token,
-        databaseDegraded: Boolean(result.databaseDegraded),
+        authenticated: true,
         loggedInAt: new Date().toISOString()
       }));
 
-      setStatus(result.databaseDegraded ? 'Database quota reached. Opening the dashboard in demo mode...' : 'Login successful. Redirecting...', true);
+      setStatus('Login successful. Redirecting...', true);
       window.setTimeout(() => redirectForRole(result.user.role), 350);
     } catch (error) {
       setStatus(error.message || 'Login failed. Check the backend server and Firebase connection.');
@@ -186,16 +170,6 @@ document.addEventListener('DOMContentLoaded', () => {
     } catch (error) {
       setStatus(error.message || 'Could not create customer account.');
     }
-  });
-
-  document.getElementById('forgot-password').addEventListener('click', () => {
-    if (!email.value.trim()) {
-      setStatus('Enter your email address first, then request password reset.');
-      email.focus();
-      return;
-    }
-
-    setStatus('Password reset is not enabled for this demo project yet.', true);
   });
 
   setRole(activeRole);

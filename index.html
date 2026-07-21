@@ -99,22 +99,15 @@
         </a>
       </div>
 
-      <div class="container booking-shell hidden">
-       
-        <div class="booking-bar__actions">
-          <a class="btn btn--ghost booking-bar__login-option hidden" id="booking-login-option" href="login.html?role=customer&next=customer-dashboard.html%23bookings">Log in to continue your booking</a>
-        </div>
-      </div>
-
     </section>
 
     <section class="stats" id="stats" aria-label="AutoCare statistics">
       <div class="container stats__grid">
-        <article><svg viewBox="0 0 24 24"><path d="M17 21a5 5 0 0 0-10 0"/><circle cx="12" cy="8" r="4"/><path d="M3 21a4 4 0 0 1 4-4M21 21a4 4 0 0 0-4-4"/></svg><strong class="stat-number" data-target="20000" data-format="compact">0</strong><span>Happy Customers</span></article>
-        <article><svg viewBox="0 0 24 24"><path d="M8 20V9a4 4 0 0 1 8 0v11"/><path d="M6 12h12M10 20h4"/></svg><strong class="stat-number" data-target="10">0</strong><span>Expert Technicians</span></article>
-        <article><svg viewBox="0 0 24 24"><path d="M17 21a5 5 0 0 0-10 0"/><circle cx="12" cy="8" r="4"/><path d="M3 21a4 4 0 0 1 4-4M21 21a4 4 0 0 0-4-4"/></svg><strong class="stat-number" data-target="20000" data-format="compact">0</strong><span>Happy Customers</span></article>
-        <article><svg viewBox="0 0 24 24"><path d="M8 20V9a4 4 0 0 1 8 0v11"/><path d="M6 12h12M10 20h4"/></svg><strong class="stat-number" data-target="10">0</strong><span>Expert Technicians</span></article>
-        <article><svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 0 1 16 0v5a3 3 0 0 1-3 3h-2"/><path d="M4 12v4h4v-4H4Zm12 0v4h4v-4h-4Z"/></svg><strong>24/7</strong><span>Support Available</span></article>
+        <article><svg viewBox="0 0 24 24"><path d="M17 21a5 5 0 0 0-10 0"/><circle cx="12" cy="8" r="4"/><path d="M3 21a4 4 0 0 1 4-4M21 21a4 4 0 0 0-4-4"/></svg><strong id="happy-customer-count" data-live-stat>Loading</strong><span>Happy Customers</span></article>
+        <article><svg viewBox="0 0 24 24"><path d="M8 20V9a4 4 0 0 1 8 0v11"/><path d="M6 12h12M10 20h4"/></svg><strong id="expert-technician-count" data-live-stat>Loading</strong><span>Expert Technicians</span></article>
+        <article><svg viewBox="0 0 24 24"><path d="M17 21a5 5 0 0 0-10 0"/><circle cx="12" cy="8" r="4"/><path d="M3 21a4 4 0 0 1 4-4M21 21a4 4 0 0 0-4-4"/></svg><strong id="customer-count" data-live-stat>Loading</strong><span>Registered Customers</span></article>
+        <article><svg viewBox="0 0 24 24"><path d="M8 20V9a4 4 0 0 1 8 0v11"/><path d="M6 12h12M10 20h4"/></svg><strong id="technician-count" data-live-stat>Loading</strong><span>Active Technicians</span></article>
+        <article><svg viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></svg><strong id="completed-service-count" data-live-stat>Loading</strong><span>Completed Services</span></article>
       </div>
     </section>
 
@@ -155,11 +148,7 @@
           </div>
           <div class="about__text hidden" id="tab-panel-reviews" role="tabpanel" aria-labelledby="tab-reviews">
             <span class="eyebrow">Reviews</span>
-            <p>The team explained the issue clearly, fixed it on time and kept the price fair. That mix of speed and confidence is why drivers return.</p>
-            <div class="review-mini">
-              <img src="assets/images/workshop-lift-mechanic.png" alt="Customer avatar" />
-              <span><strong>CMorwerFHouin</strong><small>AutoCare Client</small></span>
-            </div>
+            <p id="review-summary">Loading verified customer reviews...</p>
           </div>
         </div>
       </div>
@@ -172,14 +161,7 @@
           <h2>Our <span>Services</span></h2>
           <p>Quality maintenance and repair services to keep your vehicle safe and performing at its best.</p>
         </div>
-        <div class="service-strip">
-          <article data-service-card="General Service"><img src="assets/images/workshop-lift-mechanic.png" alt="General service" /><strong>General Service</strong><span>LKR 8,500</span><div class="service-rating" data-service-rating><div class="stars" aria-hidden="true"><span>★★★★★</span><span class="stars__fill">★★★★★</span></div><small>No reviews yet</small></div></article>
-          <article data-service-card="Oil Change"><img src="assets/images/about-mechanic-red-car.png" alt="Oil change" /><strong>Oil Change</strong><span>LKR 6,000</span><div class="service-rating" data-service-rating><div class="stars" aria-hidden="true"><span>★★★★★</span><span class="stars__fill">★★★★★</span></div><small>No reviews yet</small></div></article>
-          <article data-service-card="Brake Service"><img src="assets/images/service-wheel-closeup.png" alt="Brake service" /><strong>Brake Service</strong><span>LKR 7,500</span><div class="service-rating" data-service-rating><div class="stars" aria-hidden="true"><span>★★★★★</span><span class="stars__fill">★★★★★</span></div><small>No reviews yet</small></div></article>
-          <article data-service-card="Engine Repair"><img src="assets/images/hero-blue-workshop.png" alt="Engine repair" /><strong>Engine Repair</strong><span>LKR 12,000</span><div class="service-rating" data-service-rating><div class="stars" aria-hidden="true"><span>★★★★★</span><span class="stars__fill">★★★★★</span></div><small>No reviews yet</small></div></article>
-          <article data-service-card="AC Service"><img src="assets/images/workshop-lift-mechanic.png" alt="AC service" /><strong>AC Service</strong><span>LKR 8,000</span><div class="service-rating" data-service-rating><div class="stars" aria-hidden="true"><span>★★★★★</span><span class="stars__fill">★★★★★</span></div><small>No reviews yet</small></div></article>
-          <article data-service-card="Tire Service"><img src="assets/images/service-wheel-closeup.png" alt="Tire service" /><strong>Tire Service</strong><span>LKR 5,500</span><div class="service-rating" data-service-rating><div class="stars" aria-hidden="true"><span>★★★★★</span><span class="stars__fill">★★★★★</span></div><small>No reviews yet</small></div></article>
-        </div>
+        <div class="service-strip"><p>Loading services...</p></div>
       </div>
     </section>
 
@@ -190,48 +172,9 @@
             <h2>Repair <span>Pricing</span> Plan</h2>
             <p>Price is what you pay, value is what you get.</p>
           </div>
-          <a href="#booking-form" class="inline-link">View More Plans</a>
+          <a href="login.html?role=customer&next=customer-dashboard.html%23bookings" class="inline-link">Book a Service</a>
         </div>
-        <div class="pricing__grid">
-          <article class="pricing-card">
-            <div class="pricing-card__visual"><img src="assets/images/workshop-lift-mechanic.png" alt="Basic repair plan" /><span class="pricing-card__tag">Essential care</span></div>
-            <div class="pricing-card__body">
-              <div class="pricing-card__heading"><span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v18M3 12h18"/></svg></span><div><small>Monthly package</small><h3>Basic Plan</h3></div></div>
-              <strong><small>LKR</small>16,000<span>/ month</span></strong>
-              <ul><li>Oil, filter and fluid check</li><li>Brake inspection</li><li>Quick health report</li><li>Basic support</li></ul>
-            </div>
-            <a href="login.html?role=customer&next=customer-dashboard.html%23bookings"><span>Choose Basic</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></a>
-          </article>
-          <article class="pricing-card pricing-card--featured">
-            <div class="pricing-card__visual"><img src="assets/images/about-mechanic-red-car.png" alt="Popular repair plan" /><span class="pricing-card__tag">Most popular</span></div>
-            <div class="pricing-card__body">
-              <div class="pricing-card__heading"><span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2-5.6-3-5.6 3 1.1-6.2L3 9.6l6.2-.9L12 3Z"/></svg></span><div><small>Monthly package</small><h3>Popular Plan</h3></div></div>
-              <strong><small>LKR</small>20,000<span>/ month</span></strong>
-              <ul><li>Starter plan features</li><li>Engine diagnostics</li><li>Battery and AC check</li><li>Priority service slot</li></ul>
-            </div>
-            <a href="login.html?role=customer&next=customer-dashboard.html%23bookings"><span>Choose Popular</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></a>
-          </article>
-          <article class="pricing-card">
-            <div class="pricing-card__visual"><img src="assets/images/service-wheel-closeup.png" alt="Premium repair plan" /><span class="pricing-card__tag">Extra protection</span></div>
-            <div class="pricing-card__body">
-              <div class="pricing-card__heading"><span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 4 6v5c0 5 3.2 8.5 8 10 4.8-1.5 8-5 8-10V6l-8-3Z"/><path d="m8.5 12 2.3 2.3 4.7-5"/></svg></span><div><small>Monthly package</small><h3>Premium Plan</h3></div></div>
-              <strong><small>LKR</small>18,000<span>/ month</span></strong>
-              <ul><li>Popular plan features</li><li>Wheel alignment</li><li>Transmission inspection</li><li>Extended warranty</li></ul>
-            </div>
-            <a href="login.html?role=customer&next=customer-dashboard.html%23bookings"><span>Choose Premium</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></a>
-          </article>
-        </div>
-      </div>
-    </section>
-
-    <section class="testimonial">
-      <div class="container testimonial__inner">
-        <img src="assets/images/workshop-lift-mechanic.png" alt="Mechanic repairing a vehicle" />
-        <blockquote>
-          <span>"</span>
-          <p>Expert is the best choice for your car services. They are so professional in their services. I just love them and their work.</p>
-          <cite>Ronald Jonson - AutoCare Client</cite>
-        </blockquote>
+        <div class="pricing__grid"><p>Loading pricing plans...</p></div>
       </div>
     </section>
 
@@ -241,24 +184,11 @@
           <h2>Recent Complete <span>Work</span></h2>
           <p>Bringing car service to life, one project at a time.</p>
           <div class="gallery__controls">
-            <button type="button" id="gallery-prev" aria-label="Previous work">‹</button>
-            <button type="button" id="gallery-next" aria-label="Next work">›</button>
+            <button type="button" id="gallery-prev" aria-label="Previous work">&#8249;</button>
+            <button type="button" id="gallery-next" aria-label="Next work">&#8250;</button>
           </div>
         </div>
-        <div class="gallery-viewport" id="gallery-grid" aria-label="Recent completed work carousel">
-          <article class="gallery-item is-active">
-            <img src="assets/images/service-wheel-closeup.png" alt="Suspension inspection" />
-            <span>Suspension Inspection</span>
-          </article>
-          <article class="gallery-item is-next">
-            <img src="assets/images/workshop-lift-mechanic.png" alt="Exhaust system repair" />
-            <span>Exhaust System Repair</span>
-          </article>
-          <article class="gallery-item is-prev">
-            <img src="assets/images/about-mechanic-red-car.png" alt="Engine diagnostics" />
-            <span>Engine Diagnostics</span>
-          </article>
-        </div>
+        <div class="gallery-viewport" id="gallery-grid" aria-label="Recent completed work carousel"><p>Loading recent work...</p></div>
       </div>
     </section>
 
@@ -268,7 +198,7 @@
           <span>Need immediate assistance?</span>
           <h2>Need Emergency Assistance?</h2>
           <p>Our team is available 24/7 to assist you on the road.</p>
-          <a class="btn btn--yellow" href="tel:+18001234567">Request Emergency Help</a>
+          <a class="btn btn--yellow" href="login.html?role=customer&next=customer-dashboard.html%23emergency">Request Emergency Help</a>
         </div>
         <img src="assets/images/emergency-tow-banner.png" alt="Tow truck and rescue vehicles" />
       </div>
@@ -277,17 +207,9 @@
     <section class="articles section" id="articles">
       <div class="container">
         <div class="section-heading section-heading--row">
-          <div>
-            <h2>Our <span>Latest</span> Articles</h2>
-            <p>Stay fresh with your car services news and blog.</p>
-          </div>
-          <a href="#articles" class="inline-link">All Blog & News</a>
+          <div><h2>Our <span>Latest</span> News</h2><p>Stay up to date with our car service news and advice.</p></div>
         </div>
-        <div class="articles__grid">
-          <article class="article-card"><img src="assets/images/about-mechanic-red-car.png" alt="Mechanic checking vehicle" /><div><span>23 Jan 2026 | Maintenance</span><h3>A well-maintained car is like a well tuned instrument.</h3><a href="#articles">Read More</a></div></article>
-          <article class="article-card"><img src="assets/images/workshop-lift-mechanic.png" alt="Technician inside workshop" /><div><span>11 Jan 2026 | Auto Service</span><h3>The best car service is the one that keeps you moving forward.</h3><a href="#articles">Read More</a></div></article>
-          <article class="article-card"><img src="assets/images/hero-blue-workshop.png" alt="Covered car in workshop" /><div><span>07 Jan 2026 | Car Care</span><h3>We provide peace of mind with top-notch car service.</h3><a href="#articles">Read More</a></div></article>
-        </div>
+        <div class="articles__grid" id="news-grid"><p>Loading news...</p></div>
       </div>
     </section>
 
@@ -315,24 +237,10 @@
         <p>Reliable repairs, transparent pricing and support that keeps your vehicle ready for the road.</p>
       </div>
       <div>
-        <h3>Our Services</h3>
-        <a href="#services">Tire Fix & Balancing</a>
-        <a href="#services">Car Diagnostics</a>
-        <a href="#services">Engine Repair</a>
-        <a href="#services">AC Services</a>
-      </div>
-      <div>
         <h3>Quick Links</h3>
         <a href="#about">About Us</a>
         <a href="#pricing">Repair Rates</a>
-        <a href="#work">Recent Work</a>
-        <a href="#articles">News & Articles</a>
-      </div>
-      <div>
-        <h3>Contact</h3>
-        <p>123 AutoCare Drive, Motor City</p>
-        <p><a href="tel:+18001234567">+1 (800) 123-4567</a></p>
-        <p><a href="mailto:support@autocare.com">support@autocare.com</a></p>
+        <a href="login.html?role=customer&next=customer-dashboard.html%23bookings">Book Service</a>
       </div>
     </div>
     <div class="footer__bottom">
@@ -340,9 +248,7 @@
     </div>
   </footer>
 
-  <script src="js/navbar.js"></script>
-  <script src="js/counter.js"></script>
-  <script src="js/slider.js"></script>
-  <script src="js/main.js?v=pricing-plans-1"></script>
+  <script src="js/navbar.js?v=section-highlight-1"></script>
+  <script src="js/main.js?v=landing-content-1"></script>
 </body>
 </html>

@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="css/admin-dashboard.css?v=right-toast-1" />
+  <link rel="stylesheet" href="css/admin-dashboard.css?v=landing-content-1" />
   <link rel="stylesheet" href="css/responsive.css?v=mobile-1" />
   <link rel="stylesheet" href="css/dashboard-refresh.css?v=refresh-1" />
 </head>
@@ -38,6 +38,8 @@
         <button class="side-nav__item" type="button" data-view="emergency"><span data-icon="alert"></span>Emergency</button>
         <button class="side-nav__item" type="button" data-view="notifications"><span data-icon="bell"></span>Notifications</button>
         <button class="side-nav__item" type="button" data-view="feedback"><span data-icon="star"></span>Feedback</button>
+        <button class="side-nav__item" type="button" data-view="landing-content"><span data-icon="update"></span>Landing Content</button>
+        <button class="side-nav__item" type="button" data-view="landing-stats"><span data-icon="update"></span>Landing Stats</button>
         <button class="side-nav__item" type="button" data-view="settings"><span data-icon="settings"></span>Settings</button>
         <button class="side-nav__item" type="button" data-action="logout"><span data-icon="logout"></span>Logout</button>
       </nav>
@@ -214,6 +216,8 @@
             </div>
             <div class="table-tools"><input id="inventory-search" type="search" placeholder="Search inventory..." /></div>
             <div class="table-wrap"><table><thead><tr><th>Item</th><th>Category</th><th>Brand</th><th>Stock</th><th>Prices</th><th>Warranty</th><th>Action</th></tr></thead><tbody id="inventory-body"></tbody></table></div>
+            <div class="panel__header"><div><h3>Suppliers</h3><p>Manage the suppliers referenced by inventory items.</p></div><button class="btn btn--ghost" type="button" data-action="new-supplier">Add Supplier</button></div>
+            <div class="table-wrap"><table><thead><tr><th>Name</th><th>Email</th><th>Phone</th><th>Status</th><th>Action</th></tr></thead><tbody id="supplier-body"></tbody></table></div>
           </div>
         </section>
 
@@ -287,6 +291,30 @@
           </div>
         </section>
 
+        <section class="view" data-view-panel="landing-content">
+          <div class="panel">
+            <div class="panel__header"><div><h2>Recent Work</h2><p>Update the photos, captions, and visibility of the three recent-work slides.</p></div></div>
+            <div class="landing-content-grid" id="recent-work-admin-grid"></div>
+          </div>
+          <div class="panel landing-content-panel">
+            <div class="panel__header"><div><h2>Latest News</h2><p>Update the photos, dates, categories, headlines, and visibility of landing-page news.</p></div></div>
+            <div class="landing-content-grid" id="news-admin-grid"></div>
+          </div>
+        </section>
+
+        <section class="view" data-view-panel="landing-stats">
+          <div class="panel">
+            <div class="panel__header"><div><h2>Landing Page Statistics</h2><p>Update each public statistic independently. Changes appear on the home page after refresh.</p></div></div>
+            <div class="landing-stats-grid">
+              <form class="landing-stat-card" data-landing-stat="happyCustomers"><label><span>Happy Customers</span><input name="value" type="number" min="0" max="999999999" step="1" required /></label><button class="btn btn--blue" type="submit">Save Happy Customers</button></form>
+              <form class="landing-stat-card" data-landing-stat="expertTechnicians"><label><span>Expert Technicians</span><input name="value" type="number" min="0" max="999999999" step="1" required /></label><button class="btn btn--blue" type="submit">Save Expert Technicians</button></form>
+              <form class="landing-stat-card" data-landing-stat="registeredCustomers"><label><span>Registered Customers</span><input name="value" type="number" min="0" max="999999999" step="1" required /></label><button class="btn btn--blue" type="submit">Save Registered Customers</button></form>
+              <form class="landing-stat-card" data-landing-stat="activeTechnicians"><label><span>Active Technicians</span><input name="value" type="number" min="0" max="999999999" step="1" required /></label><button class="btn btn--blue" type="submit">Save Active Technicians</button></form>
+              <form class="landing-stat-card" data-landing-stat="completedServices"><label><span>Completed Services</span><input name="value" type="number" min="0" max="999999999" step="1" required /></label><button class="btn btn--blue" type="submit">Save Completed Services</button></form>
+            </div>
+          </div>
+        </section>
+
         <section class="view" data-view-panel="settings">
           <div class="panel">
             <div class="panel__header"><div><h2>System Settings</h2><p>Manage your admin profile picture and station preferences.</p></div></div>
@@ -330,6 +358,6 @@
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
   <script src="js/api.js?v=profile-avatar-1"></script>
-  <script src="js/admin-dashboard.js?v=quota-optimized-2"></script>
+  <script src="js/admin-dashboard.js?v=landing-content-1"></script>
 </body>
 </html>

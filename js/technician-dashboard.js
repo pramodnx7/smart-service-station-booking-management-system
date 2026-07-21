@@ -2,7 +2,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const sessionKey = 'autocare-session';
   const session = getSession();
 
-  if (!session || session.role !== 'technician' || !session.token) {
+  if (!session || session.role !== 'technician' || !session.authenticated) {
     window.location.replace('index.html');
     return;
   }
@@ -537,7 +537,7 @@ document.addEventListener('DOMContentLoaded', () => {
           body: JSON.stringify({ name: profileForm.elements.name.value, email: profileForm.elements.email.value, phone: profileForm.elements.phone.value, avatar })
         });
         state.profile = { ...state.profile, ...result.user };
-        localStorage.setItem(sessionKey, JSON.stringify({ ...getSession(), ...result.user, token: result.token }));
+        localStorage.setItem(sessionKey, JSON.stringify({ ...getSession(), ...result.user, authenticated: true }));
         profileForm.elements.avatar.value = '';
         renderProfile();
         showToast('Technician profile updated successfully.');

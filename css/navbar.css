@@ -14,6 +14,10 @@
   box-shadow: 0 12px 34px rgba(0, 0, 0, 0.28);
 }
 
+main section[id] {
+  scroll-margin-top: 86px;
+}
+
 .navbar__inner {
   width: min(1840px, calc(100% - 28px));
   min-height: 70px;

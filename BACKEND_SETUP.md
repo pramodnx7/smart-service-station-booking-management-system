@@ -26,18 +26,11 @@ Git in this project.
 npm install
 ```
 
-## 3. Seed Firestore demo data
+## 3. Provision production data
 
-The server seeds missing demo data automatically on startup. You can also run it manually:
-
-```bash
-npm run firebase:seed
-```
-
-Demo accounts:
-
-- Admin: `admin@autocare.lk` / `admin123`
-- Customer: `customer@autocare.lk` / `customer123`
+Create the first administrator and operational records through an approved,
+one-time provisioning process. The application does not create demo users or
+sample business records automatically.
 
 ## 4. Start the system
 
@@ -62,7 +55,8 @@ npm run test:connection
 ```
 
 The first command validates every project JavaScript file. The second verifies the
-API, Firestore, demo logins, authenticated sessions, and all three role dashboards.
+API, Firestore connection, authenticated sessions, and role dashboards using
+credentials supplied through environment variables.
 
 ## Security Note
 

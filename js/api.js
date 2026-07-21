@@ -11,15 +11,10 @@
   }
 
   async function request(path, options = {}) {
-    const session = getSession();
     const headers = {
       'Content-Type': 'application/json',
       ...(options.headers || {})
     };
-
-    if (session?.token) {
-      headers.Authorization = `Bearer ${session.token}`;
-    }
 
     let response;
     try {
@@ -44,12 +39,7 @@
   }
 
   async function requestBlob(path, options = {}) {
-    const session = getSession();
     const headers = { ...(options.headers || {}) };
-
-    if (session?.token) {
-      headers.Authorization = `Bearer ${session.token}`;
-    }
 
     let response;
     try {

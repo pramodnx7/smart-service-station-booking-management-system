@@ -1,16 +1,12 @@
 document.addEventListener('DOMContentLoaded', () => {
   const sessionKey = 'autocare-session';
   const pendingBookingKey = 'autocare-pending-booking';
-  const legacyStorageKey = 'autocare-customer-dashboard-state';
   const session = getSession();
 
-  if (!session || session.role !== 'customer' || !session.token) {
+  if (!session || session.role !== 'customer' || !session.authenticated) {
     window.location.replace('index.html');
     return;
   }
-
-  const storageKey = `${legacyStorageKey}-${session.id}`;
-  localStorage.removeItem(legacyStorageKey);
 
   const initialView = (window.location.hash || new URLSearchParams(window.location.search).get('view') || '').replace(/^#/, '');
   let pendingBooking = loadPendingBooking();
@@ -30,7 +26,7 @@ document.addEventListener('DOMContentLoaded', () => {
     x: '<svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg>'
   };
 
-  const defaults = {
+  const emptyState = {
     profile: { name: session.name, email: session.email, phone: session.phone || '', avatar: session.avatar || '' },
     vehicles: [],
     bookings: [],
@@ -40,10 +36,10 @@ document.addEventListener('DOMContentLoaded', () => {
     documents: [],
     notifications: [],
     rewardPoints: 0,
-    packages: ['Oil Change', 'Brake Service', 'Full Service', 'Engine Diagnostics', 'General Service', 'Electrical Repair', 'Engine Repair', 'Suspension Repair', 'Hybrid/EV Service']
+    packages: []
   };
 
-  let state = loadState();
+  let state = structuredClone(emptyState);
   let activeNotificationFilter = 'all';
   let notificationRefreshTimer = null;
 
@@ -68,16 +64,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function freshState() {
-    return JSON.parse(JSON.stringify(defaults));
-  }
-
-  function loadState() {
-    try {
-      const saved = JSON.parse(localStorage.getItem(storageKey));
-      return saved ? { ...freshState(), ...saved, profile: { ...defaults.profile, ...(saved.profile || {}) } } : freshState();
-    } catch (error) {
-      return freshState();
-    }
+    return structuredClone(emptyState);
   }
 
   function loadPendingBooking() {
@@ -94,7 +81,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function saveState() {
-    localStorage.setItem(storageKey, JSON.stringify(state));
+    // Dashboard records stay in memory; Firestore remains the only persistent source.
   }
 
   async function hydrateFromApi({ silent = false } = {}) {
@@ -112,7 +99,7 @@ document.addEventListener('DOMContentLoaded', () => {
         serviceImages: Array.isArray(data.serviceImages) ? data.serviceImages : [],
         documents: Array.isArray(data.documents) ? data.documents : [],
         notifications: Array.isArray(data.notifications) ? data.notifications : [],
-        packages: Array.isArray(data.packages) && data.packages.length ? data.packages : base.packages,
+        packages: Array.isArray(data.packages) ? data.packages : [],
         rewardPoints: Number(data.rewardPoints || 0)
       };
       saveState();
@@ -1001,7 +988,7 @@ document.addEventListener('DOMContentLoaded', () => {
           body: JSON.stringify({ name: data.name, email: data.email, phone: data.phone, avatar })
         });
         state.profile = { ...state.profile, ...result.user };
-        localStorage.setItem(sessionKey, JSON.stringify({ ...getSession(), ...result.user, token: result.token }));
+        localStorage.setItem(sessionKey, JSON.stringify({ ...getSession(), ...result.user, authenticated: true }));
         form.elements.avatar.value = '';
         saveState();
         renderProfile();

@@ -6,13 +6,12 @@
   "scripts": {
     "start": "node --use-system-ca server.js",
     "dev": "nodemon --exec \"node --use-system-ca\" server.js",
-    "firebase:seed": "node --use-system-ca scripts/seed-firestore.js",
     "check": "node scripts/check-syntax.js",
-    "test:connection": "node --use-system-ca scripts/check-connection.js"
+    "test:connection": "node --use-system-ca scripts/check-connection.js",
+    "audit:browser": "node scripts/audit-browser.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
-    "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
     "firebase": "^12.13.0",
@@ -21,6 +20,7 @@
     "jsonwebtoken": "^9.0.2"
   },
   "devDependencies": {
-    "nodemon": "^3.1.9"
+    "nodemon": "^3.1.9",
+    "playwright-core": "^1.60.0"
   }
 }
