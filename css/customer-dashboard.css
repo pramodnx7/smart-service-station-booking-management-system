@@ -1519,3 +1519,14 @@ textarea:focus {
     flex: 1 1 130px;
   }
 }
+
+.customer-queue-panel { margin-top: 22px; }
+.customer-queue-card { display: grid; grid-template-columns: 1.25fr repeat(5,minmax(0,1fr)); gap: 12px; align-items: stretch; }
+.customer-queue-card > div { display: grid; align-content: center; gap: 7px; min-height: 84px; padding: 14px; background: #f7f9fd; border: 1px solid var(--line); border-radius: 8px; }
+.customer-queue-card small { color: var(--muted); font-size: 9px; font-weight: 900; letter-spacing: .04em; text-transform: uppercase; }
+.customer-queue-card strong { color: var(--navy); font-size: 14px; }
+.customer-queue-token { background: linear-gradient(145deg,#0c3470,#1b61ba) !important; }
+.customer-queue-token small { color: rgba(255,255,255,.65); }
+.customer-queue-token strong { color: var(--yellow); font-size: 26px; }
+@media (max-width: 1050px) { .customer-queue-card { grid-template-columns: repeat(3,minmax(0,1fr)); } }
+@media (max-width: 640px) { .customer-queue-card { grid-template-columns: 1fr; } }

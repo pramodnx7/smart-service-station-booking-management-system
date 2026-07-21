@@ -157,6 +157,7 @@ document.addEventListener('DOMContentLoaded', () => {
       <div class="technician-actions" aria-label="Job actions for #SJ-${job.id}">
         <div class="technician-actions__group">
           <span>Work</span>
+          ${!job.accepted && ['Pending', 'Assigned'].includes(job.status) ? `<button class="mini-btn mini-btn--work" type="button" data-action="accept-job" data-id="${job.id}">Accept Job</button>` : ''}
           <button class="mini-btn mini-btn--work" type="button" data-action="update-progress" data-id="${job.id}">Update Progress</button>
           <button class="mini-btn mini-btn--work" type="button" data-action="add-note" data-id="${job.id}">Add Note</button>
         </div>
@@ -464,6 +465,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
   async function handleAction(action, id) {
     const job = state.jobs.find((item) => item.id === Number(id));
+    if (action === 'accept-job') {
+      await window.AutoCareApi.request(`/api/technician/jobs/${Number(id)}/accept`, { method: 'PUT' });
+      await hydrateFromApi();
+      showToast('Job accepted successfully.');
+    }
     if (action === 'update-progress') openModal('progress', job);
     if (action === 'add-note') openModal('note', job);
     if (action === 'add-part') openModal('part', job);

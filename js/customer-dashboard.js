@@ -36,7 +36,8 @@ document.addEventListener('DOMContentLoaded', () => {
     documents: [],
     notifications: [],
     rewardPoints: 0,
-    packages: []
+    packages: [],
+    queueEntries: []
   };
 
   let state = structuredClone(emptyState);
@@ -86,7 +87,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
   async function hydrateFromApi({ silent = false } = {}) {
     try {
-      const data = await window.AutoCareApi.request('/api/customer/dashboard');
+      const [data, queueData] = await Promise.all([
+        window.AutoCareApi.request('/api/customer/dashboard'),
+        window.AutoCareApi.request('/api/customer/queue').catch(() => ({ entries: [] }))
+      ]);
       const base = freshState();
       state = {
         ...base,
@@ -100,7 +104,8 @@ document.addEventListener('DOMContentLoaded', () => {
         documents: Array.isArray(data.documents) ? data.documents : [],
         notifications: Array.isArray(data.notifications) ? data.notifications : [],
         packages: Array.isArray(data.packages) ? data.packages : [],
-        rewardPoints: Number(data.rewardPoints || 0)
+        rewardPoints: Number(data.rewardPoints || 0),
+        queueEntries: Array.isArray(queueData.entries) ? queueData.entries : []
       };
       saveState();
       renderAll();
@@ -230,6 +235,21 @@ document.addEventListener('DOMContentLoaded', () => {
       <span class="badge badge--${statusClass(booking.status)}">${booking.status}</span>
       <div class="row-actions"><button class="mini-btn" type="button" data-action="reschedule-booking" data-id="${booking.id}">Reschedule</button><button class="mini-btn mini-btn--red" type="button" data-action="cancel-booking" data-id="${booking.id}">Cancel</button></div>
     ` : '<p>No upcoming bookings.</p>';
+  }
+
+  function renderCustomerQueue() {
+    const container = document.getElementById('customer-queue-status');
+    if (!container) return;
+    const entry = state.queueEntries.find((item) => !['Completed', 'Cancelled', 'No Show'].includes(item.status)) || state.queueEntries[0];
+    container.innerHTML = entry ? `
+      <article class="customer-queue-card">
+        <div class="customer-queue-token"><small>Queue Token</small><strong>${escapeHtml(entry.token)}</strong><span class="badge badge--${statusClass(entry.status)}">${escapeHtml(entry.status)}</span></div>
+        <div><small>Queue Position</small><strong>${entry.queuePosition || '-'}</strong></div>
+        <div><small>Estimated Wait</small><strong>${entry.status === 'Waiting' ? `${entry.estimatedWaitingMinutes} min` : '-'}</strong></div>
+        <div><small>Service Bay</small><strong>${escapeHtml(entry.serviceBay)}</strong></div>
+        <div><small>Mechanic</small><strong>${escapeHtml(entry.mechanic)}</strong></div>
+        <div><small>Service</small><strong>${escapeHtml(entry.service)}</strong></div>
+      </article>` : '<p class="table-empty">You are not currently checked into the service queue.</p>';
   }
 
   function vehicleCards(limit) {
@@ -564,6 +584,7 @@ document.addEventListener('DOMContentLoaded', () => {
     renderProfile();
     renderMetrics();
     renderUpcoming();
+    renderCustomerQueue();
     renderTables();
     renderProgress();
     renderSpending();
@@ -1071,4 +1092,12 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   hydrateFromApi();
   startNotificationRefresh();
+  window.setInterval(async () => {
+    if (document.hidden) return;
+    try {
+      const queueData = await window.AutoCareApi.request('/api/customer/queue');
+      state.queueEntries = Array.isArray(queueData.entries) ? queueData.entries : [];
+      renderCustomerQueue();
+    } catch (error) { /* Keep the last known queue state during temporary outages. */ }
+  }, 10000);
 });

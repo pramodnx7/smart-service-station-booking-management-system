@@ -21,6 +21,9 @@ The system is developed to improve operational efficiency, reduce manual errors,
 ### Administrative Features
 - Dashboard with operational insights
 - Booking approval, rescheduling, and management
+- Dedicated live queue management for appointments, walk-ins, and approved emergencies
+- Automatic queue tokens, priority ordering, wait estimates, mechanic assignment, and service-bay control
+- Public Now Serving display plus customer queue-position updates
 - Mechanic assignment and service progress tracking
 - Automated billing and invoice generation
 - Spare parts inventory management
@@ -66,6 +69,7 @@ The system is developed to improve operational efficiency, reduce manual errors,
 
 ### Admin / Manager
 - Manage daily operations
+- Check in appointments, register walk-ins, approve emergency priority, and operate the live queue
 - Control bookings and services
 - Monitor stock and billing
 - Analyze business performance
@@ -83,3 +87,9 @@ The system is developed to improve operational efficiency, reduce manual errors,
 
 ## 📄 License
 This project is developed for academic, educational, and demonstration purposes.
+
+## Queue Management
+
+Administrators can open `queue-management.html` from the admin sidebar. The public workshop display is available at `queue-display.html`. Queue data is stored in the `queueEntries` and `serviceBays` Firestore collections; existing customer, vehicle, booking, service-job, technician, notification, and invoice records are reused.
+
+See [Queue Management Guide](docs/QUEUE_MANAGEMENT.md) for workflow, configuration, API, and deployment details.

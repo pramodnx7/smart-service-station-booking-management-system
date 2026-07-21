@@ -8,6 +8,7 @@ const helmet = require('helmet');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const store = require('./src/firestore-store');
+const queueStore = require('./src/queue-store');
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -340,6 +341,10 @@ app.get('/api/public/landing-content', async (req, res, next) => {
   try { res.json(await withDatabaseTimeout(store.getPublicLandingContent())); } catch (error) { next(error); }
 });
 
+app.get('/api/public/queue-display', async (req, res, next) => {
+  try { res.json(await withDatabaseTimeout(queueStore.getPublicDisplay())); } catch (error) { next(error); }
+});
+
 app.post('/api/public/newsletter-subscriptions', async (req, res, next) => {
   try {
     requireFields(req.body, ['email']);
@@ -492,6 +497,10 @@ app.get('/api/customer/dashboard', requireAuth('customer'), async (req, res, nex
   }
 });
 
+app.get('/api/customer/queue', requireAuth('customer'), async (req, res, next) => {
+  try { res.json({ entries: await withDatabaseTimeout(queueStore.getCustomerQueue(req.user.id)) }); } catch (error) { next(error); }
+});
+
 app.get('/api/customer/notifications', requireAuth('customer'), async (req, res, next) => {
   try {
     res.json(await store.getUserNotifications(req.user.id));
@@ -524,6 +533,77 @@ app.get('/api/admin/dashboard', requireAuth('admin'), async (req, res, next) => 
   } catch (error) {
     next(error);
   }
+});
+
+app.get('/api/admin/queue', requireAuth('admin'), async (req, res, next) => {
+  try { res.json(await withDatabaseTimeout(queueStore.getQueueDashboard())); } catch (error) { next(error); }
+});
+
+app.get('/api/admin/queue/appointments', requireAuth('admin'), async (req, res, next) => {
+  try { res.json({ appointments: await withDatabaseTimeout(queueStore.searchAppointments(req.query.search)) }); } catch (error) { next(error); }
+});
+
+app.post('/api/admin/queue/appointments/check-in', requireAuth('admin'), async (req, res, next) => {
+  try {
+    requireFields(req.body, ['bookingId']);
+    res.status(201).json(await queueStore.checkInAppointment(req.body.bookingId, req.user.id));
+  } catch (error) { next(error); }
+});
+
+app.post('/api/admin/queue/walk-ins', requireAuth('admin'), async (req, res, next) => {
+  try {
+    let customerId = Number(req.body.customerId);
+    if (!customerId) {
+      requireFields(req.body, ['customerName', 'customerEmail', 'customerPhone', 'temporaryPassword']);
+      const passwordHash = await bcrypt.hash(validatePassword(req.body.temporaryPassword), 12);
+      const customer = await store.createCustomer({
+        name: req.body.customerName,
+        email: validateEmail(req.body.customerEmail),
+        phone: req.body.customerPhone,
+        status: 'active'
+      }, passwordHash);
+      customerId = customer.id;
+    }
+    let vehicleId = Number(req.body.vehicleId);
+    if (!vehicleId) {
+      requireFields(req.body, ['vehicleMake', 'vehicleModel', 'vehiclePlate', 'vehicleYear']);
+      const vehicle = await store.createVehicle(customerId, {
+        make: req.body.vehicleMake,
+        model: req.body.vehicleModel,
+        plate: req.body.vehiclePlate,
+        year: req.body.vehicleYear
+      });
+      vehicleId = vehicle.id;
+    }
+    requireFields({ servicePackageId: req.body.servicePackageId }, ['servicePackageId']);
+    res.status(201).json(await queueStore.registerArrival('Walk-in', { ...req.body, customerId, vehicleId }, req.user.id));
+  } catch (error) { next(error); }
+});
+
+app.post('/api/admin/queue/emergencies', requireAuth('admin'), async (req, res, next) => {
+  try {
+    requireFields(req.body, ['customerId', 'vehicleId', 'servicePackageId', 'emergencyReason']);
+    res.status(201).json(await queueStore.registerArrival('Emergency', req.body, req.user.id));
+  } catch (error) { next(error); }
+});
+
+app.post('/api/admin/queue/call-next', requireAuth('admin'), async (req, res, next) => {
+  try { res.json(await queueStore.callNextCustomer()); } catch (error) { next(error); }
+});
+
+app.put('/api/admin/queue/entries/:id/:action', requireAuth('admin'), async (req, res, next) => {
+  try {
+    const entry = await queueStore.updateQueueEntry(req.params.id, req.params.action, req.body || {});
+    if (!entry) return res.status(404).json({ message: 'Queue entry not found.' });
+    res.json(entry);
+  } catch (error) { next(error); }
+});
+
+app.put('/api/admin/queue/service-bays/:id', requireAuth('admin'), async (req, res, next) => {
+  try {
+    requireFields(req.body, ['status']);
+    res.json(await queueStore.updateServiceBay(req.params.id, req.body.status));
+  } catch (error) { next(error); }
 });
 
 app.put('/api/admin/landing-stats/:field', requireAuth('admin'), async (req, res, next) => {
@@ -599,6 +679,14 @@ app.get('/api/technician/jobs/:id', requireAuth('technician'), async (req, res, 
     const job = await store.getAssignedServiceJob(req.user.id, req.params.id);
     if (!job) return res.status(404).json({ message: 'Assigned service job not found.' });
     res.json(job);
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.put('/api/technician/jobs/:id/accept', requireAuth('technician'), async (req, res, next) => {
+  try {
+    res.json(await store.acceptTechnicianJob(req.user.id, req.params.id));
   } catch (error) {
     next(error);
   }
@@ -861,7 +949,14 @@ app.put('/api/admin/bookings/:id/status', requireAuth('admin'), async (req, res,
 
 app.put('/api/admin/bookings/:id/cancel', requireAuth('admin'), async (req, res, next) => {
   try {
-    const cancelled = await store.cancelBooking(req.params.id, req.user.id, false);
+    requireFields(req.body, ['reason']);
+    const reason = String(req.body.reason || '').trim();
+    if (reason.length < 5 || reason.length > 500) {
+      const error = new Error('Cancellation reason must be between 5 and 500 characters.');
+      error.status = 400;
+      throw error;
+    }
+    const cancelled = await store.cancelBooking(req.params.id, req.user.id, false, reason);
     if (!cancelled) return res.status(404).json({ message: 'Booking not found.' });
     res.json({ ok: true });
   } catch (error) {

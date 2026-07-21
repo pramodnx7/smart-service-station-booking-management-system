@@ -66,6 +66,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   let state = structuredClone(emptyState);
   let activeBookingStatus = 'All';
+  const overviewBookingFilters = { search: '', status: 'All', service: 'All', dateRange: 'All' };
   let activeMessageTab = 'received';
   let pendingBookingDraft = null;
   let notificationDraftSaveInProgress = false;
@@ -80,7 +81,11 @@ document.addEventListener('DOMContentLoaded', () => {
     modalSubmit: document.getElementById('modal-submit'),
     modalTitle: document.getElementById('modal-title'),
     modalKicker: document.getElementById('modal-kicker'),
-    modalBody: document.getElementById('modal-body')
+    modalBody: document.getElementById('modal-body'),
+    cancelBookingModal: document.getElementById('cancel-booking-modal'),
+    cancelBookingForm: document.getElementById('cancel-booking-form'),
+    cancelBookingTitle: document.getElementById('cancel-booking-title'),
+    cancelBookingSummary: document.getElementById('cancel-booking-summary')
   };
 
   function getSession() {
@@ -437,15 +442,18 @@ document.addEventListener('DOMContentLoaded', () => {
     injectIcons();
   }
 
-  function bookingRows(bookings) {
+  function bookingRows(bookings, { includeQueue = true, emptyMessage = 'No bookings found.' } = {}) {
+    if (!bookings.length) {
+      return `<tr><td colspan="${includeQueue ? 7 : 6}"><div class="table-empty-state"><strong>${escapeHtml(emptyMessage)}</strong><span>Adjust the filters or create a new booking request.</span></div></td></tr>`;
+    }
     return bookings.map((booking) => `
       <tr>
-        <td><span class="row-title">#BK-${booking.id}</span><span class="row-sub">${booking.service}</span></td>
+        <td><span class="row-title">#BK-${booking.id}</span><span class="row-sub">${booking.service}</span>${booking.status === 'Cancelled' && booking.cancelReason ? `<span class="row-sub booking-cancel-reason">Reason: ${escapeHtml(booking.cancelReason)}</span>` : ''}</td>
         <td>${customerName(booking.customerId)}</td>
         <td>${vehicleName(booking.vehicleId)}</td>
         <td>${booking.date}<span class="row-sub">${booking.time}</span></td>
         <td><span class="badge badge--${statusClass(booking.status)}">${booking.status}</span></td>
-        <td>${booking.queue ? `#${booking.queue}` : '-'}</td>
+        ${includeQueue ? `<td>${booking.queue ? `#${booking.queue}` : '-'}</td>` : ''}
         <td>
           <div class="row-actions booking-actions">
             <button class="mini-btn booking-icon-btn" type="button" data-action="advance-booking" data-id="${booking.id}" aria-label="Update booking status" title="Update status"><span data-icon="update"></span></button>
@@ -457,8 +465,104 @@ document.addEventListener('DOMContentLoaded', () => {
     `).join('');
   }
 
+  function localDateString(date = new Date()) {
+    const pad = (value) => String(value).padStart(2, '0');
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+  }
+
+  function openCancelBookingModal(booking) {
+    if (!booking) return;
+    selectors.cancelBookingForm.dataset.id = booking.id;
+    selectors.cancelBookingTitle.textContent = `Cancel Booking #BK-${booking.id}?`;
+    selectors.cancelBookingSummary.innerHTML = `
+      <div><span>Customer</span><strong>${escapeHtml(customerName(booking.customerId))}</strong></div>
+      <div><span>Vehicle</span><strong>${escapeHtml(vehicleName(booking.vehicleId))}</strong></div>
+      <div><span>Service</span><strong>${escapeHtml(booking.service)}</strong></div>
+      <div><span>Appointment</span><strong>${escapeHtml(booking.date)} at ${escapeHtml(booking.time)}</strong></div>`;
+    selectors.cancelBookingForm.reset();
+    selectors.cancelBookingModal.showModal();
+    window.setTimeout(() => selectors.cancelBookingForm.elements.reason.focus(), 0);
+  }
+
+  function closeCancelBookingModal() {
+    selectors.cancelBookingForm.reset();
+    selectors.cancelBookingForm.dataset.id = '';
+    selectors.cancelBookingModal.close();
+  }
+
+  async function submitBookingCancellation(event) {
+    event.preventDefault();
+    const bookingId = Number(selectors.cancelBookingForm.dataset.id);
+    const booking = state.bookings.find((item) => item.id === bookingId);
+    const reason = selectors.cancelBookingForm.elements.reason.value.trim();
+    if (!booking || reason.length < 5) {
+      selectors.cancelBookingForm.elements.reason.setCustomValidity('Please enter at least 5 characters.');
+      selectors.cancelBookingForm.elements.reason.reportValidity();
+      return;
+    }
+    selectors.cancelBookingForm.elements.reason.setCustomValidity('');
+    const submitButton = selectors.cancelBookingForm.querySelector('button[type="submit"]');
+    submitButton.disabled = true;
+    try {
+      await window.AutoCareApi.request(`/api/admin/bookings/${bookingId}/cancel`, {
+        method: 'PUT', body: JSON.stringify({ reason })
+      });
+      booking.status = 'Cancelled';
+      booking.progress = 0;
+      booking.queue = 0;
+      booking.cancelReason = reason;
+      closeCancelBookingModal();
+      renderAll();
+      await hydrateFromApi();
+      showToast(`Booking #BK-${bookingId} cancelled and the customer was notified.`);
+    } finally {
+      submitButton.disabled = false;
+    }
+  }
+
+  function upcomingBookingRequests() {
+    const today = localDateString();
+    return state.bookings
+      .filter((booking) => ['Pending', 'Approved'].includes(booking.status) && String(booking.date || '') >= today)
+      .sort((left, right) => Number(right.id) - Number(left.id));
+  }
+
+  function filteredUpcomingBookings(upcoming) {
+    const search = overviewBookingFilters.search.trim().toLowerCase();
+    const today = new Date(`${localDateString()}T00:00:00`);
+    const lastDate = overviewBookingFilters.dateRange === 'All' || overviewBookingFilters.dateRange === 'Today'
+      ? null
+      : new Date(today.getFullYear(), today.getMonth(), today.getDate() + Number(overviewBookingFilters.dateRange));
+    return upcoming.filter((booking) => {
+      const bookingDate = new Date(`${booking.date}T00:00:00`);
+      const matchesSearch = !search || [
+        `bk-${booking.id}`, booking.id, booking.service, customerName(booking.customerId), vehicleName(booking.vehicleId)
+      ].some((value) => String(value).toLowerCase().includes(search));
+      const matchesStatus = overviewBookingFilters.status === 'All' || booking.status === overviewBookingFilters.status;
+      const matchesService = overviewBookingFilters.service === 'All' || booking.service === overviewBookingFilters.service;
+      const matchesDate = overviewBookingFilters.dateRange === 'All'
+        || (overviewBookingFilters.dateRange === 'Today' && booking.date === localDateString())
+        || (lastDate && bookingDate >= today && bookingDate <= lastDate);
+      return matchesSearch && matchesStatus && matchesService && matchesDate;
+    });
+  }
+
   function renderOverview() {
-    document.getElementById('overview-bookings').innerHTML = bookingRows(state.bookings.slice(0, 5));
+    const upcoming = upcomingBookingRequests();
+    const serviceFilter = document.getElementById('overview-booking-service');
+    const services = [...new Set(upcoming.map((booking) => booking.service).filter(Boolean))].sort();
+    if (overviewBookingFilters.service !== 'All' && !services.includes(overviewBookingFilters.service)) overviewBookingFilters.service = 'All';
+    serviceFilter.innerHTML = ['<option value="All">All services</option>', ...services.map((service) => `<option value="${escapeHtml(service)}">${escapeHtml(service)}</option>`)].join('');
+    serviceFilter.value = overviewBookingFilters.service;
+    document.getElementById('overview-booking-search').value = overviewBookingFilters.search;
+    document.getElementById('overview-booking-status').value = overviewBookingFilters.status;
+    document.getElementById('overview-booking-date-range').value = overviewBookingFilters.dateRange;
+    const filtered = filteredUpcomingBookings(upcoming);
+    document.getElementById('overview-bookings').innerHTML = bookingRows(filtered, {
+      includeQueue: false,
+      emptyMessage: upcoming.length ? 'No upcoming requests match these filters.' : 'No upcoming booking requests.'
+    });
+    document.getElementById('overview-booking-count').textContent = `Showing ${filtered.length} of ${upcoming.length}`;
 
     document.getElementById('progress-list').innerHTML = state.bookings
       .filter((booking) => booking.status !== 'Cancelled')
@@ -1452,16 +1556,10 @@ document.addEventListener('DOMContentLoaded', () => {
         showToast('Only active bookings can be cancelled.');
         return;
       }
-      if (!window.confirm(`Cancel booking #BK-${numericId}? This will remove it from the active queue.`)) return;
-      await window.AutoCareApi.request(`/api/admin/bookings/${numericId}/cancel`, { method: 'PUT' });
-      booking.status = 'Cancelled';
-      booking.progress = 0;
-      booking.queue = 0;
-      saveState();
-      renderAll();
-      await hydrateFromApi();
-      showToast('Booking cancelled. The queue has been updated.');
+      openCancelBookingModal(booking);
+      return;
     }
+    if (action === 'close-cancel-booking-modal') closeCancelBookingModal();
     if (action === 'filter-bookings') {
       activeBookingStatus = element.dataset.status;
       renderBookings();
@@ -1477,6 +1575,10 @@ document.addEventListener('DOMContentLoaded', () => {
       saveState();
       renderAll();
       showToast('Inventory item deleted.');
+    }
+    if (action === 'clear-overview-booking-filters') {
+      Object.assign(overviewBookingFilters, { search: '', status: 'All', service: 'All', dateRange: 'All' });
+      renderOverview();
     }
     if (action === 'new-supplier') openModal('supplier');
     if (action === 'edit-supplier') openModal('supplier', state.inventorySuppliers.find((item) => item.id === numericId));
@@ -1745,6 +1847,26 @@ document.addEventListener('DOMContentLoaded', () => {
       } catch (error) {
         showToast(error.message || 'Profile update failed.');
       }
+    });
+    selectors.cancelBookingForm.addEventListener('submit', (event) => {
+      submitBookingCancellation(event).catch((error) => showToast(error.message || 'Booking could not be cancelled.'));
+    });
+    selectors.cancelBookingForm.elements.reason.addEventListener('input', (event) => event.target.setCustomValidity(''));
+    selectors.cancelBookingModal.addEventListener('cancel', (event) => {
+      event.preventDefault();
+      closeCancelBookingModal();
+    });
+
+    document.getElementById('overview-booking-search').addEventListener('input', (event) => {
+      overviewBookingFilters.search = event.target.value;
+      renderOverview();
+      event.target.focus();
+    });
+    ['status', 'service', 'date-range'].forEach((filterName) => {
+      document.getElementById(`overview-booking-${filterName}`).addEventListener('change', (event) => {
+        overviewBookingFilters[filterName === 'date-range' ? 'dateRange' : filterName] = event.target.value;
+        renderOverview();
+      });
     });
 
     document.addEventListener('submit', (event) => {

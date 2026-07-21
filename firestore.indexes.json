@@ -32,7 +32,11 @@
     { "collectionGroup": "inventoryCategories", "queryScope": "COLLECTION", "density": "SPARSE_ANY", "fields": [{ "fieldPath": "name", "order": "ASCENDING" }] },
     { "collectionGroup": "inventoryMovements", "queryScope": "COLLECTION", "density": "SPARSE_ANY", "fields": [{ "fieldPath": "partId", "order": "ASCENDING" }] },
     { "collectionGroup": "servicePackages", "queryScope": "COLLECTION", "density": "SPARSE_ANY", "fields": [{ "fieldPath": "name", "order": "ASCENDING" }] },
-    { "collectionGroup": "newsletterSubscriptions", "queryScope": "COLLECTION", "density": "SPARSE_ANY", "fields": [{ "fieldPath": "emailLower", "order": "ASCENDING" }] }
+    { "collectionGroup": "newsletterSubscriptions", "queryScope": "COLLECTION", "density": "SPARSE_ANY", "fields": [{ "fieldPath": "emailLower", "order": "ASCENDING" }] },
+    { "collectionGroup": "queueEntries", "queryScope": "COLLECTION", "density": "SPARSE_ANY", "fields": [{ "fieldPath": "queueDate", "order": "ASCENDING" }, { "fieldPath": "status", "order": "ASCENDING" }] },
+    { "collectionGroup": "queueEntries", "queryScope": "COLLECTION", "density": "SPARSE_ANY", "fields": [{ "fieldPath": "customerId", "order": "ASCENDING" }, { "fieldPath": "queueDate", "order": "DESCENDING" }] },
+    { "collectionGroup": "queueEntries", "queryScope": "COLLECTION", "density": "SPARSE_ANY", "fields": [{ "fieldPath": "serviceJobId", "order": "ASCENDING" }] },
+    { "collectionGroup": "queueEntries", "queryScope": "COLLECTION", "density": "SPARSE_ANY", "fields": [{ "fieldPath": "bookingId", "order": "ASCENDING" }] }
   ],
   "fieldOverrides": []
 }

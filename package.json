@@ -7,6 +7,8 @@
     "start": "node --use-system-ca server.js",
     "dev": "nodemon --exec \"node --use-system-ca\" server.js",
     "check": "node scripts/check-syntax.js",
+    "firebase:seed-people": "node --use-system-ca scripts/seed-demo-people.js",
+    "firebase:seed-bookings": "node --use-system-ca scripts/seed-demo-bookings.js",
     "test:connection": "node --use-system-ca scripts/check-connection.js",
     "audit:browser": "node scripts/audit-browser.js"
   },

@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="css/admin-dashboard.css?v=landing-content-1" />
+  <link rel="stylesheet" href="css/admin-dashboard.css?v=cancel-booking-1" />
   <link rel="stylesheet" href="css/responsive.css?v=mobile-1" />
   <link rel="stylesheet" href="css/dashboard-refresh.css?v=refresh-1" />
 </head>
@@ -27,6 +27,7 @@
         <button class="side-nav__item" type="button" data-view="customers"><span data-icon="users"></span>Customers</button>
         <button class="side-nav__item" type="button" data-view="vehicles"><span data-icon="car"></span>Vehicles</button>
         <button class="side-nav__item" type="button" data-view="bookings"><span data-icon="calendar"></span>Bookings</button>
+        <a class="side-nav__item" href="queue-management.html"><span data-icon="update"></span>Queue Management</a>
         <button class="side-nav__item" type="button" data-view="technicians"><span data-icon="technician"></span>Technicians</button>
         <button class="side-nav__item" type="button" data-view="service-jobs"><span data-icon="tools"></span>Service Jobs</button>
         <button class="side-nav__item" type="button" data-view="reports"><span data-icon="star"></span>Reports</button>
@@ -84,10 +85,18 @@
           <div class="dashboard-grid">
             <article class="panel panel--large">
               <div class="panel__header">
-                <div><h2>Upcoming Bookings</h2><p>Approve, reschedule, cancel and track queue positions.</p></div>
+                <div><h2>Upcoming Bookings</h2><p>Review future booking requests. New requests appear first.</p></div>
                 <button class="btn btn--blue" type="button" data-action="new-booking">New Booking</button>
               </div>
-              <div class="table-wrap bookings-table-wrap"><table class="overview-bookings-table"><thead><tr><th>Booking</th><th>Customer</th><th>Vehicle</th><th>Date</th><th>Status</th><th>Queue</th><th>Action</th></tr></thead><tbody id="overview-bookings"></tbody></table></div>
+              <div class="upcoming-booking-filters" aria-label="Upcoming booking filters">
+                <label class="upcoming-booking-search"><span data-icon="search"></span><input id="overview-booking-search" type="search" placeholder="Search booking, customer, vehicle..." /></label>
+                <select id="overview-booking-status" aria-label="Filter upcoming bookings by status"><option value="All">All statuses</option><option value="Pending">Pending</option><option value="Approved">Approved</option></select>
+                <select id="overview-booking-service" aria-label="Filter upcoming bookings by service"><option value="All">All services</option></select>
+                <select id="overview-booking-date-range" aria-label="Filter upcoming bookings by date"><option value="All">All upcoming dates</option><option value="Today">Today</option><option value="7">Next 7 days</option><option value="30">Next 30 days</option></select>
+                <button class="mini-btn" type="button" data-action="clear-overview-booking-filters">Clear</button>
+                <span class="overview-booking-count" id="overview-booking-count">0 requests</span>
+              </div>
+              <div class="table-wrap bookings-table-wrap"><table class="overview-bookings-table"><thead><tr><th>Booking</th><th>Customer</th><th>Vehicle</th><th>Date</th><th>Status</th><th>Action</th></tr></thead><tbody id="overview-bookings"></tbody></table></div>
             </article>
 
             <aside class="panel quick-actions">
@@ -356,8 +365,25 @@
     </form>
   </dialog>
 
+  <dialog class="modal cancel-booking-modal" id="cancel-booking-modal" aria-describedby="cancel-booking-description">
+    <form method="dialog" class="modal__card cancel-booking-card" id="cancel-booking-form">
+      <div class="cancel-booking-warning" aria-hidden="true"><span>!</span></div>
+      <div class="cancel-booking-copy">
+        <p class="eyebrow">Confirmation Required</p>
+        <h2 id="cancel-booking-title">Cancel Booking?</h2>
+        <p id="cancel-booking-description">This removes the appointment from the active booking schedule.</p>
+      </div>
+      <div class="cancel-booking-summary" id="cancel-booking-summary"></div>
+      <label class="cancel-booking-reason"><span>Reason for cancellation</span><textarea name="reason" rows="4" minlength="5" maxlength="500" required placeholder="Explain why this booking is being cancelled..."></textarea><small>The customer will receive this reason in their notification.</small></label>
+      <div class="modal__actions cancel-booking-actions">
+        <button class="btn btn--ghost" type="button" data-action="close-cancel-booking-modal">Keep Booking</button>
+        <button class="btn cancel-booking-confirm" type="submit">Yes, Cancel Booking</button>
+      </div>
+    </form>
+  </dialog>
+
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
   <script src="js/api.js?v=profile-avatar-1"></script>
-  <script src="js/admin-dashboard.js?v=landing-content-1"></script>
+  <script src="js/admin-dashboard.js?v=cancel-booking-1"></script>
 </body>
 </html>

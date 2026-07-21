@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="AutoCare live queue management for appointments, walk-ins, emergencies, mechanics and service bays." />
+  <title>AutoCare | Queue Management</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/admin-dashboard.css?v=queue-1" />
+  <link rel="stylesheet" href="css/dashboard-refresh.css?v=refresh-1" />
+  <link rel="stylesheet" href="css/queue-management.css?v=queue-1" />
+</head>
+<body class="admin-dashboard queue-dashboard">
+  <div class="dashboard-shell">
+    <aside class="sidebar" id="sidebar">
+      <a class="brand" href="admin-dashboard.html" aria-label="AutoCare admin home">
+        <span class="brand__mark"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16 2 28 7v8c0 7.5-4.7 12.6-12 15C8.7 27.6 4 22.5 4 15V7l12-5Z"/><path d="m10 17 4 4 8-10"/></svg></span>
+        <span><strong>Auto <b>Care</b></strong><small>Queue Console</small></span>
+      </a>
+      <nav class="side-nav" aria-label="Queue navigation">
+        <a class="side-nav__item" href="admin-dashboard.html"><span data-icon="dashboard"></span>Admin Dashboard</a>
+        <a class="side-nav__item is-active" href="queue-management.html"><span data-icon="queue"></span>Queue Management</a>
+        <a class="side-nav__item" href="queue-display.html" target="_blank" rel="noopener"><span data-icon="display"></span>Public Display</a>
+        <button class="side-nav__item" type="button" data-action="logout"><span data-icon="logout"></span>Logout</button>
+      </nav>
+      <div class="queue-policy-card"><strong>Smart priority</strong><p>Emergencies lead after approval. On-time appointments receive priority, while walk-ins gain points continuously as they wait.</p></div>
+    </aside>
+
+    <div class="workspace">
+      <header class="topbar">
+        <button class="icon-btn mobile-menu" type="button" id="mobile-menu" aria-label="Open menu"><span data-icon="menu"></span></button>
+        <div><p class="eyebrow">Live Workshop Operations</p><h1>Queue Management</h1></div>
+        <div class="queue-live"><i></i><span>Live</span><small id="last-updated">Connecting...</small></div>
+        <button class="icon-btn" type="button" data-action="refresh" aria-label="Refresh queue"><span data-icon="refresh"></span></button>
+      </header>
+
+      <main class="content queue-content">
+        <section class="queue-metrics" id="queue-metrics" aria-label="Queue metrics"></section>
+
+        <section class="queue-actions panel">
+          <div class="panel__header"><div><h2>Queue Actions</h2><p>Check in arrivals and move customers through the service workflow.</p></div></div>
+          <div class="queue-action-grid">
+            <button class="queue-action queue-action--blue" type="button" data-action="check-in"><span data-icon="calendar"></span><strong>Check-in Appointment</strong><small>Search verified bookings</small></button>
+            <button class="queue-action" type="button" data-action="walk-in"><span data-icon="users"></span><strong>Register Walk-in</strong><small>Existing or new customer</small></button>
+            <button class="queue-action queue-action--danger" type="button" data-action="emergency"><span data-icon="alert"></span><strong>Emergency Override</strong><small>Manager-approved priority</small></button>
+            <button class="queue-action queue-action--yellow" type="button" data-action="call-next"><span data-icon="call"></span><strong>Call Next Customer</strong><small>Auto assign bay and mechanic</small></button>
+          </div>
+        </section>
+
+        <section class="queue-serving-layout">
+          <article class="panel now-serving-panel"><div class="panel__header"><div><p class="eyebrow">Workshop Floor</p><h2>Now Serving</h2></div></div><div class="now-serving-grid" id="now-serving"></div></article>
+          <article class="panel next-queue-panel"><div class="panel__header"><div><p class="eyebrow">Priority Order</p><h2>Next Customers</h2></div></div><div class="next-customer-list" id="next-customers"></div></article>
+        </section>
+
+        <section class="panel queue-table-panel">
+          <div class="panel__header"><div><h2>Waiting Queue</h2><p>Priority scores and estimates recalculate automatically as waiting time changes.</p></div><button class="btn btn--blue" type="button" data-action="refresh">Refresh Queue</button></div>
+          <div class="queue-toolbar">
+            <label class="queue-search"><span data-icon="search"></span><input id="queue-search" type="search" placeholder="Search customer, phone, vehicle or token..." /></label>
+            <div class="queue-filters" id="queue-filters">
+              <button class="is-active" type="button" data-filter="All">All</button><button type="button" data-filter="Appointment">Appointments</button><button type="button" data-filter="Walk-in">Walk-ins</button><button type="button" data-filter="Emergency">Emergencies</button><button type="button" data-filter="Waiting">Waiting</button><button type="button" data-filter="In Service">In Service</button><button type="button" data-filter="Completed">Completed</button>
+            </div>
+          </div>
+          <div class="table-wrap"><table class="queue-table"><thead><tr><th>Token</th><th>Customer / Vehicle</th><th>Service</th><th>Type</th><th>Position</th><th>Priority</th><th>Mechanic / Bay</th><th>Estimate</th><th>Status</th><th>Check-in</th><th>Actions</th></tr></thead><tbody id="queue-body"></tbody></table></div>
+        </section>
+
+        <section class="queue-lower-layout">
+          <article class="panel"><div class="panel__header"><div><h2>Service Bays</h2><p>Busy states are automatic; available bays can be placed into maintenance.</p></div></div><div class="service-bay-grid" id="service-bays"></div></article>
+          <article class="panel"><div class="panel__header"><div><h2>Queue Performance</h2><p>Today’s operational statistics.</p></div></div><div class="queue-report-grid" id="queue-reports"></div></article>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <dialog class="modal queue-modal" id="queue-modal">
+    <form method="dialog" class="modal__card" id="queue-modal-form">
+      <div class="modal__header"><div><p class="eyebrow" id="queue-modal-kicker">Queue Action</p><h2 id="queue-modal-title">Manage Queue</h2></div><button class="icon-btn" type="button" data-action="close-modal" aria-label="Close"><span data-icon="x"></span></button></div>
+      <div class="modal__body" id="queue-modal-body"></div>
+      <div class="modal__actions"><button class="btn btn--ghost" type="button" data-action="close-modal">Cancel</button><button class="btn btn--blue" type="submit" id="queue-modal-submit">Save</button></div>
+    </form>
+  </dialog>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <script src="js/api.js?v=queue-1"></script>
+  <script src="js/queue-management.js?v=queue-1"></script>
+</body>
+</html>

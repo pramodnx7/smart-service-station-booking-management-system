@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="AutoCare public live service queue display." />
+  <title>AutoCare | Live Queue</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;700;800;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/queue-display.css?v=queue-1" />
+</head>
+<body>
+  <header class="display-header"><a href="index.html" class="display-brand"><span><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16 2 28 7v8c0 7.5-4.7 12.6-12 15C8.7 27.6 4 22.5 4 15V7l12-5Z"/><path d="m10 17 4 4 8-10"/></svg></span><div><strong>Auto <b>Care</b></strong><small>Service Queue</small></div></a><div class="display-clock"><strong id="display-time">--:--</strong><small id="display-date">Loading...</small></div></header>
+  <main>
+    <section class="display-title"><span>Live Workshop Status</span><h1>Now Serving</h1><p>Watch your queue token and proceed to the displayed service bay when called.</p></section>
+    <section class="display-serving" id="display-serving"><div class="display-empty">Connecting to live queue...</div></section>
+    <section class="display-next"><div class="display-next__heading"><div><span>Coming Up</span><h2>Next Customers</h2></div><div class="display-live"><i></i> Auto refresh</div></div><div class="display-next__grid" id="display-next"></div></section>
+  </main>
+  <footer><span>Keep your token ready</span><span id="display-updated">Waiting for update...</span></footer>
+  <script src="js/queue-display.js?v=queue-1"></script>
+</body>
+</html>

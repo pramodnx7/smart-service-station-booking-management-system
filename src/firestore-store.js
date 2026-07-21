@@ -26,7 +26,9 @@ const collections = {
   documents: 'documents',
   uploadAuditLogs: 'uploadAuditLogs',
   newsletterSubscriptions: 'newsletterSubscriptions',
-  appSettings: 'appSettings'
+  appSettings: 'appSettings',
+  queueEntries: 'queueEntries',
+  serviceBays: 'serviceBays'
 };
 
 const landingStatsDocument = 'landing-stats';
@@ -724,6 +726,9 @@ function bookingView(booking, serviceById) {
     status: booking.status,
     queue: booking.queuePosition || 0,
     progress: booking.progress || 0,
+    cancelReason: booking.cancelReason || '',
+    cancelledAt: formatDate(booking.cancelledAt),
+    cancelledByUserId: booking.cancelledByUserId || null,
     assignedTechnicianId: booking.assignedTechnicianId || null,
     serviceBayId: booking.serviceBayId || null,
     serviceBayName: booking.serviceBayName || (booking.serviceBayId ? bayLabel(booking.serviceBayId) : ''),
@@ -749,6 +754,7 @@ function serviceJobView(job, context = {}) {
     serviceType: job.serviceType,
     priority: job.priority || 'Normal',
     status: job.status || 'Pending',
+    accepted: Boolean(job.acceptedAt),
     progress: Number(job.progress || 0),
     startDate: formatDate(job.startDate),
     expectedCompletionDate: formatDate(job.expectedCompletionDate),
@@ -1733,7 +1739,13 @@ async function updateBooking(id, userId, data, enforceOwner = true) {
   return bookingView(booking, new Map([[service.id, service]]));
 }
 
-async function cancelBooking(id, userId, enforceOwner = true) {
+async function cancelBooking(id, userId, enforceOwner = true, reason = '') {
+  const cancelReason = String(reason || '').trim();
+  if (cancelReason.length > 500) {
+    const error = new Error('Cancellation reason cannot exceed 500 characters.');
+    error.status = 400;
+    throw error;
+  }
   const current = await getById(collections.bookings, id);
   if (!current || (enforceOwner && current.userId !== userId)) return false;
   if (current.status === 'Cancelled') return true;
@@ -1771,16 +1783,23 @@ async function cancelBooking(id, userId, enforceOwner = true) {
         transaction.set(document.ref, { queuePosition, updatedAt: fieldValue() }, { merge: true });
       }
     });
-    transaction.set(target.ref, { status: 'Cancelled', progress: 0, queuePosition: 0, updatedAt: fieldValue() }, { merge: true });
+    transaction.set(target.ref, {
+      status: 'Cancelled', progress: 0, queuePosition: 0, cancelReason,
+      cancelledByUserId: Number(userId), cancelledAt: fieldValue(), updatedAt: fieldValue()
+    }, { merge: true });
     transaction.set(queueRef, { bookingDate, lastPosition, updatedAt: fieldValue() }, { merge: true });
-    return { ...targetData, status: 'Cancelled', progress: 0, queuePosition: 0, id: Number(id) };
+    return {
+      ...targetData, status: 'Cancelled', progress: 0, queuePosition: 0,
+      cancelReason, cancelledByUserId: Number(userId), id: Number(id)
+    };
   });
   if (!booking) return false;
   const [service, vehicle] = await Promise.all([
     getById(collections.servicePackages, current.servicePackageId),
     getById(collections.vehicles, current.vehicleId)
   ]);
-  await createUserNotification(current.userId, 'Booking Cancelled', bookingNotificationMessage('Booking cancelled', booking, service, vehicle));
+  const reasonMessage = cancelReason ? ` Reason: ${cancelReason}` : '';
+  await createUserNotification(current.userId, 'Booking Cancelled', `${bookingNotificationMessage('Booking cancelled', booking, service, vehicle)}${reasonMessage}`);
   return true;
 }
 
@@ -3016,6 +3035,11 @@ async function updateTechnicianProgress(userId, data) {
   if (status === 'Completed') {
     await createUserNotification(job.customerId, 'Work Completed', `Your ${job.serviceType} work is complete. Your vehicle is ready for final admin review.`);
   }
+  const linkedQueueEntries = await allWhere(collections.queueEntries, 'serviceJobId', Number(data.serviceJobId));
+  await Promise.all(linkedQueueEntries.map((entry) => updateDocument(collections.queueEntries, entry.id, status === 'Completed'
+    ? { status: 'Completed', completedAt: fieldValue() }
+    : { status: 'In Service', ...(entry.serviceStartedAt ? {} : { serviceStartedAt: fieldValue() }) })));
+  if (status === 'Completed' && job.bookingId) await updateDocument(collections.bookings, job.bookingId, { status: 'Completed', progress: 100 });
 
   const context = await dashboardContext();
   return { progress: progressEntry, job: serviceJobView(updated, context) };
@@ -3304,6 +3328,33 @@ async function completeTechnicianJob(userId, serviceJobId) {
   await notifyAdmins('Service Job Completed', `Service job #SJ-${serviceJobId} is ready for admin review.`);
   await createUserNotification(job.customerId, 'Work Completed', `Your ${job.serviceType} work is complete. Your vehicle is ready for final admin review.`);
 
+  const linkedQueueEntries = await allWhere(collections.queueEntries, 'serviceJobId', Number(serviceJobId));
+  await Promise.all(linkedQueueEntries.map((entry) => updateDocument(collections.queueEntries, entry.id, {
+    status: 'Completed', completedAt: fieldValue()
+  })));
+  if (job.bookingId) await updateDocument(collections.bookings, job.bookingId, { status: 'Completed', progress: 100 });
+
+  const context = await dashboardContext();
+  return serviceJobView(updated, context);
+}
+
+async function acceptTechnicianJob(userId, serviceJobId) {
+  const technician = await getTechnicianByUserId(userId);
+  const job = await getById(collections.serviceJobs, serviceJobId);
+  if (!technician || !job || Number(job.assignedTechnicianId) !== Number(technician.id)) {
+    const error = new Error('Only the assigned technician can accept this job.');
+    error.status = 403;
+    throw error;
+  }
+  if (!['Pending', 'Assigned'].includes(job.status)) {
+    const error = new Error('Only a pending assignment can be accepted.');
+    error.status = 409;
+    throw error;
+  }
+  const updated = await updateDocument(collections.serviceJobs, serviceJobId, {
+    status: 'Assigned', acceptedAt: fieldValue()
+  });
+  await notifyAdmins('Queue Job Accepted', `Service job #SJ-${serviceJobId} was accepted by the assigned technician.`);
   const context = await dashboardContext();
   return serviceJobView(updated, context);
 }
@@ -3514,6 +3565,7 @@ async function checkConnection() {
 }
 
 module.exports = {
+  acceptTechnicianJob,
   addTechnicianNote,
   addUsedPart,
   advanceBooking,
