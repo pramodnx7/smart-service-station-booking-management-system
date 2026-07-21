@@ -102,7 +102,58 @@
     else image.removeAttribute('src');
   }
 
+  function confirmationDialog() {
+    let dialog = document.getElementById('autocare-confirm-dialog');
+    if (dialog) return dialog;
+    dialog = document.createElement('dialog');
+    dialog.id = 'autocare-confirm-dialog';
+    dialog.className = 'autocare-confirm';
+    dialog.setAttribute('aria-labelledby', 'autocare-confirm-title');
+    dialog.setAttribute('aria-describedby', 'autocare-confirm-message');
+    dialog.innerHTML = `
+      <form method="dialog" class="autocare-confirm__card">
+        <div class="autocare-confirm__icon" aria-hidden="true"><span>!</span></div>
+        <p class="autocare-confirm__eyebrow">Confirmation Required</p>
+        <h2 id="autocare-confirm-title"></h2>
+        <p class="autocare-confirm__message" id="autocare-confirm-message"></p>
+        <p class="autocare-confirm__details" id="autocare-confirm-details" hidden></p>
+        <div class="autocare-confirm__actions">
+          <button class="autocare-confirm__cancel" type="submit" value="cancel">Go Back</button>
+          <button class="autocare-confirm__submit" type="submit" value="confirm">Confirm</button>
+        </div>
+      </form>`;
+    document.body.appendChild(dialog);
+    return dialog;
+  }
+
+  function confirmAction({
+    title = 'Are you sure?',
+    message = 'Please confirm that you want to continue.',
+    details = '',
+    confirmLabel = 'Confirm',
+    cancelLabel = 'Go Back',
+    tone = 'danger'
+  } = {}) {
+    const dialog = confirmationDialog();
+    if (dialog.open) return Promise.resolve(false);
+    dialog.dataset.tone = tone;
+    dialog.querySelector('#autocare-confirm-title').textContent = title;
+    dialog.querySelector('#autocare-confirm-message').textContent = message;
+    const detailsElement = dialog.querySelector('#autocare-confirm-details');
+    detailsElement.textContent = details;
+    detailsElement.hidden = !details;
+    dialog.querySelector('.autocare-confirm__submit').textContent = confirmLabel;
+    dialog.querySelector('.autocare-confirm__cancel').textContent = cancelLabel;
+    dialog.returnValue = 'cancel';
+    return new Promise((resolve) => {
+      dialog.addEventListener('close', () => resolve(dialog.returnValue === 'confirm'), { once: true });
+      dialog.showModal();
+      dialog.querySelector('.autocare-confirm__cancel').focus();
+    });
+  }
+
   window.AutoCareApi = {
+    confirmAction,
     getSession,
     displayAvatar,
     optimizeProfileImage,

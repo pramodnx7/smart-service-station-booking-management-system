@@ -374,6 +374,94 @@ tbody tr:last-child td { border-bottom: 0; }
 .notification-item { transition: transform .18s ease, box-shadow .18s ease; }
 .notification-item:hover { transform: translateY(-2px); box-shadow: var(--dash-shadow-hover); }
 
+.autocare-confirm {
+  width: min(500px, calc(100% - 28px));
+  padding: 0;
+  color: #13243d;
+  background: #fff;
+  border: 0;
+  border-radius: 20px;
+  box-shadow: 0 28px 90px rgba(3, 18, 40, .3);
+  font-family: Inter, Arial, sans-serif;
+}
+
+.autocare-confirm::backdrop {
+  background: rgba(3, 12, 27, .7);
+  backdrop-filter: blur(3px);
+}
+
+.autocare-confirm__card {
+  display: grid;
+  justify-items: center;
+  margin: 0;
+  padding: 32px 32px 0;
+  text-align: center;
+}
+
+.autocare-confirm__icon {
+  width: 66px;
+  height: 66px;
+  display: grid;
+  place-items: center;
+  margin-bottom: 15px;
+  color: #d83c48;
+  background: #fff0f1;
+  border: 1px solid #ffd5d9;
+  border-radius: 50%;
+}
+
+.autocare-confirm[data-tone="warning"] .autocare-confirm__icon {
+  color: #b87900;
+  background: #fff8df;
+  border-color: #f6dfa3;
+}
+
+.autocare-confirm[data-tone="success"] .autocare-confirm__icon {
+  color: #168b61;
+  background: #eaf9f3;
+  border-color: #bdebd9;
+}
+
+.autocare-confirm__icon span { font-size: 30px; font-weight: 900; line-height: 1; }
+.autocare-confirm__eyebrow { margin: 0 0 5px; color: #7a879a; font-size: 10px; font-weight: 900; letter-spacing: .12em; text-transform: uppercase; }
+.autocare-confirm h2 { margin: 0; color: #13243d; font-size: 23px; letter-spacing: -.025em; }
+.autocare-confirm__message { max-width: 410px; margin: 10px 0 0; color: #68768a; font-size: 14px; line-height: 1.65; }
+.autocare-confirm__details { width: 100%; margin: 18px 0 0; padding: 12px 14px; color: #485871; background: #f7f9fc; border: 1px solid #e3e9f2; border-radius: 11px; font-size: 12px; line-height: 1.55; }
+
+.autocare-confirm__actions {
+  width: calc(100% + 64px);
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin: 27px -32px 0;
+  padding: 18px 32px;
+  border-top: 1px solid #e5eaf2;
+}
+
+.autocare-confirm__actions button {
+  min-height: 42px;
+  padding: 0 18px;
+  border: 1px solid #d7dfeb;
+  border-radius: 10px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.autocare-confirm__cancel { color: #44536a; background: #fff; }
+.autocare-confirm__submit { color: #fff; background: #d83c48; border-color: #d83c48 !important; }
+.autocare-confirm[data-tone="warning"] .autocare-confirm__submit { color: #342a0b; background: #f2c94c; border-color: #f2c94c !important; }
+.autocare-confirm[data-tone="success"] .autocare-confirm__submit { background: #168b61; border-color: #168b61 !important; }
+.autocare-confirm__actions button:hover { filter: brightness(.96); transform: translateY(-1px); }
+.autocare-confirm__actions button:focus-visible { outline: 3px solid rgba(47, 85, 212, .2); outline-offset: 2px; }
+
+@media (max-width: 520px) {
+  .autocare-confirm__card { padding: 25px 20px 0; }
+  .autocare-confirm__actions { width: calc(100% + 40px); margin-inline: -20px; padding: 16px 20px; flex-direction: column-reverse; }
+  .autocare-confirm__actions button { width: 100%; }
+}
+
 .admin-plan-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
 .admin-plan-card { overflow: hidden; background: #fff; border: 1px solid var(--dash-border); border-radius: 16px; box-shadow: 0 12px 30px rgba(17,38,74,.07); }
 .admin-plan-card.is-featured { border-color: #e6b719; box-shadow: 0 12px 34px rgba(230,183,25,.15); }

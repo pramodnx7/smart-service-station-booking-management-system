@@ -866,7 +866,10 @@ document.addEventListener('DOMContentLoaded', () => {
       const vehicle = state.vehicles.find((item) => item.id === numericId);
       if (!vehicle) return;
       const vehicleLabel = `${vehicle.make || ''} ${vehicle.model || ''} (${vehicle.plate || 'No plate'})`.trim();
-      if (!window.confirm(`Remove ${vehicleLabel}? This action cannot be undone.`)) return;
+      if (!await window.AutoCareApi.confirmAction({
+        title: 'Remove Vehicle?', message: `Remove ${vehicleLabel} from your account?`,
+        details: 'This is permanent. A vehicle with linked bookings or service history may be protected.', confirmLabel: 'Remove Vehicle'
+      })) return;
       await window.AutoCareApi.request(`/api/customer/vehicles/${numericId}`, { method: 'DELETE' });
       state.vehicles = state.vehicles.filter((item) => item.id !== numericId);
       saveState();
@@ -888,7 +891,11 @@ document.addEventListener('DOMContentLoaded', () => {
         showToast('Only active bookings can be cancelled.');
         return;
       }
-      if (!window.confirm(`Cancel booking #BK-${numericId}? This will remove it from the active queue.`)) return;
+      if (!await window.AutoCareApi.confirmAction({
+        title: `Cancel Booking #BK-${numericId}?`,
+        message: `${booking.service} on ${booking.date} at ${booking.time} will be cancelled.`,
+        details: 'The appointment will be removed from the active booking schedule.', confirmLabel: 'Cancel Booking', tone: 'warning'
+      })) return;
       await window.AutoCareApi.request(`/api/customer/bookings/${numericId}/cancel`, { method: 'PUT' });
       booking.status = 'Cancelled';
       booking.progress = 0;
@@ -899,6 +906,11 @@ document.addEventListener('DOMContentLoaded', () => {
       showToast('Booking cancelled. The queue has been updated.');
     }
     if (action === 'delete-booking') {
+      const booking = state.bookings.find((item) => item.id === numericId);
+      if (!booking || !await window.AutoCareApi.confirmAction({
+        title: `Delete Booking #BK-${numericId}?`, message: 'Permanently remove this cancelled booking record?',
+        details: 'Deleted booking history cannot be recovered.', confirmLabel: 'Delete Booking'
+      })) return;
       await window.AutoCareApi.request(`/api/customer/bookings/${numericId}`, { method: 'DELETE' });
       state.bookings = state.bookings.filter((item) => item.id !== numericId);
       saveState();

@@ -1502,7 +1502,12 @@ document.addEventListener('DOMContentLoaded', () => {
     if (action === 'delete-customer') {
       const customer = state.customers.find((item) => item.id === numericId);
       if (!customer) return;
-      if (!window.confirm(`Remove ${customer.name}'s customer account? This cannot be undone.`)) return;
+      if (!await window.AutoCareApi.confirmAction({
+        title: 'Remove Customer Account?',
+        message: `Remove ${customer.name}'s customer account?`,
+        details: 'This permanently removes the customer profile and cannot be undone.',
+        confirmLabel: 'Remove Customer'
+      })) return;
       await window.AutoCareApi.request(`/api/admin/customers/${numericId}`, { method: 'DELETE' });
       state.customers = state.customers.filter((item) => item.id !== numericId);
       saveState();
@@ -1514,6 +1519,13 @@ document.addEventListener('DOMContentLoaded', () => {
     if (action === 'new-technician') openModal('technician');
     if (action === 'edit-technician') openModal('technician', state.technicians.find((item) => item.id === numericId));
     if (action === 'delete-technician') {
+      const technician = state.technicians.find((item) => item.id === numericId);
+      if (!technician || !await window.AutoCareApi.confirmAction({
+        title: 'Remove Technician?',
+        message: `Remove ${technician?.name || 'this technician'} from the workshop team?`,
+        details: 'This action is permanent and may be blocked when active work is assigned.',
+        confirmLabel: 'Remove Technician'
+      })) return;
       await window.AutoCareApi.request(`/api/admin/technicians/${numericId}`, { method: 'DELETE' });
       state.technicians = state.technicians.filter((item) => item.id !== numericId);
       saveState();
@@ -1529,7 +1541,10 @@ document.addEventListener('DOMContentLoaded', () => {
       const vehicle = state.vehicles.find((item) => item.id === numericId);
       if (!vehicle) return;
       const vehicleLabel = `${vehicle.make || ''} ${vehicle.model || ''} (${vehicle.plate || 'No plate'})`.trim();
-      if (!window.confirm(`Remove ${vehicleLabel}? This action cannot be undone.`)) return;
+      if (!await window.AutoCareApi.confirmAction({
+        title: 'Remove Vehicle?', message: `Remove ${vehicleLabel}?`,
+        details: 'The vehicle will be permanently removed. Linked bookings may prevent this action.', confirmLabel: 'Remove Vehicle'
+      })) return;
       await window.AutoCareApi.request(`/api/admin/vehicles/${numericId}`, { method: 'DELETE' });
       state.vehicles = state.vehicles.filter((item) => item.id !== numericId);
       saveState();
@@ -1570,6 +1585,11 @@ document.addEventListener('DOMContentLoaded', () => {
     if (action === 'new-inventory-item') openModal('inventoryItem');
     if (action === 'edit-inventory-item') openModal('inventoryItem', state.inventoryParts.find((item) => item.id === numericId));
     if (action === 'delete-inventory-item') {
+      const item = state.inventoryParts.find((part) => part.id === numericId);
+      if (!item || !await window.AutoCareApi.confirmAction({
+        title: 'Delete Inventory Item?', message: `Delete ${item?.partName || item?.name || 'this inventory item'}?`,
+        details: 'Stock records linked to active service work may prevent deletion.', confirmLabel: 'Delete Item'
+      })) return;
       await window.AutoCareApi.request(`/api/admin/inventory/items/${numericId}`, { method: 'DELETE' });
       state.inventoryParts = state.inventoryParts.filter((item) => item.id !== numericId);
       saveState();
@@ -1583,7 +1603,11 @@ document.addEventListener('DOMContentLoaded', () => {
     if (action === 'new-supplier') openModal('supplier');
     if (action === 'edit-supplier') openModal('supplier', state.inventorySuppliers.find((item) => item.id === numericId));
     if (action === 'delete-supplier') {
-      if (!window.confirm('Delete this supplier?')) return;
+      const supplier = state.inventorySuppliers.find((item) => item.id === numericId);
+      if (!await window.AutoCareApi.confirmAction({
+        title: 'Delete Supplier?', message: `Delete ${supplier?.name || 'this supplier'}?`,
+        details: 'This cannot be undone. Suppliers linked to inventory records may be protected.', confirmLabel: 'Delete Supplier'
+      })) return;
       await window.AutoCareApi.request(`/api/admin/inventory/suppliers/${numericId}`, { method: 'DELETE' });
       state.inventorySuppliers = state.inventorySuppliers.filter((item) => item.id !== numericId);
       renderAll();
@@ -1592,7 +1616,11 @@ document.addEventListener('DOMContentLoaded', () => {
     if (action === 'new-service') openModal('service');
     if (action === 'edit-service') openModal('service', state.packages.find((item) => item.id === numericId));
     if (action === 'delete-service') {
-      if (!window.confirm('Delete this service package?')) return;
+      const service = state.packages.find((item) => item.id === numericId);
+      if (!await window.AutoCareApi.confirmAction({
+        title: 'Delete Service Package?', message: `Delete ${service?.name || 'this service package'}?`,
+        details: 'Services linked to bookings, invoices, or reviews cannot be removed.', confirmLabel: 'Delete Service'
+      })) return;
       await window.AutoCareApi.request(`/api/admin/services/${numericId}`, { method: 'DELETE' });
       state.packages = state.packages.filter((item) => item.id !== numericId);
       renderAll();
@@ -1601,7 +1629,11 @@ document.addEventListener('DOMContentLoaded', () => {
     if (action === 'new-pricing-plan') openModal('pricingPlan');
     if (action === 'edit-pricing-plan') openModal('pricingPlan', state.pricingPlans.find((item) => item.id === numericId));
     if (action === 'delete-pricing-plan') {
-      if (!window.confirm('Delete this landing page plan?')) return;
+      const plan = state.pricingPlans.find((item) => item.id === numericId);
+      if (!await window.AutoCareApi.confirmAction({
+        title: 'Delete Pricing Plan?', message: `Delete ${plan?.name || 'this landing page plan'}?`,
+        details: 'The plan will disappear from the public website immediately.', confirmLabel: 'Delete Plan'
+      })) return;
       await window.AutoCareApi.request(`/api/admin/pricing-plans/${numericId}`, { method: 'DELETE' });
       state.pricingPlans = state.pricingPlans.filter((item) => item.id !== numericId);
       saveState(); renderAll(); showToast('Landing plan deleted.'); return;
@@ -1654,6 +1686,10 @@ document.addEventListener('DOMContentLoaded', () => {
     if (action === 'download-file') downloadFile(element.dataset.kind, numericId);
     if (action === 'preview-completed-image') openImagePreview(element.dataset.url, element.dataset.name);
     if (action === 'delete-file') {
+      if (!await window.AutoCareApi.confirmAction({
+        title: 'Permanently Delete File?', message: 'Remove this uploaded file from the service record?',
+        details: 'The stored file and its database record will be permanently deleted.', confirmLabel: 'Delete File'
+      })) return;
       await window.AutoCareApi.request(`/api/admin/files/${element.dataset.kind}/${numericId}`, { method: 'DELETE' });
       state.servicePhotos = (state.servicePhotos || []).filter((item) => !(item.kind === element.dataset.kind && item.id === numericId));
       state.documents = (state.documents || []).filter((item) => !(item.kind === element.dataset.kind && item.id === numericId));
@@ -1697,6 +1733,10 @@ document.addEventListener('DOMContentLoaded', () => {
       showToast('Draft delivered successfully.');
     }
     if (action === 'delete-notification-draft') {
+      if (!await window.AutoCareApi.confirmAction({
+        title: 'Delete Notification Draft?', message: 'Remove this unsent notification draft?',
+        details: 'The draft cannot be recovered after deletion.', confirmLabel: 'Delete Draft'
+      })) return;
       await window.AutoCareApi.request(`/api/admin/notification-drafts/${numericId}`, { method: 'DELETE' });
       await refreshNotifications();
       showToast('Draft deleted.');

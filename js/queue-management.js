@@ -229,7 +229,15 @@ document.addEventListener('DOMContentLoaded', () => {
       await window.AutoCareApi.request(`/api/admin/queue/service-bays/${id}`, { method: 'PUT', body: JSON.stringify({ status: button.dataset.status }) });
       await refreshQueue(); showToast(`Service bay marked ${button.dataset.status.toLowerCase()}.`); return;
     }
-    if (['complete', 'cancel', 'no-show'].includes(action) && !window.confirm(`Confirm ${action.replace('-', ' ')} for this queue entry?`)) return;
+    if (['complete', 'cancel', 'no-show'].includes(action)) {
+      const entry = state.entries.find((item) => item.id === id);
+      const confirmations = {
+        complete: { title: `Complete ${entry?.token || 'Queue Entry'}?`, message: 'Mark this service as completed and notify the customer?', confirmLabel: 'Complete Service', tone: 'success' },
+        cancel: { title: `Cancel ${entry?.token || 'Queue Entry'}?`, message: 'Remove this customer from the active service queue?', confirmLabel: 'Cancel Entry', tone: 'danger' },
+        'no-show': { title: `Mark ${entry?.token || 'Queue Entry'} as No Show?`, message: 'Close this queue entry because the customer did not arrive?', confirmLabel: 'Mark No Show', tone: 'warning' }
+      };
+      if (!await window.AutoCareApi.confirmAction({ ...confirmations[action], details: 'This updates the linked booking and customer notification.' })) return;
+    }
     if (['call', 'skip', 'recall', 'start', 'complete', 'cancel', 'no-show'].includes(action)) await runEntryAction(action, id);
   }
 
@@ -244,7 +252,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const result = await window.AutoCareApi.request('/api/admin/queue/walk-ins', { method: 'POST', body: JSON.stringify(data) });
         closeModal(); await refreshQueue(); showToast(`Walk-in registered as ${result.token}.`);
       } else if (mode === 'emergency') {
-        if (!window.confirm('Approve this emergency for highest queue priority?')) return;
+        if (!await window.AutoCareApi.confirmAction({
+          title: 'Approve Emergency Priority?',
+          message: 'Place this customer at the highest queue priority?',
+          details: 'Use emergency priority only after manager approval.', confirmLabel: 'Approve Emergency', tone: 'warning'
+        })) return;
         const result = await window.AutoCareApi.request('/api/admin/queue/emergencies', { method: 'POST', body: JSON.stringify(data) });
         closeModal(); await refreshQueue(); showToast(`Emergency approved as ${result.token}.`);
       } else if (mode === 'assign') {
