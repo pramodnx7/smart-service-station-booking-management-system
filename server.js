@@ -9,6 +9,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const store = require('./src/firestore-store');
 const queueStore = require('./src/queue-store');
+const imageStorage = require('./src/utils/uploadImage');
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -290,16 +291,26 @@ async function handleFileUpload(req, res, next, kind) {
     const files = Array.isArray(req.body.files) ? req.body.files : [req.body];
     const saved = [];
     for (const file of files) {
-      const storedFile = storeUploadedFile(file);
+      const uploaded = await imageStorage.uploadFile(
+        file,
+        kind === 'photo' ? 'services' : 'documents',
+        { allowPdf: kind === 'document' }
+      );
+      const storedFile = {
+        absolutePath: '',
+        relativePath: uploaded.url,
+        storagePath: uploaded.path,
+        originalName: uploaded.fileName,
+        mimeType: uploaded.mimeType,
+        sizeBytes: uploaded.sizeBytes
+      };
       const payload = { ...req.body, ...file };
       try {
         saved.push(kind === 'photo'
           ? await store.recordStoredPhoto(req.user, payload, storedFile)
           : await store.recordStoredDocument(req.user, payload, storedFile));
       } catch (error) {
-        if (storedFile.absolutePath && fs.existsSync(storedFile.absolutePath)) {
-          fs.unlinkSync(storedFile.absolutePath);
-        }
+        await imageStorage.deleteFile(uploaded.path).catch(() => {});
         throw error;
       }
     }
@@ -359,13 +370,76 @@ function landingImage(value, label) {
   const image = String(value || '').trim();
   const isSafePath = /^(?:assets|uploads)\/[-a-z0-9_./]+$/i.test(image);
   const isImageData = /^data:image\/(?:jpeg|png|webp);base64,[a-z0-9+/=]+$/i.test(image) && Buffer.byteLength(image, 'utf8') <= 700 * 1024;
-  if (!isSafePath && !isImageData) {
+  const storageOrigin = String(process.env.SUPABASE_URL || '').replace(/\/$/, '');
+  const storageBucket = process.env.SUPABASE_STORAGE_BUCKET || 'service-station';
+  const isSupabaseImage = image.startsWith(`${storageOrigin}/storage/v1/object/public/${storageBucket}/`);
+  if (!isSafePath && !isImageData && !isSupabaseImage) {
     const error = new Error(`${label} must be a valid JPG, PNG, WebP, or project image.`);
     error.status = 400;
     throw error;
   }
   return image;
 }
+
+function canUseStorageFolder(role, folder) {
+  const permissions = {
+    admin: ['customers', 'vehicles', 'mechanics', 'services', 'inventory', 'company', 'documents'],
+    customer: ['customers', 'vehicles', 'documents'],
+    technician: ['mechanics', 'services', 'documents']
+  };
+  return (permissions[role] || []).includes(String(folder || ''));
+}
+
+async function entityMediaBeforeDelete(entity, id) {
+  return store.getEntityMedia(entity, id);
+}
+
+async function cleanupDeletedEntityMedia(mediaUrls) {
+  if (!mediaUrls?.length) return;
+  await imageStorage.deleteFiles(mediaUrls);
+}
+
+app.post('/api/images/upload', requireAuth(), async (req, res, next) => {
+  try {
+    requireFields(req.body, ['folder', 'file']);
+    if (!canUseStorageFolder(req.user.role, req.body.folder)) {
+      return res.status(403).json({ message: 'You cannot upload to this image folder.' });
+    }
+    res.status(201).json(await imageStorage.uploadFile(req.body.file, req.body.folder, {
+      allowPdf: req.body.folder === 'documents'
+    }));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post('/api/images/replace', requireAuth(), async (req, res, next) => {
+  try {
+    requireFields(req.body, ['folder', 'file']);
+    if (!canUseStorageFolder(req.user.role, req.body.folder)) {
+      return res.status(403).json({ message: 'You cannot replace files in this image folder.' });
+    }
+    res.json(await imageStorage.replaceFile(req.body.file, req.body.folder, req.body.oldUrl, {
+      allowPdf: req.body.folder === 'documents'
+    }));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.delete('/api/images', requireAuth(), async (req, res, next) => {
+  try {
+    requireFields(req.body, ['path']);
+    const firstFolder = String(req.body.path).replace(/^https?:.*\/public\/[^/]+\//, '').split('/')[0];
+    if (!canUseStorageFolder(req.user.role, firstFolder)) {
+      return res.status(403).json({ message: 'You cannot delete this stored image.' });
+    }
+    await imageStorage.deleteFile(req.body.path);
+    res.status(204).end();
+  } catch (error) {
+    next(error);
+  }
+});
 
 function pricingPlanPayload(body) {
   requireFields(body, ['name', 'badge', 'price', 'image', 'buttonText']);
@@ -382,7 +456,8 @@ function pricingPlanPayload(body) {
 
 function servicePayload(body) {
   requireFields(body, ['name', 'price', 'duration', 'description']);
-  return { ...body, image: landingImage(body.image || 'assets/images/service-wheel-closeup.png', 'Service photo') };
+  const fallback = `${String(process.env.SUPABASE_URL || '').replace(/\/$/, '')}/storage/v1/object/public/${process.env.SUPABASE_STORAGE_BUCKET || 'service-station'}/company/system-assets/service-wheel-closeup.png`;
+  return { ...body, image: landingImage(body.image || fallback, 'Service photo') };
 }
 
 function landingContentPayload(section, body) {
@@ -825,7 +900,9 @@ app.put('/api/customer/vehicles/:id', requireAuth('customer'), async (req, res, 
 
 app.delete('/api/customer/vehicles/:id', requireAuth('customer'), async (req, res, next) => {
   try {
+    const mediaUrls = await entityMediaBeforeDelete('vehicle', req.params.id);
     if (!(await store.deleteVehicle(req.params.id, req.user.id, true))) return res.status(404).json({ message: 'Vehicle not found.' });
+    await cleanupDeletedEntityMedia(mediaUrls);
     res.status(204).end();
   } catch (error) {
     next(error);
@@ -920,6 +997,8 @@ app.post('/api/invoices/:id/email', requireAuth('admin'), async (req, res, next)
 app.get('/api/files/:kind/:id/download', requireAuth(), async (req, res, next) => {
   try {
     const file = await store.getFileForDownload(req.user, req.params.kind, req.params.id);
+    const remoteUrl = file?.imageUrl || file?.fileUrl;
+    if (remoteUrl && /^https:\/\//i.test(remoteUrl)) return res.redirect(remoteUrl);
     if (!file || !file.filePath || !fs.existsSync(file.filePath)) return res.status(404).send('File not found.');
     res.download(file.filePath, file.fileName || path.basename(file.filePath));
   } catch (error) {
@@ -1045,9 +1124,10 @@ app.post('/api/admin/customers', requireAuth('admin'), async (req, res, next) =>
       name: req.body.name,
       email: req.body.email,
       phone: req.body.phone,
-      status: req.body.status || 'active'
+      status: req.body.status || 'active',
+      profileImage: req.body.profileImage || ''
     }, passwordHash);
-    res.status(201).json({ id: user.id, name: user.name, email: user.email, phone: user.phone, status: 'Active' });
+    res.status(201).json({ id: user.id, name: user.name, email: user.email, phone: user.phone, status: 'Active', profileImage: user.profileImage, avatar: user.avatar });
   } catch (error) {
     next(error);
   }
@@ -1069,8 +1149,10 @@ app.put('/api/admin/customers/:id', requireAuth('admin'), async (req, res, next)
 
 app.delete('/api/admin/customers/:id', requireAuth('admin'), async (req, res, next) => {
   try {
+    const mediaUrls = await entityMediaBeforeDelete('customer', req.params.id);
     const deleted = await store.deleteCustomer(req.params.id);
     if (!deleted) return res.status(404).json({ message: 'Customer not found.' });
+    await cleanupDeletedEntityMedia(mediaUrls);
     res.status(204).end();
   } catch (error) {
     next(error);
@@ -1103,8 +1185,10 @@ app.put('/api/admin/technicians/:id', requireAuth('admin'), async (req, res, nex
 
 app.delete('/api/admin/technicians/:id', requireAuth('admin'), async (req, res, next) => {
   try {
+    const mediaUrls = await entityMediaBeforeDelete('technician', req.params.id);
     const deleted = await store.deleteTechnician(req.params.id);
     if (!deleted) return res.status(404).json({ message: 'Technician not found.' });
+    await cleanupDeletedEntityMedia(mediaUrls);
     res.status(204).end();
   } catch (error) {
     next(error);
@@ -1176,6 +1260,9 @@ app.delete('/api/admin/files/:kind/:id', requireAuth('admin'), async (req, res, 
     if (file.filePath && fs.existsSync(file.filePath)) {
       fs.unlinkSync(file.filePath);
     }
+    if (file.storagePath || /^https:\/\//i.test(file.imageUrl || file.fileUrl || '')) {
+      await imageStorage.deleteFile(file.storagePath || file.imageUrl || file.fileUrl);
+    }
     res.status(204).end();
   } catch (error) {
     next(error);
@@ -1204,7 +1291,9 @@ app.put('/api/admin/inventory/items/:id', requireAuth('admin'), async (req, res,
 
 app.delete('/api/admin/inventory/items/:id', requireAuth('admin'), async (req, res, next) => {
   try {
+    const mediaUrls = await entityMediaBeforeDelete('inventory', req.params.id);
     if (!(await store.deleteInventoryItem(req.params.id))) return res.status(404).json({ message: 'Inventory item not found.' });
+    await cleanupDeletedEntityMedia(mediaUrls);
     res.status(204).end();
   } catch (error) {
     next(error);
@@ -1284,7 +1373,9 @@ app.put('/api/admin/vehicles/:id', requireAuth('admin'), async (req, res, next) 
 
 app.delete('/api/admin/vehicles/:id', requireAuth('admin'), async (req, res, next) => {
   try {
+    const mediaUrls = await entityMediaBeforeDelete('vehicle', req.params.id);
     if (!(await store.deleteVehicle(req.params.id, req.user.id, false))) return res.status(404).json({ message: 'Vehicle not found.' });
+    await cleanupDeletedEntityMedia(mediaUrls);
     res.status(204).end();
   } catch (error) {
     next(error);
@@ -1311,8 +1402,18 @@ app.put('/api/admin/services/:id', requireAuth('admin'), async (req, res, next) 
 
 app.delete('/api/admin/services/:id', requireAuth('admin'), async (req, res, next) => {
   try {
+    const mediaUrls = await entityMediaBeforeDelete('service', req.params.id);
     if (!(await store.deleteService(req.params.id))) return res.status(404).json({ message: 'Service package not found.' });
+    await cleanupDeletedEntityMedia(mediaUrls);
     res.status(204).end();
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.put('/api/admin/company-settings', requireAuth('admin'), async (req, res, next) => {
+  try {
+    res.json(await store.updateCompanySettings(req.body));
   } catch (error) {
     next(error);
   }

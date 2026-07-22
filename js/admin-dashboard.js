@@ -61,7 +61,8 @@ document.addEventListener('DOMContentLoaded', () => {
       activeTechnicians: 0,
       completedServices: 0
     },
-    landingContent: { recentWork: [], news: [] }
+    landingContent: { recentWork: [], news: [] },
+    companySettings: null
   };
 
   let state = structuredClone(emptyState);
@@ -233,7 +234,7 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
         <div class="invoice-preview__brand-row">
           <div class="invoice-preview__brand">
-            <div class="invoice-preview__logo">AC</div>
+            ${state.companySettings?.invoiceLogo ? `<img class="invoice-preview__logo" src="${state.companySettings.invoiceLogo}" alt="Company invoice logo" data-image-viewer />` : '<div class="invoice-preview__logo">AC</div>'}
             <div>
               <strong>${company.name}</strong>
               <p>${company.address}</p>
@@ -313,11 +314,11 @@ document.addEventListener('DOMContentLoaded', () => {
         <div class="invoice-preview__signatures">
           <div>
             <span>Prepared By</span>
-            <div class="invoice-preview__signature"></div>
+            ${invoice.mechanicSignature ? `<img class="invoice-preview__signature" src="${invoice.mechanicSignature}" alt="Mechanic signature" data-image-viewer />` : '<div class="invoice-preview__signature"></div>'}
           </div>
           <div>
             <span>Authorized Signature</span>
-            <div class="invoice-preview__signature"></div>
+            ${invoice.customerSignature ? `<img class="invoice-preview__signature" src="${invoice.customerSignature}" alt="Customer signature" data-image-viewer />` : '<div class="invoice-preview__signature"></div>'}
           </div>
           <div class="invoice-preview__qr">
             <div class="invoice-preview__qr-box">QR</div>
@@ -449,8 +450,8 @@ document.addEventListener('DOMContentLoaded', () => {
     return bookings.map((booking) => `
       <tr>
         <td><span class="row-title">#BK-${booking.id}</span><span class="row-sub">${booking.service}</span>${booking.status === 'Cancelled' && booking.cancelReason ? `<span class="row-sub booking-cancel-reason">Reason: ${escapeHtml(booking.cancelReason)}</span>` : ''}</td>
-        <td>${customerName(booking.customerId)}</td>
-        <td>${vehicleName(booking.vehicleId)}</td>
+        <td>${escapeHtml(booking.customerName || customerName(booking.customerId))}</td>
+        <td>${escapeHtml(booking.vehicleName || vehicleName(booking.vehicleId))}${booking.vehicleNumber ? `<span class="row-sub">${escapeHtml(booking.vehicleNumber)}</span>` : ''}</td>
         <td>${booking.date}<span class="row-sub">${booking.time}</span></td>
         <td><span class="badge badge--${statusClass(booking.status)}">${booking.status}</span></td>
         ${includeQueue ? `<td>${booking.queue ? `#${booking.queue}` : '-'}</td>` : ''}
@@ -475,8 +476,8 @@ document.addEventListener('DOMContentLoaded', () => {
     selectors.cancelBookingForm.dataset.id = booking.id;
     selectors.cancelBookingTitle.textContent = `Cancel Booking #BK-${booking.id}?`;
     selectors.cancelBookingSummary.innerHTML = `
-      <div><span>Customer</span><strong>${escapeHtml(customerName(booking.customerId))}</strong></div>
-      <div><span>Vehicle</span><strong>${escapeHtml(vehicleName(booking.vehicleId))}</strong></div>
+      <div><span>Customer</span><strong>${escapeHtml(booking.customerName || customerName(booking.customerId))}</strong></div>
+      <div><span>Vehicle</span><strong>${escapeHtml(booking.vehicleName || vehicleName(booking.vehicleId))}</strong></div>
       <div><span>Service</span><strong>${escapeHtml(booking.service)}</strong></div>
       <div><span>Appointment</span><strong>${escapeHtml(booking.date)} at ${escapeHtml(booking.time)}</strong></div>`;
     selectors.cancelBookingForm.reset();
@@ -536,7 +537,7 @@ document.addEventListener('DOMContentLoaded', () => {
     return upcoming.filter((booking) => {
       const bookingDate = new Date(`${booking.date}T00:00:00`);
       const matchesSearch = !search || [
-        `bk-${booking.id}`, booking.id, booking.service, customerName(booking.customerId), vehicleName(booking.vehicleId)
+        `bk-${booking.id}`, booking.id, booking.service, booking.customerName || customerName(booking.customerId), booking.vehicleName || vehicleName(booking.vehicleId)
       ].some((value) => String(value).toLowerCase().includes(search));
       const matchesStatus = overviewBookingFilters.status === 'All' || booking.status === overviewBookingFilters.status;
       const matchesService = overviewBookingFilters.service === 'All' || booking.service === overviewBookingFilters.service;
@@ -571,7 +572,7 @@ document.addEventListener('DOMContentLoaded', () => {
         <div class="progress-item">
           <header><strong>${booking.service}</strong><span>${booking.progress}%</span></header>
           <div class="progress-bar"><span style="width:${booking.progress}%"></span></div>
-          <small>${customerName(booking.customerId)} - ${vehicleName(booking.vehicleId)}</small>
+          <small>${escapeHtml(booking.customerName || customerName(booking.customerId))} - ${escapeHtml(booking.vehicleName || vehicleName(booking.vehicleId))}</small>
         </div>
       `).join('');
 
@@ -694,7 +695,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.getElementById('inventory-body').innerHTML = items.map((part) => `
       <tr>
-        <td><span class="row-title">${part.partName || part.name}</span><span class="row-sub">${part.itemCode || part.sku || ''}</span></td>
+        <td><div class="file-cell">${part.image ? `<img class="service-photo-thumb" src="${part.image}" alt="${part.partName || part.name}" data-image-viewer />` : ''}<div><span class="row-title">${part.partName || part.name}</span><span class="row-sub">${part.itemCode || part.sku || ''}</span></div></div></td>
         <td>${part.category || '-'}</td>
         <td>${part.brand || '-'}</td>
         <td><span class="badge badge--${part.status === 'Out of Stock' ? 'cancelled' : part.status === 'Low Stock' ? 'parts' : 'completed'}">${part.stock ?? part.stockQuantity}</span><span class="row-sub">Min ${part.minimumStockLevel || 0}</span></td>
@@ -1052,6 +1053,16 @@ document.addEventListener('DOMContentLoaded', () => {
     renderFeedback();
     renderLandingStats();
     renderLandingContentAdmin();
+    const companyContainer = document.getElementById('company-image-settings');
+    if (companyContainer && state.companySettings && !companyContainer.dataset.ready) {
+      companyContainer.dataset.ready = 'true';
+      companyContainer.innerHTML = [
+        window.AutoCareImages.uploader({ name: 'logo', label: 'Company Logo', folder: 'company', value: state.companySettings.logo }),
+        window.AutoCareImages.uploader({ name: 'invoiceLogo', label: 'Invoice Logo', folder: 'company', value: state.companySettings.invoiceLogo }),
+        window.AutoCareImages.uploader({ name: 'banner', label: 'Workshop Banner', folder: 'company', value: state.companySettings.banner })
+      ].join('');
+      window.AutoCareImages.enhance(companyContainer);
+    }
   }
 
   function field(name, label, type = 'text', value = '', options = [], required = true) {
@@ -1066,12 +1077,14 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function vehicleImageUpload(record = {}) {
-    return `
-      <label class="full"><span>Car Image</span><input name="vehicleImage" type="file" accept=".jpg,.jpeg,.png,image/jpeg,image/png" /></label>
-      <div class="full vehicle-image-preview" data-file-preview="vehicleImage">
-        ${record.image ? `<img src="${record.image}" alt="" /><span>Current car image</span>` : '<span>No car image selected</span>'}
-      </div>
-    `;
+    return [
+      window.AutoCareImages.uploader({ name: 'frontImage', label: 'Front Image', folder: 'vehicles', value: record.frontImage || record.image }),
+      window.AutoCareImages.uploader({ name: 'rearImage', label: 'Rear Image', folder: 'vehicles', value: record.rearImage }),
+      window.AutoCareImages.uploader({ name: 'leftImage', label: 'Left Image', folder: 'vehicles', value: record.leftImage }),
+      window.AutoCareImages.uploader({ name: 'rightImage', label: 'Right Image', folder: 'vehicles', value: record.rightImage }),
+      window.AutoCareImages.uploader({ name: 'interiorImage', label: 'Interior Image', folder: 'vehicles', value: record.interiorImage }),
+      window.AutoCareImages.uploader({ name: 'engineImage', label: 'Engine Image', folder: 'vehicles', value: record.engineImage })
+    ].join('');
   }
 
   function readFileAsBase64(file) {
@@ -1148,7 +1161,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const config = {
       customer: {
         title: record.id ? 'Edit Customer' : 'Register Customer',
-        body: field('name', 'Full Name', 'text', record.name || '') + field('email', 'Email', 'email', record.email || '') + field('phone', 'Phone', 'tel', record.phone || '') + field('password', record.id ? 'Reset Password (optional)' : 'Temporary Password', 'password', '', [], !record.id) + field('status', 'Status', 'select', record.status || 'Active', [{ value: 'Active', label: 'Active' }, { value: 'Pending', label: 'Pending' }, { value: 'Inactive', label: 'Inactive' }])
+        body: field('name', 'Full Name', 'text', record.name || '') + field('email', 'Email', 'email', record.email || '') + field('phone', 'Phone', 'tel', record.phone || '') + field('password', record.id ? 'Reset Password (optional)' : 'Temporary Password', 'password', '', [], !record.id) + field('status', 'Status', 'select', record.status || 'Active', [{ value: 'Active', label: 'Active' }, { value: 'Pending', label: 'Pending' }, { value: 'Inactive', label: 'Inactive' }]) + window.AutoCareImages.uploader({ name: 'profileImage', label: 'Profile Image', folder: 'customers', value: record.profileImage || record.avatar })
       },
       vehicle: {
         title: record.id ? 'Edit Vehicle' : 'Add Vehicle',
@@ -1156,7 +1169,7 @@ document.addEventListener('DOMContentLoaded', () => {
       },
       technician: {
         title: record.id ? 'Edit Technician' : 'Create Technician',
-        body: field('name', 'Full Name', 'text', record.name || '') + field('email', 'Email', 'email', record.email || '') + field('phone', 'Phone', 'tel', record.phone || '') + field('password', record.id ? 'Reset Password (optional)' : 'Temporary Password', 'password', '', [], !record.id) + field('employeeNo', 'Employee No', 'text', record.employeeNo || '') + field('specialization', 'Specialization', 'select', record.specialization || technicianSpecializations[0], technicianSpecializations.map((item) => ({ value: item, label: item }))) + field('experienceYears', 'Experience Years', 'number', record.experienceYears || '0') + field('status', 'Status', 'select', record.status || 'Active', [{ value: 'Active', label: 'Active' }, { value: 'Inactive', label: 'Inactive' }])
+        body: field('name', 'Full Name', 'text', record.name || '') + field('email', 'Email', 'email', record.email || '') + field('phone', 'Phone', 'tel', record.phone || '') + field('password', record.id ? 'Reset Password (optional)' : 'Temporary Password', 'password', '', [], !record.id) + field('employeeNo', 'Employee No', 'text', record.employeeNo || '') + field('specialization', 'Specialization', 'select', record.specialization || technicianSpecializations[0], technicianSpecializations.map((item) => ({ value: item, label: item }))) + field('experienceYears', 'Experience Years', 'number', record.experienceYears || '0') + field('status', 'Status', 'select', record.status || 'Active', [{ value: 'Active', label: 'Active' }, { value: 'Inactive', label: 'Inactive' }]) + window.AutoCareImages.uploader({ name: 'profileImage', label: 'Profile Photo', folder: 'mechanics', value: record.profileImage || record.avatar }) + window.AutoCareImages.uploader({ name: 'nicImage', label: 'NIC Photo', folder: 'mechanics', value: record.nicImage }) + window.AutoCareImages.uploader({ name: 'certificateUrls', label: 'Certificates', folder: 'documents', value: record.certificateUrls || [], multiple: true, acceptPdf: true })
       },
       booking: {
         title: record.id ? 'Reschedule Booking' : 'Book Service Appointment',
@@ -1172,7 +1185,7 @@ document.addEventListener('DOMContentLoaded', () => {
       },
       inventoryItem: {
         title: record.id ? 'Edit Inventory Item' : 'Add Inventory Item',
-        body: field('itemCode', 'Item Code', 'text', record.itemCode || record.sku || '') + field('partName', 'Part Name', 'text', record.partName || record.name || '') + field('category', 'Category', 'select', record.category || categoryOptions[0]?.value, categoryOptions) + field('brand', 'Brand', 'text', record.brand || '') + field('manufacturer', 'Manufacturer', 'text', record.manufacturer || '') + field('supplierId', 'Supplier', 'select', record.supplierId || supplierOptions[0]?.value, supplierOptions) + field('purchasePrice', 'Purchase Price', 'number', record.purchasePrice || '0') + field('sellingPrice', 'Selling Price', 'number', record.sellingPrice || record.unitPrice || '0') + field('stockQuantity', 'Stock Quantity', 'number', record.stock ?? record.stockQuantity ?? '0') + field('minimumStockLevel', 'Minimum Stock Level', 'number', record.minimumStockLevel || '0') + field('location', 'Location', 'text', record.location || '') + field('warrantyPeriod', 'Warranty Period', 'text', record.warrantyPeriod || '') + field('description', 'Description', 'textarea', record.description || '')
+        body: field('itemCode', 'Item Code', 'text', record.itemCode || record.sku || '') + field('partName', 'Part Name', 'text', record.partName || record.name || '') + field('category', 'Category', 'select', record.category || categoryOptions[0]?.value, categoryOptions) + field('brand', 'Brand', 'text', record.brand || '') + field('manufacturer', 'Manufacturer', 'text', record.manufacturer || '') + field('supplierId', 'Supplier', 'select', record.supplierId || supplierOptions[0]?.value, supplierOptions) + field('purchasePrice', 'Purchase Price', 'number', record.purchasePrice || '0') + field('sellingPrice', 'Selling Price', 'number', record.sellingPrice || record.unitPrice || '0') + field('stockQuantity', 'Stock Quantity', 'number', record.stock ?? record.stockQuantity ?? '0') + field('minimumStockLevel', 'Minimum Stock Level', 'number', record.minimumStockLevel || '0') + field('location', 'Location', 'text', record.location || '') + field('warrantyPeriod', 'Warranty Period', 'text', record.warrantyPeriod || '') + field('description', 'Description', 'textarea', record.description || '') + window.AutoCareImages.uploader({ name: 'image', label: 'Inventory Item Image', folder: 'inventory', value: record.image })
       },
       supplier: {
         title: record.id ? 'Edit Supplier' : 'Add Supplier',
@@ -1180,15 +1193,15 @@ document.addEventListener('DOMContentLoaded', () => {
       },
       service: {
         title: record.id ? 'Edit Service Package' : 'Add Service Package',
-        body: field('name', 'Package Name', 'text', record.name || '') + field('price', 'Price', 'number', record.price || '') + field('duration', 'Duration', 'text', record.duration || '') + field('image', 'Current Image Path', 'text', record.image || 'assets/images/service-wheel-closeup.png') + '<label class="full"><span>Upload New Service Photo (optional)</span><input name="serviceImage" type="file" accept="image/jpeg,image/png,image/webp" /></label>' + field('description', 'Description', 'textarea', record.description || '')
+        body: field('name', 'Package Name', 'text', record.name || '') + field('price', 'Price', 'number', record.price || '') + field('duration', 'Duration', 'text', record.duration || '') + window.AutoCareImages.uploader({ name: 'image', label: 'Service Photo', folder: 'services', value: record.image }) + field('description', 'Description', 'textarea', record.description || '')
       },
       pricingPlan: {
         title: record.id ? 'Edit Landing Plan' : 'Add Landing Plan',
-        body: field('name', 'Plan Name', 'text', record.name || '') + field('badge', 'Image Badge', 'text', record.badge || '') + field('price', 'Price (LKR)', 'number', record.price || '') + field('billingPeriod', 'Billing Period', 'text', record.billingPeriod || 'month') + field('buttonText', 'Button Text', 'text', record.buttonText || '') + field('displayOrder', 'Display Order', 'number', record.displayOrder || (state.pricingPlans.length + 1)) + field('featured', 'Highlight Plan', 'select', String(Boolean(record.featured)), [{ value: 'false', label: 'No' }, { value: 'true', label: 'Yes - Most Popular' }]) + field('active', 'Visibility', 'select', String(record.active !== false), [{ value: 'true', label: 'Visible' }, { value: 'false', label: 'Hidden' }]) + field('image', 'Current Image Path', 'text', record.image || 'assets/images/workshop-lift-mechanic.png') + '<label class="full"><span>Upload New Image (optional)</span><input name="planImage" type="file" accept="image/jpeg,image/png,image/webp" /></label>' + field('features', 'Features (one per line)', 'textarea', (record.features || []).join('\n'))
+        body: field('name', 'Plan Name', 'text', record.name || '') + field('badge', 'Image Badge', 'text', record.badge || '') + field('price', 'Price (LKR)', 'number', record.price || '') + field('billingPeriod', 'Billing Period', 'text', record.billingPeriod || 'month') + field('buttonText', 'Button Text', 'text', record.buttonText || '') + field('displayOrder', 'Display Order', 'number', record.displayOrder || (state.pricingPlans.length + 1)) + field('featured', 'Highlight Plan', 'select', String(Boolean(record.featured)), [{ value: 'false', label: 'No' }, { value: 'true', label: 'Yes - Most Popular' }]) + field('active', 'Visibility', 'select', String(record.active !== false), [{ value: 'true', label: 'Visible' }, { value: 'false', label: 'Hidden' }]) + field('image', 'Current Image URL', 'text', record.image || 'https://ieliygatevqevgssroze.supabase.co/storage/v1/object/public/service-station/company/system-assets/workshop-lift-mechanic.png') + '<label class="full"><span>Upload New Image (optional)</span><input name="planImage" type="file" accept="image/jpeg,image/png,image/webp" /></label>' + field('features', 'Features (one per line)', 'textarea', (record.features || []).join('\n'))
       },
       invoice: {
         title: 'Create Invoice',
-        body: field('serviceJobId', 'Completed Service Job', 'select', record.serviceJobId || completedJobOptions[0]?.value, completedJobOptions) + field('customerId', 'Customer', 'select', record.customerId || customerOptions[0]?.value, customerOptions) + field('service', 'Service', 'select', record.service || state.packages[0]?.name, state.packages.map((item) => ({ value: item.name, label: item.name }))) + field('laborCost', 'Labor Cost', 'number', record.laborCost || '') + field('serviceCharges', 'Service Charges', 'number', record.serviceCharges || '0') + field('tax', 'Tax', 'number', record.tax || '0') + field('discount', 'Discount', 'number', record.discount || '0') + field('payment', 'Payment Status', 'select', record.payment || 'Unpaid', paymentOptions) + field('date', 'Date', 'date', record.date || new Date().toISOString().slice(0, 10))
+        body: field('serviceJobId', 'Completed Service Job', 'select', record.serviceJobId || completedJobOptions[0]?.value, completedJobOptions) + field('customerId', 'Customer', 'select', record.customerId || customerOptions[0]?.value, customerOptions) + field('service', 'Service', 'select', record.service || state.packages[0]?.name, state.packages.map((item) => ({ value: item.name, label: item.name }))) + field('laborCost', 'Labor Cost', 'number', record.laborCost || '') + field('serviceCharges', 'Service Charges', 'number', record.serviceCharges || '0') + field('tax', 'Tax', 'number', record.tax || '0') + field('discount', 'Discount', 'number', record.discount || '0') + field('payment', 'Payment Status', 'select', record.payment || 'Unpaid', paymentOptions) + field('date', 'Date', 'date', record.date || new Date().toISOString().slice(0, 10)) + window.AutoCareImages.uploader({ name: 'customerSignature', label: 'Customer Signature', folder: 'documents' }) + window.AutoCareImages.uploader({ name: 'mechanicSignature', label: 'Mechanic Signature', folder: 'documents' })
       },
       emergency: {
         title: 'Emergency Service Request',
@@ -1205,6 +1218,7 @@ document.addEventListener('DOMContentLoaded', () => {
     selectors.modalKicker.textContent = 'Admin Action';
     selectors.modalTitle.textContent = config[mode].title;
     selectors.modalBody.innerHTML = config[mode].body;
+    window.AutoCareImages.enhance(selectors.modalBody);
     selectors.modalActions.innerHTML = `
       <button class="btn btn--ghost" type="button" data-action="close-modal">${mode === 'notification' ? 'Close & Save Draft' : 'Cancel'}</button>
       <button class="btn btn--blue" type="submit" id="modal-submit">${mode === 'notification' ? 'Send' : 'Save'}</button>
@@ -1251,6 +1265,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const mode = selectors.modalForm.dataset.mode;
     const id = Number(selectors.modalForm.dataset.id);
     let successMessage = 'Dashboard data saved successfully.';
+    const imageTransaction = await window.AutoCareImages.collect(selectors.modalForm);
+    Object.assign(data, imageTransaction.values);
+    try {
 
     if (mode === 'customer') {
       const savedCustomer = await window.AutoCareApi.request(id ? `/api/admin/customers/${id}` : '/api/admin/customers', {
@@ -1265,19 +1282,17 @@ document.addEventListener('DOMContentLoaded', () => {
         openModal('booking', pendingBookingDraft);
         pendingBookingDraft = null;
         showToast('New customer added and selected for this appointment.');
+        await window.AutoCareImages.commit(imageTransaction);
         return;
       }
     }
 
     if (mode === 'vehicle') {
-      const vehicleImage = await fileInputToPayload('vehicleImage');
-      const existingVehicle = state.vehicles.find((item) => item.id === id);
       const payload = {
         ...data,
         customerId: Number(data.customerId),
-        image: existingVehicle?.image || 'assets/images/hero-blue-workshop.png'
+        image: data.frontImage || 'https://ieliygatevqevgssroze.supabase.co/storage/v1/object/public/service-station/company/system-assets/hero-blue-workshop.png'
       };
-      if (vehicleImage) payload.vehicleImage = vehicleImage;
       const savedVehicle = await window.AutoCareApi.request(id ? `/api/admin/vehicles/${id}` : '/api/admin/vehicles', {
         method: id ? 'PUT' : 'POST',
         body: JSON.stringify(payload)
@@ -1291,6 +1306,7 @@ document.addEventListener('DOMContentLoaded', () => {
         openModal('booking', pendingBookingDraft);
         pendingBookingDraft = null;
         showToast('New vehicle added and selected for this appointment.');
+        await window.AutoCareImages.commit(imageTransaction);
         return;
       }
     }
@@ -1368,10 +1384,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     if (mode === 'service') {
-      const imageFile = selectors.modalForm.elements.serviceImage.files[0];
-      const image = imageFile ? await window.AutoCareApi.optimizeProfileImage(imageFile) : data.image;
-      const payload = { ...data, image, price: Number(data.price) };
-      delete payload.serviceImage;
+      const payload = { ...data, image: data.image || 'https://ieliygatevqevgssroze.supabase.co/storage/v1/object/public/service-station/company/system-assets/service-wheel-closeup.png', price: Number(data.price) };
       const savedService = await window.AutoCareApi.request(id ? `/api/admin/services/${id}` : '/api/admin/services', {
         method: id ? 'PUT' : 'POST',
         body: JSON.stringify(payload)
@@ -1416,6 +1429,11 @@ document.addEventListener('DOMContentLoaded', () => {
     saveState();
     renderAll();
     showToast(successMessage);
+    await window.AutoCareImages.commit(imageTransaction);
+    } catch (error) {
+      await window.AutoCareImages.rollback(imageTransaction);
+      throw error;
+    }
   }
 
   async function advanceBooking(id) {
@@ -1505,7 +1523,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!await window.AutoCareApi.confirmAction({
         title: 'Remove Customer Account?',
         message: `Remove ${customer.name}'s customer account?`,
-        details: 'This permanently removes the customer profile and cannot be undone.',
+        details: 'The account disappears immediately. Historical service and billing records are preserved safely.',
         confirmLabel: 'Remove Customer'
       })) return;
       await window.AutoCareApi.request(`/api/admin/customers/${numericId}`, { method: 'DELETE' });
@@ -1523,7 +1541,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!technician || !await window.AutoCareApi.confirmAction({
         title: 'Remove Technician?',
         message: `Remove ${technician?.name || 'this technician'} from the workshop team?`,
-        details: 'This action is permanent and may be blocked when active work is assigned.',
+        details: 'The technician disappears immediately. Linked history is preserved and active work becomes available for reassignment.',
         confirmLabel: 'Remove Technician'
       })) return;
       await window.AutoCareApi.request(`/api/admin/technicians/${numericId}`, { method: 'DELETE' });
@@ -1543,7 +1561,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const vehicleLabel = `${vehicle.make || ''} ${vehicle.model || ''} (${vehicle.plate || 'No plate'})`.trim();
       if (!await window.AutoCareApi.confirmAction({
         title: 'Remove Vehicle?', message: `Remove ${vehicleLabel}?`,
-        details: 'The vehicle will be permanently removed. Linked bookings may prevent this action.', confirmLabel: 'Remove Vehicle'
+        details: 'The vehicle disappears immediately while linked service history remains available.', confirmLabel: 'Remove Vehicle'
       })) return;
       await window.AutoCareApi.request(`/api/admin/vehicles/${numericId}`, { method: 'DELETE' });
       state.vehicles = state.vehicles.filter((item) => item.id !== numericId);
@@ -1588,7 +1606,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const item = state.inventoryParts.find((part) => part.id === numericId);
       if (!item || !await window.AutoCareApi.confirmAction({
         title: 'Delete Inventory Item?', message: `Delete ${item?.partName || item?.name || 'this inventory item'}?`,
-        details: 'Stock records linked to active service work may prevent deletion.', confirmLabel: 'Delete Item'
+        details: 'The item disappears immediately while stock and service history remain available.', confirmLabel: 'Delete Item'
       })) return;
       await window.AutoCareApi.request(`/api/admin/inventory/items/${numericId}`, { method: 'DELETE' });
       state.inventoryParts = state.inventoryParts.filter((item) => item.id !== numericId);
@@ -1606,7 +1624,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const supplier = state.inventorySuppliers.find((item) => item.id === numericId);
       if (!await window.AutoCareApi.confirmAction({
         title: 'Delete Supplier?', message: `Delete ${supplier?.name || 'this supplier'}?`,
-        details: 'This cannot be undone. Suppliers linked to inventory records may be protected.', confirmLabel: 'Delete Supplier'
+        details: 'The supplier disappears immediately while linked inventory history remains available.', confirmLabel: 'Delete Supplier'
       })) return;
       await window.AutoCareApi.request(`/api/admin/inventory/suppliers/${numericId}`, { method: 'DELETE' });
       state.inventorySuppliers = state.inventorySuppliers.filter((item) => item.id !== numericId);
@@ -1619,7 +1637,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const service = state.packages.find((item) => item.id === numericId);
       if (!await window.AutoCareApi.confirmAction({
         title: 'Delete Service Package?', message: `Delete ${service?.name || 'this service package'}?`,
-        details: 'Services linked to bookings, invoices, or reviews cannot be removed.', confirmLabel: 'Delete Service'
+        details: 'The service disappears from new bookings immediately. Existing booking and invoice history is preserved.', confirmLabel: 'Delete Service'
       })) return;
       await window.AutoCareApi.request(`/api/admin/services/${numericId}`, { method: 'DELETE' });
       state.packages = state.packages.filter((item) => item.id !== numericId);
@@ -1738,6 +1756,8 @@ document.addEventListener('DOMContentLoaded', () => {
         details: 'The draft cannot be recovered after deletion.', confirmLabel: 'Delete Draft'
       })) return;
       await window.AutoCareApi.request(`/api/admin/notification-drafts/${numericId}`, { method: 'DELETE' });
+      state.notificationDrafts = state.notificationDrafts.filter((draft) => draft.id !== numericId);
+      renderNotifications();
       await refreshNotifications();
       showToast('Draft deleted.');
     }
@@ -1872,7 +1892,9 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('settings-form').addEventListener('submit', async (event) => {
       event.preventDefault();
       const form = event.currentTarget;
+      let imageTransaction;
       try {
+        imageTransaction = await window.AutoCareImages.collect(form);
         const avatarFile = form.elements.profilePicture.files[0];
         const avatar = avatarFile ? await window.AutoCareApi.optimizeProfileImage(avatarFile) : (state.profile?.avatar || '');
         const result = await window.AutoCareApi.request('/api/profile', {
@@ -1880,11 +1902,17 @@ document.addEventListener('DOMContentLoaded', () => {
           body: JSON.stringify({ name: form.elements.name.value, email: form.elements.email.value, phone: form.elements.phone.value, avatar })
         });
         state.profile = result.user;
+        state.companySettings = await window.AutoCareApi.request('/api/admin/company-settings', {
+          method: 'PUT',
+          body: JSON.stringify(imageTransaction.values)
+        });
+        await window.AutoCareImages.commit(imageTransaction);
         localStorage.setItem(sessionKey, JSON.stringify({ ...getSession(), ...result.user, authenticated: true }));
         form.elements.profilePicture.value = '';
         applyAdminProfile(state.profile);
         showToast('Admin profile updated successfully.');
       } catch (error) {
+        if (imageTransaction) await window.AutoCareImages.rollback(imageTransaction);
         showToast(error.message || 'Profile update failed.');
       }
     });

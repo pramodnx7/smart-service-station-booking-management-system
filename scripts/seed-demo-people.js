@@ -110,7 +110,7 @@ async function seedDemoPeople() {
       const customerId = customerIds[index % customerIds.length];
       transaction.set(db.collection('vehicles').doc(String(id)), {
         id, userId: customerId, name: `${make} ${model}`, make, model, plateNumber: plates[index],
-        year: String(2013 + (index % 13)), imageUrl: 'assets/images/hero-blue-workshop.png',
+        year: String(2013 + (index % 13)), imageUrl: 'https://ieliygatevqevgssroze.supabase.co/storage/v1/object/public/service-station/company/system-assets/hero-blue-workshop.png',
         seedBatch, createdAt: timestamp
       });
     });

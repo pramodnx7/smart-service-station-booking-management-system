@@ -9,10 +9,14 @@
     "check": "node scripts/check-syntax.js",
     "firebase:seed-people": "node --use-system-ca scripts/seed-demo-people.js",
     "firebase:seed-bookings": "node --use-system-ca scripts/seed-demo-bookings.js",
+    "firebase:migrate-images": "node --use-system-ca scripts/migrate-images-to-supabase.js --execute",
+    "firebase:migrate-images:dry-run": "node --use-system-ca scripts/migrate-images-to-supabase.js",
+    "firebase:migrate-static-images": "node --use-system-ca scripts/migrate-static-images-to-supabase.js",
     "test:connection": "node --use-system-ca scripts/check-connection.js",
     "audit:browser": "node scripts/audit-browser.js"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.110.8",
     "bcryptjs": "^2.4.3",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",

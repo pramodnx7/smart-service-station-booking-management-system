@@ -11,6 +11,7 @@
   <link rel="stylesheet" href="css/admin-dashboard.css?v=cancel-booking-1" />
   <link rel="stylesheet" href="css/responsive.css?v=mobile-1" />
   <link rel="stylesheet" href="css/dashboard-refresh.css?v=confirm-popup-1" />
+  <link rel="stylesheet" href="css/image-management.css?v=1" />
 </head>
 <body class="admin-dashboard">
   <div class="dashboard-shell">
@@ -339,9 +340,10 @@
               <label><span>Support Phone</span><input name="supportPhone" value="+94 77 023 4567" required /></label>
               <label><span>Support Email</span><input name="supportEmail" type="email" value="support@autocare.lk" required /></label>
               <label><span>Admin Password</span><input name="password" type="password" placeholder="Change password" /></label>
+              <div class="full" id="company-image-settings"></div>
               <div class="database-note">
                 <strong>Database connection</strong>
-                <p>Use the provided Supabase PostgreSQL URLs only in a backend server or migration tool. Browser JavaScript should use secure API endpoints or Supabase anon keys with Row Level Security.</p>
+                <p>Firebase Firestore stores application data and image URLs. Supabase Storage is used only for uploaded images and documents.</p>
               </div>
               <button class="btn btn--yellow" type="submit">Save Settings</button>
             </form>
@@ -384,6 +386,7 @@
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
   <script src="js/api.js?v=confirm-popup-1"></script>
-  <script src="js/admin-dashboard.js?v=confirm-popup-1"></script>
+  <script src="js/image-management.js?v=1"></script>
+  <script src="js/admin-dashboard.js?v=image-management-1"></script>
 </body>
 </html>

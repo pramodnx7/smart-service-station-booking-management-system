@@ -13,7 +13,7 @@
   inset: 0;
   background:
     linear-gradient(90deg, rgba(3, 12, 27, 0.58) 0%, rgba(4, 15, 33, 0.38) 34%, rgba(4, 15, 33, 0.08) 66%, rgba(4, 15, 33, 0.02) 100%),
-    url("../assets/images/hero-blue-workshop.png") center / cover no-repeat;
+    url("https://ieliygatevqevgssroze.supabase.co/storage/v1/object/public/service-station/company/system-assets/hero-blue-workshop.png") center / cover no-repeat;
   overflow: hidden;
 }
 

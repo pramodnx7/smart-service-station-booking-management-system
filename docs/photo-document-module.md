@@ -1,60 +1,43 @@
-# Photo & Document Management Module
+# Image & Document Management
 
-## Storage
+Application records remain in Firebase Firestore. Supabase is used only for file storage; Firestore stores public URLs and storage metadata.
 
-Files are uploaded as base64 payloads to authenticated API endpoints, validated server-side, stored under `uploads/service-files`, and exposed only through authenticated download routes.
+## Configuration
 
-Allowed formats: `JPG`, `PNG`, `PDF`, `DOCX`
+Create a public Supabase Storage bucket named `service-station`, then add these server-only values to `.env`:
 
-Maximum file size: `5MB`
-
-## Firestore Collections
-
-- `servicePhotos`
-- `documents`
-- `uploadAuditLogs`
-- `serviceJobs`
-- `vehicles`
-- `technicians`
-- `invoices`
-
-## Permissions
-
-- Admin can upload, view, download, and permanently delete files.
-- Assigned technicians can upload service-job photos/documents.
-- Customers can only view/download files linked to their own service jobs.
-- All uploads must be linked to a service job.
-- Duplicate file uploads for the same service job and type are rejected.
-
-## ER Diagram
-
-```mermaid
-erDiagram
-  SERVICE_JOBS ||--o{ SERVICE_PHOTOS : has
-  VEHICLES ||--o{ SERVICE_PHOTOS : shows
-  TECHNICIANS ||--o{ SERVICE_PHOTOS : uploads
-  USERS ||--o{ SERVICE_PHOTOS : customer
-  SERVICE_JOBS ||--o{ DOCUMENTS : has
-  VEHICLES ||--o{ DOCUMENTS : belongs_to
-  USERS ||--o{ DOCUMENTS : customer
-  USERS ||--o{ UPLOAD_AUDIT_LOGS : performs
-  INVOICES ||--o{ DOCUMENTS : pdf
+```env
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=your-private-service-role-key
+SUPABASE_STORAGE_BUCKET=service-station
 ```
 
-## Migration Order
+Never expose the service-role key in browser JavaScript or commit it to Git.
 
-1. `database/schema.sql`
-2. `database/technician-module.sql`
-3. `database/inventory-module.sql`
-4. `database/photo-document-module.sql`
+## Storage folders
+
+- `customers/`: customer profile images
+- `vehicles/`: front, rear, left, right, interior, and engine images
+- `mechanics/`: profile and NIC images
+- `services/`: service evidence and package images
+- `inventory/`: inventory item images
+- `company/`: company, invoice, and workshop branding
+- `documents/`: certificates and PDFs
+
+Supported image types are JPG/JPEG, PNG, and WebP. PDFs are accepted only in the documents folder. The maximum file size is 5 MB.
+
+## Failure safety
+
+The browser uploads through authenticated API routes. New files are deleted automatically when the related Firestore save fails. Replaced files are deleted only after Firestore succeeds. Deleting a customer, vehicle, mechanic, inventory item, service, or uploaded service file also removes its Supabase objects.
 
 ## APIs
 
+- `POST /api/images/upload`
+- `POST /api/images/replace`
+- `DELETE /api/images`
 - `POST /api/technician/jobs/:id/photos/upload`
 - `POST /api/technician/jobs/:id/documents/upload`
 - `POST /api/admin/service-jobs/:id/photos/upload`
 - `POST /api/admin/service-jobs/:id/documents/upload`
 - `GET /api/files/:kind/:id/download`
 - `DELETE /api/admin/files/:kind/:id`
-- `GET /api/invoices/:id/pdf`
-- `POST /api/invoices/:id/email`

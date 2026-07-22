@@ -3,7 +3,7 @@
   color: rgba(255, 255, 255, 0.74);
   background:
     linear-gradient(90deg, rgba(4, 13, 25, 0.96), rgba(5, 23, 44, 0.92)),
-    url("../assets/images/workshop-lift-mechanic.png") center / cover no-repeat;
+    url("https://ieliygatevqevgssroze.supabase.co/storage/v1/object/public/service-station/company/system-assets/workshop-lift-mechanic.png") center / cover no-repeat;
 }
 
 .footer::before {

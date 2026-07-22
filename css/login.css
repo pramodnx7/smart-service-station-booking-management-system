@@ -40,7 +40,7 @@ button { cursor: pointer; }
   color: #fff;
   background:
     linear-gradient(90deg, rgba(3, 14, 31, 0.92), rgba(3, 14, 31, 0.52)),
-    url("../assets/images/hero-blue-workshop.png") center / cover no-repeat;
+    url("https://ieliygatevqevgssroze.supabase.co/storage/v1/object/public/service-station/company/system-assets/hero-blue-workshop.png") center / cover no-repeat;
   overflow: hidden;
 }
 
@@ -448,7 +448,7 @@ input:focus {
   padding: clamp(30px, 3.5vw, 58px);
   background:
     linear-gradient(105deg, rgba(3, 14, 31, .96) 4%, rgba(3, 17, 39, .82) 47%, rgba(3, 14, 31, .35)),
-    url("../assets/images/hero-blue-workshop.png") center / cover no-repeat;
+    url("https://ieliygatevqevgssroze.supabase.co/storage/v1/object/public/service-station/company/system-assets/hero-blue-workshop.png") center / cover no-repeat;
 }
 
 .login-visual::before {

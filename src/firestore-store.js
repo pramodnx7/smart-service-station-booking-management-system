@@ -32,6 +32,9 @@ const collections = {
 };
 
 const landingStatsDocument = 'landing-stats';
+const companySettingsDocument = 'company';
+const systemAssetBase = `${String(process.env.SUPABASE_URL || '').replace(/\/$/, '')}/storage/v1/object/public/${process.env.SUPABASE_STORAGE_BUCKET || 'service-station'}/company/system-assets`;
+const systemAsset = (fileName) => `${systemAssetBase}/${fileName}`;
 const landingContentDocumentPrefix = 'landing-content';
 const landingStatDefaults = {
   happyCustomers: 20000,
@@ -39,19 +42,19 @@ const landingStatDefaults = {
 };
 const landingContentDefaults = {
   recentWork: [
-    { title: 'Suspension Inspection', image: 'assets/images/service-wheel-closeup.png', active: true },
-    { title: 'Exhaust System Repair', image: 'assets/images/workshop-lift-mechanic.png', active: true },
-    { title: 'Engine Diagnostics', image: 'assets/images/about-mechanic-red-car.png', active: true }
+    { title: 'Suspension Inspection', image: systemAsset('service-wheel-closeup.png'), active: true },
+    { title: 'Exhaust System Repair', image: systemAsset('workshop-lift-mechanic.png'), active: true },
+    { title: 'Engine Diagnostics', image: systemAsset('about-mechanic-red-car.png'), active: true }
   ],
   news: [
-    { date: '2026-01-23', category: 'Maintenance', title: 'A well-maintained car is like a well tuned instrument.', image: 'assets/images/about-mechanic-red-car.png', active: true },
-    { date: '2026-01-11', category: 'Auto Service', title: 'The best car service is the one that keeps you moving forward.', image: 'assets/images/workshop-lift-mechanic.png', active: true },
-    { date: '2026-01-07', category: 'Car Care', title: 'We provide peace of mind with top-notch car service.', image: 'assets/images/hero-blue-workshop.png', active: true }
+    { date: '2026-01-23', category: 'Maintenance', title: 'A well-maintained car is like a well tuned instrument.', image: systemAsset('about-mechanic-red-car.png'), active: true },
+    { date: '2026-01-11', category: 'Auto Service', title: 'The best car service is the one that keeps you moving forward.', image: systemAsset('workshop-lift-mechanic.png'), active: true },
+    { date: '2026-01-07', category: 'Car Care', title: 'We provide peace of mind with top-notch car service.', image: systemAsset('hero-blue-workshop.png'), active: true }
   ]
 };
 
-const defaultImage = 'assets/images/hero-blue-workshop.png';
-const defaultServiceImage = 'assets/images/service-wheel-closeup.png';
+const defaultImage = systemAsset('hero-blue-workshop.png');
+const defaultServiceImage = systemAsset('service-wheel-closeup.png');
 const serviceJobStatuses = ['Pending', 'Assigned', 'In Progress', 'Waiting For Parts', 'Quality Check', 'Completed', 'Cancelled'];
 const inventoryCategories = ['Engine Parts', 'Brake System', 'Electrical', 'Suspension', 'Cooling System', 'Filters', 'Fluids & Lubricants', 'Batteries', 'Tires & Wheels', 'Accessories'];
 const partConditions = ['Brand New', 'Used', 'Refurbished', 'Reconditioned', 'Customer Supplied'];
@@ -582,7 +585,8 @@ function publicUser(user) {
     name: user.name,
     email: user.email,
     phone: user.phone || '',
-    avatar: user.avatar || ''
+    avatar: user.avatar || user.profileImage || '',
+    profileImage: user.profileImage || user.avatar || ''
   };
 }
 
@@ -593,7 +597,8 @@ function customerView(user) {
     email: user.email,
     phone: user.phone || '',
     status: titleCase(user.status || 'active'),
-    avatar: user.avatar || ''
+    avatar: user.avatar || user.profileImage || '',
+    profileImage: user.profileImage || user.avatar || ''
   };
 }
 
@@ -609,7 +614,10 @@ function technicianView(technician, user) {
     phone: technician.phone || profile?.phone || '',
     experienceYears: Number(technician.experienceYears || 0),
     status: titleCase(technician.status || 'active'),
-    avatar: profile?.avatar || ''
+    avatar: profile?.avatar || technician.profileImage || '',
+    profileImage: technician.profileImage || profile?.profileImage || profile?.avatar || '',
+    nicImage: technician.nicImage || '',
+    certificateUrls: Array.isArray(technician.certificateUrls) ? technician.certificateUrls : []
   };
 }
 
@@ -623,7 +631,13 @@ function vehicleView(vehicle) {
     model: vehicle.model,
     plate: vehicle.plateNumber,
     year: vehicle.year,
-    image: vehicle.imageUrl || defaultImage
+    image: vehicle.frontImage || vehicle.imageUrl || defaultImage,
+    frontImage: vehicle.frontImage || vehicle.imageUrl || '',
+    rearImage: vehicle.rearImage || '',
+    leftImage: vehicle.leftImage || '',
+    rightImage: vehicle.rightImage || '',
+    interiorImage: vehicle.interiorImage || '',
+    engineImage: vehicle.engineImage || ''
   };
 }
 
@@ -702,7 +716,8 @@ function partView(part) {
     warrantyProvider: part.warrantyProvider || part.supplier || '',
     status: inventoryStockStatus(stock, part.status, minimumStockLevel),
     inventoryValue: stock * purchasePrice,
-    retailValue: stock * sellingPrice
+    retailValue: stock * sellingPrice,
+    image: part.image || ''
   };
 }
 
@@ -767,7 +782,11 @@ function serviceJobView(job, context = {}) {
     customerName: customer?.name || 'Unknown customer',
     customerPhone: customer?.phone || '',
     customerEmail: customer?.email || '',
-    technicianName: technicianUser?.name || technician?.name || 'Unassigned'
+    technicianName: technicianUser?.name || technician?.name || 'Unassigned',
+    beforeImages: Array.isArray(job.beforeImages) ? job.beforeImages : [],
+    afterImages: Array.isArray(job.afterImages) ? job.afterImages : [],
+    damageImages: Array.isArray(job.damageImages) ? job.damageImages : [],
+    completedImages: Array.isArray(job.completedImages) ? job.completedImages : []
   };
 }
 
@@ -807,7 +826,9 @@ function invoiceView(invoice, serviceById) {
     tax: Number(invoice.tax || 0),
     discount: Number(invoice.discount || 0),
     payment: invoice.paymentStatus,
-    date: formatDate(invoice.invoiceDate)
+    date: formatDate(invoice.invoiceDate),
+    customerSignature: invoice.customerSignature || '',
+    mechanicSignature: invoice.mechanicSignature || ''
   };
 }
 
@@ -1058,7 +1079,7 @@ async function ensureUserByEmailRole({ id, role, name, email, phone = '', passwo
   return createDocument(collections.users, userData);
 }
 
-async function createUser({ role, name, email, phone = '', passwordHash, status = 'active' }) {
+async function createUser({ role, name, email, phone = '', passwordHash, status = 'active', profileImage = '' }) {
   if (await emailExists(email)) {
     const error = new Error('An account with this email already exists.');
     error.status = 409;
@@ -1072,7 +1093,8 @@ async function createUser({ role, name, email, phone = '', passwordHash, status 
     emailLower: emailKey(email),
     phone: String(phone || '').trim(),
     passwordHash,
-    status: String(status || 'active').toLowerCase()
+    status: String(status || 'active').toLowerCase(),
+    profileImage: String(profileImage || '')
   });
 
   return publicUser(user);
@@ -1080,14 +1102,15 @@ async function createUser({ role, name, email, phone = '', passwordHash, status 
 
 async function getCustomerDashboard(userId) {
   const customerId = Number(userId);
-  const [user, vehicles, bookings, invoices, notifications, serviceMap, jobs] = await Promise.all([
+  const [user, vehicles, bookings, invoices, notifications, serviceMap, jobs, companySettingsSnapshot] = await Promise.all([
     getById(collections.users, userId),
     allWhere(collections.vehicles, 'userId', customerId),
     allWhere(collections.bookings, 'userId', customerId),
     allWhere(collections.invoices, 'userId', customerId),
     allWhere(collections.notifications, 'userId', customerId),
     servicesById(),
-    allWhere(collections.serviceJobs, 'customerId', customerId)
+    allWhere(collections.serviceJobs, 'customerId', customerId),
+    db.collection(collections.appSettings).doc(companySettingsDocument).get()
   ]);
 
   const packages = Array.from(serviceMap.values())
@@ -1121,15 +1144,16 @@ async function getCustomerDashboard(userId) {
   };
 
   return {
-    profile: { name: user.name, email: user.email, phone: user.phone || '', avatar: user.avatar || '' },
-    vehicles: sortById(vehicles).map(vehicleView),
-    bookings: sortDateDesc(bookings.map((item) => bookingView(item, serviceMap)), 'date', 'time'),
+    profile: { name: user.name, email: user.email, phone: user.phone || '', avatar: user.avatar || user.profileImage || '', profileImage: user.profileImage || user.avatar || '' },
+    vehicles: sortById(vehicles.filter((vehicle) => vehicle.archived !== true)).map(vehicleView),
+    bookings: sortDateDesc(bookings.filter((booking) => booking.hiddenForCustomer !== true).map((item) => bookingView(item, serviceMap)), 'date', 'time'),
     invoices: sortDateDesc(invoices.map((item) => invoiceView(item, serviceMap)), 'date'),
     notifications: sortById(notifications).reverse().map(({ id, type, message, unread }) => ({ id, type, message, unread })),
     usedParts: sortById(usages).reverse().map((usage) => usageView(usage, context)),
     serviceImages: sortById(images).reverse().map((image) => fileView(image, 'photo')),
     documents: sortById(documents).reverse().map((document) => fileView(document, 'document')),
-    packages
+    packages,
+    companySettings: companySettingsSnapshot.exists ? companySettingsSnapshot.data() : {}
   };
 }
 
@@ -1263,7 +1287,7 @@ function buildInventoryReports(parts, movements, usages, context = {}) {
 
 async function getAdminDashboard(userId) {
   assertFirebaseConfigured();
-  const [users, vehicles, bookings, packages, pricingPlans, invoices, emergencies, notifications, notificationDrafts, feedback, technicians, serviceJobs, inventoryParts, suppliers, categories, movements, usages, photos, documents, serviceMap, landingStatsSnapshot, landingContentSettings] = await Promise.all([
+  const [users, vehicles, bookings, packages, pricingPlans, invoices, emergencies, notifications, notificationDrafts, feedback, technicians, serviceJobs, inventoryParts, suppliers, categories, movements, usages, photos, documents, serviceMap, landingStatsSnapshot, landingContentSettings, companySettingsSnapshot] = await Promise.all([
     all(collections.users),
     all(collections.vehicles),
     all(collections.bookings),
@@ -1285,7 +1309,8 @@ async function getAdminDashboard(userId) {
     all(collections.documents),
     servicesById(),
     db.collection(collections.appSettings).doc(landingStatsDocument).get(),
-    getLandingContentSettings()
+    getLandingContentSettings(),
+    db.collection(collections.appSettings).doc(companySettingsDocument).get()
   ]);
 
   const context = {
@@ -1296,27 +1321,34 @@ async function getAdminDashboard(userId) {
     jobsById: new Map(serviceJobs.map((job) => [Number(job.id), job])),
     partsById: new Map(inventoryParts.map((part) => [Number(part.id), part]))
   };
+  const visibleTechnicians = technicians.filter((technician) => technician.archived !== true);
+  const visibleInventoryParts = inventoryParts.filter((part) => part.archived !== true);
   const jobViews = sortById(serviceJobs).map((item) => serviceJobView(item, context));
-  const inventoryReports = buildInventoryReports(inventoryParts, movements, usages, context);
+  const inventoryReports = buildInventoryReports(visibleInventoryParts, movements, usages, context);
 
   return {
     profile: publicUser(context.usersById.get(Number(userId))),
-    customers: sortById(users.filter((user) => user.role === 'customer')).map(customerView),
-    technicians: sortById(technicians).map((technician) => technicianView(technician, context.usersById.get(Number(technician.userId)))),
-    vehicles: sortById(vehicles).map(vehicleView),
-    bookings: sortDateDesc(bookings.map((item) => bookingView(item, serviceMap)), 'date', 'time'),
+    customers: sortById(users.filter((user) => user.role === 'customer' && user.archived !== true)).map(customerView),
+    technicians: sortById(visibleTechnicians).map((technician) => technicianView(technician, context.usersById.get(Number(technician.userId)))),
+    vehicles: sortById(vehicles.filter((vehicle) => vehicle.archived !== true)).map(vehicleView),
+    bookings: sortDateDesc(bookings.map((item) => ({
+      ...bookingView(item, serviceMap),
+      customerName: context.usersById.get(Number(item.userId))?.name || 'Unknown customer',
+      vehicleName: vehicleNotificationLabel(context.vehiclesById.get(Number(item.vehicleId))),
+      vehicleNumber: context.vehiclesById.get(Number(item.vehicleId))?.plateNumber || ''
+    })), 'date', 'time'),
     serviceJobs: jobViews,
-    inventoryParts: sortById(inventoryParts).map(partView),
-    inventorySuppliers: sortById(suppliers),
+    inventoryParts: sortById(visibleInventoryParts).map(partView),
+    inventorySuppliers: sortById(suppliers.filter((supplier) => supplier.archived !== true)),
     inventoryCategories: sortById(categories),
     stockMovements: inventoryReports.stockMovements,
     partUsageHistory: inventoryReports.technicianUsage,
     servicePhotos: sortById(photos).reverse().map((photo) => fileView(photo, 'photo')),
     documents: sortById(documents).reverse().map((document) => fileView(document, 'document')),
     inventoryReports,
-    technicianWorkload: buildTechnicianWorkload(technicians, jobViews, context.usersById),
-    technicianPerformance: buildTechnicianPerformance(technicians, jobViews, context.usersById),
-    packages: sortById(packages).map(({ id, name, price, duration, description, image }) => ({ id, name, price: Number(price), duration, description, image: image || defaultServiceImage })),
+    technicianWorkload: buildTechnicianWorkload(visibleTechnicians, jobViews, context.usersById),
+    technicianPerformance: buildTechnicianPerformance(visibleTechnicians, jobViews, context.usersById),
+    packages: sortById(packages.filter((service) => service.archived !== true)).map(({ id, name, price, duration, description, image }) => ({ id, name, price: Number(price), duration, description, image: image || defaultServiceImage })),
     pricingPlans: pricingPlans.map(pricingPlanView).sort((a, b) => a.displayOrder - b.displayOrder || a.id - b.id),
     invoices: sortDateDesc(invoices.map((item) => invoiceView(item, serviceMap)), 'date'),
     emergencies: sortById(emergencies).reverse().map(({ id, userId, customerId, location, problem, status }) => ({ id, customerId: customerId || userId, location, problem, status })),
@@ -1324,9 +1356,27 @@ async function getAdminDashboard(userId) {
     sentNotifications: sortById(notifications.filter((item) => Number(item.senderUserId) === Number(userId))).reverse().map((item) => sentNotificationView(item, context.usersById)),
     notificationDrafts: sortById(notificationDrafts.filter((item) => Number(item.createdByUserId) === Number(userId))).reverse().map((item) => notificationDraftView(item, context.usersById)),
     feedback: sortById(feedback).reverse().map(({ id, userId, customerId, rating, comment }) => ({ id, customerId: customerId || userId, rating, comment })),
-    landingStats: landingStatsView(landingStatsSnapshot.exists ? landingStatsSnapshot.data() : {}, users, technicians, serviceJobs),
-    landingContent: landingContentView(landingContentSettings)
+    landingStats: landingStatsView(
+      landingStatsSnapshot.exists ? landingStatsSnapshot.data() : {},
+      users.filter((user) => user.archived !== true),
+      visibleTechnicians,
+      serviceJobs
+    ),
+    landingContent: landingContentView(landingContentSettings),
+    companySettings: companySettingsSnapshot.exists ? companySettingsSnapshot.data() : {}
   };
+}
+
+async function updateCompanySettings(data) {
+  assertFirebaseConfigured();
+  const allowed = ['logo', 'invoiceLogo', 'banner'];
+  const payload = Object.fromEntries(allowed
+    .filter((key) => Object.prototype.hasOwnProperty.call(data, key))
+    .map((key) => [key, String(data[key] || '').trim()]));
+  payload.updatedAt = fieldValue();
+  await db.collection(collections.appSettings).doc(companySettingsDocument).set(payload, { merge: true });
+  const snapshot = await db.collection(collections.appSettings).doc(companySettingsDocument).get();
+  return snapshot.data() || {};
 }
 
 async function getAdminServiceJobDetails(serviceJobId) {
@@ -1381,7 +1431,13 @@ async function createVehicle(userId, data) {
     model: data.model.trim(),
     plateNumber: data.plate.trim().toUpperCase(),
     year: String(data.year).trim(),
-    imageUrl: String(data.image || defaultImage).trim()
+    imageUrl: String(data.frontImage || data.image || defaultImage).trim(),
+    frontImage: String(data.frontImage || data.image || '').trim(),
+    rearImage: String(data.rearImage || '').trim(),
+    leftImage: String(data.leftImage || '').trim(),
+    rightImage: String(data.rightImage || '').trim(),
+    interiorImage: String(data.interiorImage || '').trim(),
+    engineImage: String(data.engineImage || '').trim()
   });
   await createUserNotification(
     userId,
@@ -1402,7 +1458,13 @@ async function updateVehicle(id, userId, data, enforceOwner = true) {
     model: data.model.trim(),
     plateNumber: data.plate.trim().toUpperCase(),
     year: String(data.year).trim(),
-    imageUrl: String(data.image || current.imageUrl || defaultImage).trim()
+    imageUrl: String(data.frontImage || data.image || current.frontImage || current.imageUrl || defaultImage).trim(),
+    frontImage: String(data.frontImage ?? current.frontImage ?? data.image ?? current.imageUrl ?? '').trim(),
+    rearImage: String(data.rearImage ?? current.rearImage ?? '').trim(),
+    leftImage: String(data.leftImage ?? current.leftImage ?? '').trim(),
+    rightImage: String(data.rightImage ?? current.rightImage ?? '').trim(),
+    interiorImage: String(data.interiorImage ?? current.interiorImage ?? '').trim(),
+    engineImage: String(data.engineImage ?? current.engineImage ?? '').trim()
   });
 
   await createUserNotification(
@@ -1422,9 +1484,8 @@ async function deleteVehicle(id, userId, enforceOwner = true) {
     allWhere(collections.serviceJobs, 'vehicleId', Number(id))
   ]);
   if (bookings.length || jobs.length) {
-    const error = new Error('Vehicle cannot be removed while linked booking or service job records exist.');
-    error.status = 409;
-    throw error;
+    await updateDocument(collections.vehicles, id, { archived: true, archivedAt: fieldValue() });
+    return true;
   }
   await deleteDocument(collections.vehicles, id);
   return true;
@@ -1809,9 +1870,8 @@ async function deleteBooking(id, userId = null, enforceOwner = true) {
   if (enforceOwner && userId && Number(current.userId) !== Number(userId)) return false;
   const jobs = await allWhere(collections.serviceJobs, 'bookingId', Number(id));
   if (jobs.length) {
-    const error = new Error('Booking cannot be removed because a linked service job exists. Cancel it instead.');
-    error.status = 409;
-    throw error;
+    await updateDocument(collections.bookings, id, { hiddenForCustomer: true });
+    return true;
   }
   await deleteDocument(collections.bookings, id);
   return true;
@@ -1961,7 +2021,12 @@ async function getPublicStats() {
     db.collection(collections.appSettings).doc(landingStatsDocument).get()
   ]);
   const settings = settingsSnapshot.exists ? settingsSnapshot.data() : {};
-  return landingStatsView(settings, users, technicians, jobs);
+  return landingStatsView(
+    settings,
+    users.filter((user) => user.archived !== true),
+    technicians.filter((technician) => technician.archived !== true),
+    jobs
+  );
 }
 
 async function getPublicLandingContent() {
@@ -2033,6 +2098,7 @@ async function updateProfile(userId, data) {
     phone: data.phone.trim()
   };
   if (Object.prototype.hasOwnProperty.call(data, 'avatar')) changes.avatar = String(data.avatar || '');
+  if (Object.prototype.hasOwnProperty.call(data, 'profileImage')) changes.profileImage = String(data.profileImage || '');
   if (data.passwordHash) changes.passwordHash = data.passwordHash;
   const user = await updateDocument(collections.users, userId, changes);
   return publicUser(user);
@@ -2055,6 +2121,7 @@ async function updateCustomer(id, data) {
     phone: data.phone.trim(),
     status: String(data.status || 'active').toLowerCase()
   };
+  if (Object.prototype.hasOwnProperty.call(data, 'profileImage')) changes.profileImage = String(data.profileImage || '');
   if (data.passwordHash) changes.passwordHash = data.passwordHash;
   const user = await updateDocument(collections.users, id, changes);
 
@@ -2065,7 +2132,7 @@ async function deleteCustomer(id) {
   const customer = await getById(collections.users, id);
   if (!customer || customer.role !== 'customer') return false;
 
-  const [vehicles, bookings, invoices, jobs, emergencies, feedback, notifications, notificationDrafts] = await Promise.all([
+  const [vehicles, bookings, invoices, jobs, emergencies, feedback, notifications, notificationDrafts, queueEntries] = await Promise.all([
     all(collections.vehicles),
     all(collections.bookings),
     all(collections.invoices),
@@ -2073,7 +2140,8 @@ async function deleteCustomer(id) {
     all(collections.emergencyRequests),
     all(collections.feedback),
     all(collections.notifications),
-    all(collections.notificationDrafts)
+    all(collections.notificationDrafts),
+    all(collections.queueEntries)
   ]);
   const customerId = Number(id);
   const dependencies = [
@@ -2085,14 +2153,30 @@ async function deleteCustomer(id) {
     ['feedback', feedback.some((item) => Number(item.userId) === customerId)]
   ].filter(([, exists]) => exists).map(([label]) => label);
 
-  if (dependencies.length) {
-    const error = new Error(`Customer cannot be removed because linked ${dependencies.join(', ')} records exist. Set the customer status to inactive instead.`);
-    error.status = 409;
-    throw error;
-  }
-
   const customerNotifications = notifications.filter((item) => Number(item.userId) === customerId);
   const customerDrafts = notificationDrafts.filter((item) => Number(item.userId) === customerId);
+  if (dependencies.length) {
+    const batch = db.batch();
+    const timestamp = fieldValue();
+    batch.set(docRef(collections.users, customerId), { status: 'removed', archived: true, archivedAt: timestamp, updatedAt: timestamp }, { merge: true });
+    vehicles.filter((item) => Number(item.userId) === customerId).forEach((vehicle) => {
+      batch.set(docRef(collections.vehicles, vehicle.id), { archived: true, archivedAt: timestamp, updatedAt: timestamp }, { merge: true });
+    });
+    bookings.filter((item) => Number(item.userId) === customerId && !['Completed', 'Cancelled'].includes(item.status)).forEach((booking) => {
+      batch.set(docRef(collections.bookings, booking.id), {
+        status: 'Cancelled', progress: 0, queuePosition: 0,
+        cancelReason: 'Customer account removed by administrator.', cancelledAt: timestamp, updatedAt: timestamp
+      }, { merge: true });
+    });
+    queueEntries.filter((item) => Number(item.customerId) === customerId && !['Completed', 'Cancelled', 'No Show'].includes(item.status)).forEach((entry) => {
+      batch.set(docRef(collections.queueEntries, entry.id), { status: 'Cancelled', closedAt: timestamp, updatedAt: timestamp }, { merge: true });
+    });
+    customerNotifications.forEach((item) => batch.delete(docRef(collections.notifications, item.id)));
+    customerDrafts.forEach((item) => batch.delete(docRef(collections.notificationDrafts, item.id)));
+    await batch.commit();
+    return true;
+  }
+
   await Promise.all([
     ...customerNotifications.map((item) => deleteDocument(collections.notifications, item.id)),
     ...customerDrafts.map((item) => deleteDocument(collections.notificationDrafts, item.id))
@@ -2144,6 +2228,7 @@ function normalizeInventoryPayload(data) {
     location: String(data.location || '').trim(),
     warrantyPeriod: String(data.warrantyPeriod || '').trim(),
     warrantyProvider: String(data.warrantyProvider || data.supplier || '').trim(),
+    image: String(data.image || '').trim(),
     status: inventoryStockStatus(stock, String(data.status || 'Active').trim(), minimumStockLevel)
   };
 }
@@ -2213,9 +2298,8 @@ async function deleteInventoryItem(id) {
     allWhere(collections.inventoryMovements, 'partId', Number(id))
   ]);
   if (usages.length || movements.some((movement) => movement.type !== 'Opening Stock')) {
-    const error = new Error('Inventory item has stock or service history and cannot be deleted. Set it inactive instead.');
-    error.status = 409;
-    throw error;
+    await updateDocument(collections.inventoryParts, id, { archived: true, active: false, archivedAt: fieldValue() });
+    return true;
   }
   await Promise.all(movements.map((movement) => deleteDocument(collections.inventoryMovements, movement.id)));
   await deleteDocument(collections.inventoryParts, id);
@@ -2247,9 +2331,8 @@ async function deleteInventorySupplier(id) {
   if (!supplier) return false;
   const parts = await allWhere(collections.inventoryParts, 'supplierId', Number(id));
   if (parts.length) {
-    const error = new Error('Supplier cannot be removed while inventory items reference it.');
-    error.status = 409;
-    throw error;
+    await updateDocument(collections.inventorySuppliers, id, { archived: true, status: 'Inactive', archivedAt: fieldValue() });
+    return true;
   }
   await deleteDocument(collections.inventorySuppliers, id);
   return true;
@@ -2593,7 +2676,10 @@ async function updateTechnician(id, data) {
     email: emailKey(data.email),
     emailLower: emailKey(data.email),
     phone: String(data.phone || '').trim(),
-    status: String(data.status || 'active').toLowerCase()
+    status: String(data.status || 'active').toLowerCase(),
+    profileImage: String(data.profileImage || '').trim(),
+    nicImage: String(data.nicImage || '').trim(),
+    certificateUrls: Array.isArray(data.certificateUrls) ? data.certificateUrls.filter(Boolean) : []
   };
   if (data.passwordHash) userChanges.passwordHash = data.passwordHash;
   const user = await updateDocument(collections.users, current.userId, userChanges);
@@ -2603,7 +2689,10 @@ async function updateTechnician(id, data) {
     specialization: await normalizeTechnicianSpecialization(data.specialization),
     phone: String(data.phone || '').trim(),
     experienceYears: Number(data.experienceYears || 0),
-    status: String(data.status || 'active').toLowerCase()
+    status: String(data.status || 'active').toLowerCase(),
+    profileImage: String(data.profileImage ?? current.profileImage ?? '').trim(),
+    nicImage: String(data.nicImage ?? current.nicImage ?? '').trim(),
+    certificateUrls: Array.isArray(data.certificateUrls) ? data.certificateUrls.filter(Boolean) : (current.certificateUrls || [])
   });
 
   return technicianView(technician, user);
@@ -2613,12 +2702,22 @@ async function deleteTechnician(id) {
   const technician = await getById(collections.technicians, id);
   if (!technician) return false;
 
-  const jobs = await all(collections.serviceJobs);
-  const hasJobs = jobs.some((job) => Number(job.assignedTechnicianId) === Number(id));
-  if (hasJobs) {
-    const error = new Error('Technician has service jobs and cannot be deleted. Deactivate the technician instead.');
-    error.status = 409;
-    throw error;
+  const [jobs, bookings] = await Promise.all([all(collections.serviceJobs), all(collections.bookings)]);
+  const hasLinkedWork = jobs.some((job) => Number(job.assignedTechnicianId) === Number(id))
+    || bookings.some((booking) => Number(booking.assignedTechnicianId) === Number(id));
+  if (hasLinkedWork) {
+    const batch = db.batch();
+    const timestamp = fieldValue();
+    batch.set(docRef(collections.technicians, id), { status: 'inactive', archived: true, archivedAt: timestamp, updatedAt: timestamp }, { merge: true });
+    batch.set(docRef(collections.users, technician.userId), { status: 'inactive', archived: true, archivedAt: timestamp, updatedAt: timestamp }, { merge: true });
+    jobs.filter((job) => Number(job.assignedTechnicianId) === Number(id) && !['Completed', 'Cancelled'].includes(job.status)).forEach((job) => {
+      batch.set(docRef(collections.serviceJobs, job.id), { assignedTechnicianId: null, status: 'Pending', updatedAt: timestamp }, { merge: true });
+    });
+    bookings.filter((booking) => Number(booking.assignedTechnicianId) === Number(id) && !['Completed', 'Cancelled'].includes(booking.status)).forEach((booking) => {
+      batch.set(docRef(collections.bookings, booking.id), { assignedTechnicianId: null, updatedAt: timestamp }, { merge: true });
+    });
+    await batch.commit();
+    return true;
   }
 
   const [notifications, notificationDrafts] = await Promise.all([
@@ -2805,7 +2904,7 @@ async function getTechnicianDashboard(userId) {
     notes,
     progress: progressEntries,
     partsUsed,
-    inventoryParts: inventoryParts.map(partView),
+    inventoryParts: inventoryParts.filter((part) => part.archived !== true).map(partView),
     servicePhotos: sortById(photos).reverse().map((photo) => fileView(photo, 'photo')),
     documents: sortById(documents).reverse().map((document) => fileView(document, 'document')),
     notifications: sortById(notifications).reverse().map(({ id, type, message, unread }) => ({ id, type, message, unread }))
@@ -2896,6 +2995,7 @@ async function recordStoredPhoto(user, data, storedFile) {
     photoType: data.photoType,
     imageUrl: storedFile.relativePath,
     filePath: storedFile.absolutePath,
+    storagePath: storedFile.storagePath || '',
     fileName: storedFile.originalName,
     mimeType: storedFile.mimeType,
     sizeBytes: storedFile.sizeBytes,
@@ -2903,6 +3003,18 @@ async function recordStoredPhoto(user, data, storedFile) {
     uploadedBy: user.role,
     uploadedAt: fieldValue()
   });
+  const galleryField = {
+    'Before Service': 'beforeImages',
+    'After Service': 'afterImages',
+    'Replaced Part': 'damageImages',
+    'Vehicle Inspection': 'completedImages'
+  }[data.photoType];
+  if (galleryField) {
+    await docRef(collections.serviceJobs, job.id).set({
+      [galleryField]: admin.firestore.FieldValue.arrayUnion(storedFile.relativePath),
+      updatedAt: fieldValue()
+    }, { merge: true });
+  }
   await createUploadAudit({ fileKind: 'photo', fileId: photo.id, action: 'Uploaded', userId: user.id, role: user.role });
   await createUserNotification(job.customerId, 'Service Photo Uploaded', `${data.photoType} photo uploaded for service job #SJ-${job.id}.`);
   return fileView(photo, 'photo');
@@ -2938,6 +3050,7 @@ async function recordStoredDocument(user, data, storedFile) {
     fileName: storedFile.originalName,
     fileUrl: storedFile.relativePath,
     filePath: storedFile.absolutePath,
+    storagePath: storedFile.storagePath || '',
     mimeType: storedFile.mimeType,
     sizeBytes: storedFile.sizeBytes,
     uploadedBy: user.role,
@@ -2985,6 +3098,35 @@ async function deleteStoredFile(user, kind, id) {
   await deleteDocument(collection, id);
   await createUploadAudit({ fileKind: kind, fileId: Number(id), action: 'Deleted', userId: user.id, role: user.role });
   return file;
+}
+
+function mediaValues(record, fields) {
+  return fields.flatMap((field) => {
+    const value = record?.[field];
+    return Array.isArray(value) ? value : [value];
+  }).filter((value) => /^https:\/\//i.test(String(value || '')));
+}
+
+async function getEntityMedia(entity, id) {
+  const entityFields = {
+    vehicle: [collections.vehicles, ['frontImage', 'rearImage', 'leftImage', 'rightImage', 'interiorImage', 'engineImage', 'imageUrl']],
+    technician: [collections.technicians, ['profileImage', 'nicImage', 'certificateUrls']],
+    inventory: [collections.inventoryParts, ['image']],
+    service: [collections.servicePackages, ['image']],
+    serviceJob: [collections.serviceJobs, ['beforeImages', 'afterImages', 'damageImages', 'completedImages']]
+  };
+  if (entity === 'customer') {
+    const [customer, vehicles] = await Promise.all([
+      getById(collections.users, id),
+      allWhere(collections.vehicles, 'userId', Number(id))
+    ]);
+    return [...mediaValues(customer, ['profileImage', 'avatar']), ...vehicles.flatMap((vehicle) => (
+      mediaValues(vehicle, ['frontImage', 'rearImage', 'leftImage', 'rightImage', 'interiorImage', 'engineImage', 'imageUrl'])
+    ))];
+  }
+  const config = entityFields[entity];
+  if (!config) return [];
+  return mediaValues(await getById(config[0], id), config[1]);
 }
 
 async function updateTechnicianProgress(userId, data) {
@@ -3391,9 +3533,8 @@ async function deleteService(id) {
     allWhere(collections.feedback, 'servicePackageId', Number(id))
   ]);
   if (bookings.length || invoices.length || feedback.length) {
-    const error = new Error('Service package has booking, invoice, or feedback history and cannot be deleted.');
-    error.status = 409;
-    throw error;
+    await updateDocument(collections.servicePackages, id, { active: false, archived: true, archivedAt: fieldValue() });
+    return true;
   }
   await deleteDocument(collections.servicePackages, id);
   return true;
@@ -3439,7 +3580,9 @@ async function createInvoice(data) {
     discount,
     amount: grandTotal,
     paymentStatus: data.payment,
-    invoiceDate: data.date
+    invoiceDate: data.date,
+    customerSignature: String(data.customerSignature || '').trim(),
+    mechanicSignature: String(data.mechanicSignature || '').trim()
   });
 
   return invoiceView(invoice, new Map([[service.id, service]]));
@@ -3605,6 +3748,7 @@ module.exports = {
   getById,
   getCustomerDashboard,
   getEmergencyRequests,
+  getEntityMedia,
   getBookingSlots,
   getInventoryReports,
   getIndividualReportPdf,
@@ -3636,6 +3780,7 @@ module.exports = {
   completeTechnicianJob,
   updateBooking,
   updateCustomer,
+  updateCompanySettings,
   updateDocument,
   updateInventoryItem,
   updateInventorySupplier,

@@ -37,7 +37,8 @@ document.addEventListener('DOMContentLoaded', () => {
     notifications: [],
     rewardPoints: 0,
     packages: [],
-    queueEntries: []
+    queueEntries: [],
+    companySettings: {}
   };
 
   let state = structuredClone(emptyState);
@@ -202,6 +203,14 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('profile-full-name').value = state.profile.name;
     document.getElementById('profile-email-input').value = state.profile.email;
     document.getElementById('profile-phone').value = state.profile.phone;
+    const profileUploader = document.getElementById('customer-profile-uploader');
+    if (profileUploader && !profileUploader.dataset.ready) {
+      profileUploader.dataset.ready = 'true';
+      profileUploader.innerHTML = window.AutoCareImages.uploader({
+        name: 'profileImage', label: 'Your Profile Image', folder: 'customers', value: state.profile.profileImage || state.profile.avatar
+      });
+      window.AutoCareImages.enhance(profileUploader);
+    }
   }
 
   function renderMetrics() {
@@ -253,17 +262,20 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function vehicleCards(limit) {
-    return state.vehicles.slice(0, limit || state.vehicles.length).map((vehicle) => `
+    return state.vehicles.slice(0, limit || state.vehicles.length).map((vehicle) => {
+      const images = [vehicle.frontImage || vehicle.image, vehicle.rearImage, vehicle.leftImage, vehicle.rightImage, vehicle.interiorImage, vehicle.engineImage].filter(Boolean);
+      return `
       <article class="vehicle-card">
-        <img src="${vehicle.image || 'assets/images/hero-blue-workshop.png'}" alt="${vehicle.make} ${vehicle.model}" />
+        <img src="${vehicle.image || 'https://ieliygatevqevgssroze.supabase.co/storage/v1/object/public/service-station/company/system-assets/hero-blue-workshop.png'}" alt="${vehicle.make} ${vehicle.model}" data-image-viewer />
         <h3>${displayVehicleName(vehicle)}</h3>
         <p>${vehicle.plate}</p>
+        <div class="vehicle-image-gallery">${images.map((image, index) => `<img src="${image}" alt="${vehicle.make} ${vehicle.model} view ${index + 1}" data-image-viewer />`).join('')}</div>
         <div class="card-meta"><span>${vehicle.year}</span><span>${vehicle.model}</span></div>
         <div class="row-actions"><button class="mini-btn" type="button" data-action="new-booking-for-vehicle" data-id="${vehicle.id}">Book Service</button><button class="mini-btn" type="button" data-action="edit-vehicle" data-id="${vehicle.id}">Edit</button><button class="mini-btn mini-btn--red" type="button" data-action="delete-vehicle" data-id="${vehicle.id}">Delete</button></div>
       </article>
-    `).join('') + `
+    `; }).join('') + `
       <article class="vehicle-card">
-        <img src="assets/images/hero_car.svg" alt="" />
+        <img src="https://ieliygatevqevgssroze.supabase.co/storage/v1/object/public/service-station/company/system-assets/hero_car.svg" alt="" />
         <h3>Add New Vehicle</h3>
         <p>Register another vehicle.</p>
         <div class="row-actions"><button class="mini-btn" type="button" data-action="new-vehicle">Add Vehicle</button></div>
@@ -318,7 +330,7 @@ document.addEventListener('DOMContentLoaded', () => {
     `).join('') : emptyRow(7, 'No parts recorded yet.');
     document.getElementById('service-photo-list').innerHTML = (state.serviceImages || []).length ? (state.serviceImages || []).map((image) => `
       <article class="notification-item">
-        <span data-icon="tools"></span>
+        <img class="service-photo-thumb" src="${image.previewUrl || image.fileUrl}" alt="${image.photoType || 'Service photo'}" data-image-viewer />
         <div><strong>${image.photoType || 'Service Photo'} #SJ-${image.serviceJobId}</strong><p>${image.description || image.fileName || image.imageUrl}</p></div>
       </article>
     `).join('') : '<article class="notification-empty"><strong>No service photos yet.</strong><p>Photos will appear after a service job is updated.</p></article>';
@@ -419,7 +431,8 @@ document.addEventListener('DOMContentLoaded', () => {
         bankName: 'Sampath Bank',
         accountName: 'AutoCare Service Station',
         accountNumber: '100-200-300-4',
-        branch: 'Colombo 03'
+        branch: 'Colombo 03',
+        invoiceLogo: state.companySettings?.invoiceLogo || ''
       }
     };
   }
@@ -451,7 +464,7 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
         <div class="invoice-preview__brand-row">
           <div class="invoice-preview__brand">
-            <div class="invoice-preview__logo">AC</div>
+            ${company.invoiceLogo ? `<img class="invoice-preview__logo" src="${company.invoiceLogo}" alt="Company invoice logo" data-image-viewer />` : '<div class="invoice-preview__logo">AC</div>'}
             <div>
               <strong>${company.name}</strong>
               <p>${company.address}</p>
@@ -520,11 +533,11 @@ document.addEventListener('DOMContentLoaded', () => {
         <div class="invoice-preview__signatures">
           <div>
             <span>Prepared By</span>
-            <div class="invoice-preview__signature"></div>
+            ${invoice.mechanicSignature ? `<img class="invoice-preview__signature" src="${invoice.mechanicSignature}" alt="Mechanic signature" data-image-viewer />` : '<div class="invoice-preview__signature"></div>'}
           </div>
           <div>
             <span>Authorized Signature</span>
-            <div class="invoice-preview__signature"></div>
+            ${invoice.customerSignature ? `<img class="invoice-preview__signature" src="${invoice.customerSignature}" alt="Customer signature" data-image-viewer />` : '<div class="invoice-preview__signature"></div>'}
           </div>
           <div class="invoice-preview__qr">
             <div class="invoice-preview__qr-box">QR</div>
@@ -627,8 +640,7 @@ document.addEventListener('DOMContentLoaded', () => {
         ${field('newVehicleName', 'New Vehicle Name', 'text', '', [], false)}
         ${field('newVehiclePlate', 'Number Plate', 'text', '', [], false)}
         ${field('newVehicleYear', 'Year', 'number', '2026', [], false)}
-        <label class="full"><span>Customer Car Image</span><input name="newVehicleImage" type="file" accept=".jpg,.jpeg,.png,image/jpeg,image/png" /></label>
-        <div class="full vehicle-image-preview" data-file-preview="newVehicleImage"></div>
+        ${window.AutoCareImages.uploader({ name: 'newVehicleFrontImage', label: 'Front Vehicle Image', folder: 'vehicles' })}
       </div>
     `;
   }
@@ -718,7 +730,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const config = {
       vehicle: {
         title: record.id ? 'Edit Vehicle' : 'Add Vehicle',
-        body: field('name', 'Vehicle Name', 'text', record.name || `${record.make || ''} ${record.model || ''}`.trim()) + field('make', 'Vehicle Make', 'text', record.make || '') + field('model', 'Model', 'text', record.model || '') + field('plate', 'Number Plate', 'text', record.plate || '') + field('year', 'Year', 'number', record.year || '2026') + '<label class="full"><span>Customer Car Image</span><input name="vehicleImage" type="file" accept=".jpg,.jpeg,.png,image/jpeg,image/png" /></label>' + vehicleImagePreview(record.image, 'vehicleImage')
+        body: field('name', 'Vehicle Name', 'text', record.name || `${record.make || ''} ${record.model || ''}`.trim()) + field('make', 'Vehicle Make', 'text', record.make || '') + field('model', 'Model', 'text', record.model || '') + field('plate', 'Number Plate', 'text', record.plate || '') + field('year', 'Year', 'number', record.year || '2026') + [
+          window.AutoCareImages.uploader({ name: 'frontImage', label: 'Front Image', folder: 'vehicles', value: record.frontImage || record.image }),
+          window.AutoCareImages.uploader({ name: 'rearImage', label: 'Rear Image', folder: 'vehicles', value: record.rearImage }),
+          window.AutoCareImages.uploader({ name: 'leftImage', label: 'Left Image', folder: 'vehicles', value: record.leftImage }),
+          window.AutoCareImages.uploader({ name: 'rightImage', label: 'Right Image', folder: 'vehicles', value: record.rightImage }),
+          window.AutoCareImages.uploader({ name: 'interiorImage', label: 'Interior Image', folder: 'vehicles', value: record.interiorImage }),
+          window.AutoCareImages.uploader({ name: 'engineImage', label: 'Engine Image', folder: 'vehicles', value: record.engineImage })
+        ].join('')
       },
       booking: {
         title: record.id ? 'Reschedule Booking' : 'Book Service Appointment',
@@ -734,6 +753,7 @@ document.addEventListener('DOMContentLoaded', () => {
     els.modalForm.dataset.id = record.id || '';
     els.modalTitle.textContent = config[mode].title;
     els.modalBody.innerHTML = config[mode].body;
+    window.AutoCareImages.enhance(els.modalBody);
     toggleNewVehicleFields();
     if (mode === 'booking') refreshBookingSlots();
     els.modal.showModal();
@@ -755,11 +775,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const data = Object.fromEntries(formData.entries());
     const mode = els.modalForm.dataset.mode;
     const id = Number(els.modalForm.dataset.id);
+    const imageTransaction = await window.AutoCareImages.collect(els.modalForm);
+    Object.assign(data, imageTransaction.values);
+    try {
 
     if (mode === 'vehicle') {
-      const payload = { name: data.name, make: data.make, model: data.model, plate: data.plate, year: data.year };
-      const vehicleImage = await fileInputToPayload('vehicleImage');
-      if (vehicleImage) payload.vehicleImage = vehicleImage;
+      const payload = { ...data, name: data.name, make: data.make, model: data.model, plate: data.plate, year: data.year, image: data.frontImage };
       const savedVehicle = await window.AutoCareApi.request(id ? `/api/customer/vehicles/${id}` : '/api/customer/vehicles', {
         method: id ? 'PUT' : 'POST',
         body: JSON.stringify(payload)
@@ -780,7 +801,8 @@ document.addEventListener('DOMContentLoaded', () => {
             model: vehicleParts.model,
             plate: data.newVehiclePlate,
             year: data.newVehicleYear,
-            vehicleImage: await fileInputToPayload('newVehicleImage')
+            frontImage: data.newVehicleFrontImage,
+            image: data.newVehicleFrontImage
           })
         });
         state.vehicles.push(savedVehicle);
@@ -809,6 +831,11 @@ document.addEventListener('DOMContentLoaded', () => {
     saveState();
     renderAll();
     await hydrateFromApi({ silent: true });
+    await window.AutoCareImages.commit(imageTransaction);
+    } catch (error) {
+      await window.AutoCareImages.rollback(imageTransaction);
+      throw error;
+    }
   }
 
   async function downloadInvoicePdf(id) {
@@ -868,7 +895,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const vehicleLabel = `${vehicle.make || ''} ${vehicle.model || ''} (${vehicle.plate || 'No plate'})`.trim();
       if (!await window.AutoCareApi.confirmAction({
         title: 'Remove Vehicle?', message: `Remove ${vehicleLabel} from your account?`,
-        details: 'This is permanent. A vehicle with linked bookings or service history may be protected.', confirmLabel: 'Remove Vehicle'
+        details: 'The vehicle disappears immediately while existing service history remains available.', confirmLabel: 'Remove Vehicle'
       })) return;
       await window.AutoCareApi.request(`/api/customer/vehicles/${numericId}`, { method: 'DELETE' });
       state.vehicles = state.vehicles.filter((item) => item.id !== numericId);
@@ -1013,31 +1040,23 @@ document.addEventListener('DOMContentLoaded', () => {
       event.preventDefault();
       const form = event.currentTarget;
       const data = Object.fromEntries(new FormData(form).entries());
+      let imageTransaction;
       try {
-        const avatarFile = form.elements.avatar.files[0];
-        const avatar = avatarFile ? await window.AutoCareApi.optimizeProfileImage(avatarFile) : state.profile.avatar;
+        imageTransaction = await window.AutoCareImages.collect(form);
+        const profileImage = imageTransaction.values.profileImage || '';
         const result = await window.AutoCareApi.request('/api/profile', {
           method: 'PUT',
-          body: JSON.stringify({ name: data.name, email: data.email, phone: data.phone, avatar })
+          body: JSON.stringify({ name: data.name, email: data.email, phone: data.phone, avatar: profileImage, profileImage })
         });
+        await window.AutoCareImages.commit(imageTransaction);
         state.profile = { ...state.profile, ...result.user };
         localStorage.setItem(sessionKey, JSON.stringify({ ...getSession(), ...result.user, authenticated: true }));
-        form.elements.avatar.value = '';
         saveState();
         renderProfile();
         showToast('Profile updated successfully.');
       } catch (error) {
+        if (imageTransaction) await window.AutoCareImages.rollback(imageTransaction);
         showToast(error.message || 'Profile update failed.');
-      }
-    });
-
-    document.querySelector('#profile-form [name="avatar"]').addEventListener('change', async (event) => {
-      try {
-        const avatar = event.target.files[0] ? await window.AutoCareApi.optimizeProfileImage(event.target.files[0]) : state.profile.avatar;
-        window.AutoCareApi.displayAvatar(avatar, document.getElementById('customer-avatar-preview'), document.getElementById('customer-avatar-initials'));
-      } catch (error) {
-        event.target.value = '';
-        showToast(error.message);
       }
     });
 

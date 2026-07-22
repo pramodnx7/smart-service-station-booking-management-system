@@ -466,7 +466,7 @@ dialog {
     border-radius: 0 0 32px 32px;
     background:
       linear-gradient(115deg, rgba(2, 14, 32, 0.98) 0%, rgba(2, 19, 43, 0.82) 50%, rgba(2, 15, 33, 0.28) 100%),
-      url("../assets/images/hero-blue-workshop.png") 62% center / cover no-repeat;
+      url("https://ieliygatevqevgssroze.supabase.co/storage/v1/object/public/service-station/company/system-assets/hero-blue-workshop.png") 62% center / cover no-repeat;
     box-shadow: 0 24px 55px rgba(3, 25, 54, 0.25);
   }
 

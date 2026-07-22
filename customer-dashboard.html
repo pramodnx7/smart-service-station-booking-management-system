@@ -11,6 +11,7 @@
   <link rel="stylesheet" href="css/customer-dashboard.css?v=right-toast-1" />
   <link rel="stylesheet" href="css/responsive.css?v=mobile-1" />
   <link rel="stylesheet" href="css/dashboard-refresh.css?v=confirm-popup-1" />
+  <link rel="stylesheet" href="css/image-management.css?v=1" />
 </head>
 <body class="customer-dashboard">
   <div class="customer-shell">
@@ -168,7 +169,7 @@
             <form class="profile-form" id="profile-form">
               <div class="avatar-editor">
                 <span class="avatar-preview"><span id="customer-avatar-initials">CU</span><img id="customer-avatar-preview" alt="Profile picture preview" hidden /></span>
-                <div><strong>Your profile picture</strong><small>JPG, PNG or WebP. The image is automatically optimized.</small><label class="avatar-upload">Choose picture<input name="avatar" type="file" accept="image/jpeg,image/png,image/webp" /></label></div>
+                <div id="customer-profile-uploader"></div>
               </div>
               <label><span>Full Name</span><input name="name" id="profile-full-name" required /></label>
               <label><span>Email</span><input name="email" id="profile-email-input" type="email" required /></label>
@@ -235,6 +236,7 @@
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
   <script src="js/api.js?v=confirm-popup-1"></script>
-  <script src="js/customer-dashboard.js?v=confirm-popup-1"></script>
+  <script src="js/image-management.js?v=1"></script>
+  <script src="js/customer-dashboard.js?v=image-management-1"></script>
 </body>
 </html>
