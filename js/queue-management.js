@@ -293,5 +293,5 @@ document.addEventListener('DOMContentLoaded', () => {
   selectors.modal.addEventListener('cancel', (event) => { event.preventDefault(); closeModal(); });
 
   refreshQueue();
-  window.setInterval(() => { if (!document.hidden) refreshQueue(); }, 10000);
+  window.setInterval(() => { if (!document.hidden) refreshQueue(); }, 30000);
 });

@@ -520,3 +520,14 @@ tbody tr:last-child td { border-bottom: 0; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition: none !important; animation-duration: .01ms !important; }
 }
+
+.autocare-success { width: min(92vw, 430px); padding: 0; border: 0; border-radius: 22px; background: transparent; box-shadow: 0 24px 80px rgba(7, 22, 48, .32); }
+.autocare-success::backdrop { background: rgba(8, 20, 42, .58); backdrop-filter: blur(3px); }
+.autocare-success__card { display: grid; justify-items: center; gap: .7rem; padding: 2.1rem 2rem 1.7rem; border-radius: 22px; background: #fff; text-align: center; }
+.autocare-success__icon { display: grid; place-items: center; width: 68px; height: 68px; border-radius: 50%; background: linear-gradient(135deg, #20b978, #0b8d5b); color: #fff; font-size: 2rem; font-weight: 900; box-shadow: 0 12px 28px rgba(22, 163, 105, .28); }
+.autocare-success__eyebrow { margin: .25rem 0 0; color: #168a5c; font-size: .75rem; font-weight: 900; letter-spacing: .14em; text-transform: uppercase; }
+.autocare-success h2 { margin: 0; color: #10233f; font-size: 1.65rem; }
+.autocare-success p { max-width: 330px; margin: 0; color: #67758c; line-height: 1.55; }
+.autocare-success__button { min-width: 130px; margin-top: .55rem; padding: .8rem 1.25rem; border: 0; border-radius: 11px; background: #315eea; color: #fff; font: inherit; font-weight: 800; cursor: pointer; box-shadow: 0 8px 18px rgba(49, 94, 234, .24); }
+.autocare-success__button:hover { background: #244cd0; }
+.autocare-success__button:focus-visible { outline: 3px solid rgba(49, 94, 234, .3); outline-offset: 3px; }

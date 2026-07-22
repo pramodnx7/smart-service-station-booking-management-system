@@ -396,7 +396,9 @@ async function entityMediaBeforeDelete(entity, id) {
 
 async function cleanupDeletedEntityMedia(mediaUrls) {
   if (!mediaUrls?.length) return;
-  await imageStorage.deleteFiles(mediaUrls);
+  const referencedUrls = new Set(await store.getReferencedMediaUrls());
+  const unusedUrls = [...new Set(mediaUrls)].filter((url) => !referencedUrls.has(url));
+  if (unusedUrls.length) await imageStorage.deleteFiles(unusedUrls);
 }
 
 app.post('/api/images/upload', requireAuth(), async (req, res, next) => {
@@ -434,7 +436,7 @@ app.delete('/api/images', requireAuth(), async (req, res, next) => {
     if (!canUseStorageFolder(req.user.role, firstFolder)) {
       return res.status(403).json({ message: 'You cannot delete this stored image.' });
     }
-    await imageStorage.deleteFile(req.body.path);
+    await cleanupDeletedEntityMedia([req.body.path]);
     res.status(204).end();
   } catch (error) {
     next(error);
@@ -540,6 +542,7 @@ app.put('/api/profile', requireAuth(), async (req, res, next) => {
     if (payload.password) payload.passwordHash = await bcrypt.hash(validatePassword(payload.password), 12);
     delete payload.password;
     const user = await store.updateProfile(req.user.id, payload);
+    queueStore.invalidateReferenceData('users');
     const token = signUser(user);
     sendAuthCookie(res, token);
     res.json({ user });
@@ -761,7 +764,9 @@ app.get('/api/technician/jobs/:id', requireAuth('technician'), async (req, res, 
 
 app.put('/api/technician/jobs/:id/accept', requireAuth('technician'), async (req, res, next) => {
   try {
-    res.json(await store.acceptTechnicianJob(req.user.id, req.params.id));
+    const job = await store.acceptTechnicianJob(req.user.id, req.params.id);
+    queueStore.invalidateReferenceData('serviceJobs');
+    res.json(job);
   } catch (error) {
     next(error);
   }
@@ -770,7 +775,9 @@ app.put('/api/technician/jobs/:id/accept', requireAuth('technician'), async (req
 app.post('/api/technician/jobs/:id/progress', requireAuth('technician'), async (req, res, next) => {
   try {
     requireFields(req.body, ['progressPercentage', 'status']);
-    res.status(201).json(await store.updateTechnicianProgress(req.user.id, { ...req.body, serviceJobId: req.params.id }));
+    const progress = await store.updateTechnicianProgress(req.user.id, { ...req.body, serviceJobId: req.params.id });
+    queueStore.invalidateReferenceData('serviceJobs');
+    res.status(201).json(progress);
   } catch (error) {
     next(error);
   }
@@ -850,7 +857,9 @@ app.post('/api/technician/jobs/:id/documents/upload', requireAuth('technician'),
 
 app.put('/api/technician/jobs/:id/complete', requireAuth('technician'), async (req, res, next) => {
   try {
-    res.json(await store.completeTechnicianJob(req.user.id, req.params.id));
+    const job = await store.completeTechnicianJob(req.user.id, req.params.id);
+    queueStore.invalidateReferenceData('serviceJobs');
+    res.json(job);
   } catch (error) {
     next(error);
   }
@@ -864,10 +873,12 @@ app.post('/api/customer/vehicles', requireAuth('customer'), async (req, res, nex
       assertImageUpload(req.body.vehicleImage, 'Vehicle image');
       storedVehicleImage = storeUploadedFile(req.body.vehicleImage);
     }
-    res.status(201).json(await store.createVehicle(req.user.id, {
+    const vehicle = await store.createVehicle(req.user.id, {
       ...req.body,
       image: storedVehicleImage?.relativePath || req.body.image
-    }));
+    });
+    queueStore.invalidateReferenceData('vehicles');
+    res.status(201).json(vehicle);
   } catch (error) {
     if (storedVehicleImage?.absolutePath && fs.existsSync(storedVehicleImage.absolutePath)) {
       fs.unlinkSync(storedVehicleImage.absolutePath);
@@ -889,6 +900,7 @@ app.put('/api/customer/vehicles/:id', requireAuth('customer'), async (req, res, 
       image: storedVehicleImage?.relativePath || req.body.image
     }, true);
     if (!vehicle) return res.status(404).json({ message: 'Vehicle not found.' });
+    queueStore.invalidateReferenceData('vehicles');
     res.json(vehicle);
   } catch (error) {
     if (storedVehicleImage?.absolutePath && fs.existsSync(storedVehicleImage.absolutePath)) {
@@ -903,6 +915,7 @@ app.delete('/api/customer/vehicles/:id', requireAuth('customer'), async (req, re
     const mediaUrls = await entityMediaBeforeDelete('vehicle', req.params.id);
     if (!(await store.deleteVehicle(req.params.id, req.user.id, true))) return res.status(404).json({ message: 'Vehicle not found.' });
     await cleanupDeletedEntityMedia(mediaUrls);
+    queueStore.invalidateReferenceData('vehicles');
     res.status(204).end();
   } catch (error) {
     next(error);
@@ -1127,6 +1140,7 @@ app.post('/api/admin/customers', requireAuth('admin'), async (req, res, next) =>
       status: req.body.status || 'active',
       profileImage: req.body.profileImage || ''
     }, passwordHash);
+    queueStore.invalidateReferenceData('users');
     res.status(201).json({ id: user.id, name: user.name, email: user.email, phone: user.phone, status: 'Active', profileImage: user.profileImage, avatar: user.avatar });
   } catch (error) {
     next(error);
@@ -1141,6 +1155,7 @@ app.put('/api/admin/customers/:id', requireAuth('admin'), async (req, res, next)
     delete payload.password;
     const user = await store.updateCustomer(req.params.id, payload);
     if (!user) return res.status(404).json({ message: 'Customer not found.' });
+    queueStore.invalidateReferenceData('users');
     res.json(user);
   } catch (error) {
     next(error);
@@ -1153,6 +1168,7 @@ app.delete('/api/admin/customers/:id', requireAuth('admin'), async (req, res, ne
     const deleted = await store.deleteCustomer(req.params.id);
     if (!deleted) return res.status(404).json({ message: 'Customer not found.' });
     await cleanupDeletedEntityMedia(mediaUrls);
+    queueStore.invalidateReferenceData('users');
     res.status(204).end();
   } catch (error) {
     next(error);
@@ -1163,7 +1179,9 @@ app.post('/api/admin/technicians', requireAuth('admin'), async (req, res, next) 
   try {
     requireFields(req.body, ['name', 'email', 'phone', 'password', 'employeeNo', 'specialization', 'experienceYears']);
     const passwordHash = await bcrypt.hash(validatePassword(req.body.password), 12);
-    res.status(201).json(await store.createTechnician(req.body, passwordHash));
+    const technician = await store.createTechnician(req.body, passwordHash);
+    queueStore.invalidateReferenceData('users', 'technicians');
+    res.status(201).json(technician);
   } catch (error) {
     next(error);
   }
@@ -1177,6 +1195,7 @@ app.put('/api/admin/technicians/:id', requireAuth('admin'), async (req, res, nex
     delete payload.password;
     const technician = await store.updateTechnician(req.params.id, payload);
     if (!technician) return res.status(404).json({ message: 'Technician not found.' });
+    queueStore.invalidateReferenceData('users', 'technicians');
     res.json(technician);
   } catch (error) {
     next(error);
@@ -1189,6 +1208,7 @@ app.delete('/api/admin/technicians/:id', requireAuth('admin'), async (req, res, 
     const deleted = await store.deleteTechnician(req.params.id);
     if (!deleted) return res.status(404).json({ message: 'Technician not found.' });
     await cleanupDeletedEntityMedia(mediaUrls);
+    queueStore.invalidateReferenceData('users', 'technicians');
     res.status(204).end();
   } catch (error) {
     next(error);
@@ -1260,9 +1280,8 @@ app.delete('/api/admin/files/:kind/:id', requireAuth('admin'), async (req, res, 
     if (file.filePath && fs.existsSync(file.filePath)) {
       fs.unlinkSync(file.filePath);
     }
-    if (file.storagePath || /^https:\/\//i.test(file.imageUrl || file.fileUrl || '')) {
-      await imageStorage.deleteFile(file.storagePath || file.imageUrl || file.fileUrl);
-    }
+    const storedUrl = file.imageUrl || file.fileUrl || file.storagePath;
+    if (storedUrl) await cleanupDeletedEntityMedia([storedUrl]);
     res.status(204).end();
   } catch (error) {
     next(error);
@@ -1337,10 +1356,12 @@ app.post('/api/admin/vehicles', requireAuth('admin'), async (req, res, next) => 
       assertImageUpload(req.body.vehicleImage, 'Vehicle image');
       storedVehicleImage = storeUploadedFile(req.body.vehicleImage);
     }
-    res.status(201).json(await store.createVehicle(Number(req.body.customerId), {
+    const vehicle = await store.createVehicle(Number(req.body.customerId), {
       ...req.body,
       image: storedVehicleImage?.relativePath || req.body.image
-    }));
+    });
+    queueStore.invalidateReferenceData('vehicles');
+    res.status(201).json(vehicle);
   } catch (error) {
     if (storedVehicleImage?.absolutePath && fs.existsSync(storedVehicleImage.absolutePath)) {
       fs.unlinkSync(storedVehicleImage.absolutePath);
@@ -1362,6 +1383,7 @@ app.put('/api/admin/vehicles/:id', requireAuth('admin'), async (req, res, next) 
       image: storedVehicleImage?.relativePath || req.body.image
     }, false);
     if (!vehicle) return res.status(404).json({ message: 'Vehicle not found.' });
+    queueStore.invalidateReferenceData('vehicles');
     res.json(vehicle);
   } catch (error) {
     if (storedVehicleImage?.absolutePath && fs.existsSync(storedVehicleImage.absolutePath)) {
@@ -1376,6 +1398,7 @@ app.delete('/api/admin/vehicles/:id', requireAuth('admin'), async (req, res, nex
     const mediaUrls = await entityMediaBeforeDelete('vehicle', req.params.id);
     if (!(await store.deleteVehicle(req.params.id, req.user.id, false))) return res.status(404).json({ message: 'Vehicle not found.' });
     await cleanupDeletedEntityMedia(mediaUrls);
+    queueStore.invalidateReferenceData('vehicles');
     res.status(204).end();
   } catch (error) {
     next(error);
@@ -1384,7 +1407,9 @@ app.delete('/api/admin/vehicles/:id', requireAuth('admin'), async (req, res, nex
 
 app.post('/api/admin/services', requireAuth('admin'), async (req, res, next) => {
   try {
-    res.status(201).json(await store.createService(servicePayload(req.body)));
+    const service = await store.createService(servicePayload(req.body));
+    queueStore.invalidateReferenceData('servicePackages');
+    res.status(201).json(service);
   } catch (error) {
     next(error);
   }
@@ -1394,6 +1419,7 @@ app.put('/api/admin/services/:id', requireAuth('admin'), async (req, res, next) 
   try {
     const service = await store.updateService(req.params.id, servicePayload(req.body));
     if (!service) return res.status(404).json({ message: 'Service package not found.' });
+    queueStore.invalidateReferenceData('servicePackages');
     res.json(service);
   } catch (error) {
     next(error);
@@ -1405,6 +1431,7 @@ app.delete('/api/admin/services/:id', requireAuth('admin'), async (req, res, nex
     const mediaUrls = await entityMediaBeforeDelete('service', req.params.id);
     if (!(await store.deleteService(req.params.id))) return res.status(404).json({ message: 'Service package not found.' });
     await cleanupDeletedEntityMedia(mediaUrls);
+    queueStore.invalidateReferenceData('servicePackages');
     res.status(204).end();
   } catch (error) {
     next(error);
@@ -1433,7 +1460,9 @@ app.put('/api/admin/pricing-plans/:id', requireAuth('admin'), async (req, res, n
 
 app.delete('/api/admin/pricing-plans/:id', requireAuth('admin'), async (req, res, next) => {
   try {
+    const mediaUrls = await entityMediaBeforeDelete('pricingPlan', req.params.id);
     if (!(await store.deletePricingPlan(req.params.id))) return res.status(404).json({ message: 'Landing plan not found.' });
+    await cleanupDeletedEntityMedia(mediaUrls);
     res.status(204).end();
   } catch (error) { next(error); }
 });

@@ -3096,6 +3096,16 @@ async function deleteStoredFile(user, kind, id) {
   const file = await getById(collection, id);
   if (!file) return null;
   await deleteDocument(collection, id);
+  if (kind === 'photo' && file.serviceJobId && file.imageUrl) {
+    const removeUrl = admin.firestore.FieldValue.arrayRemove(file.imageUrl);
+    await docRef(collections.serviceJobs, file.serviceJobId).set({
+      beforeImages: removeUrl,
+      afterImages: removeUrl,
+      damageImages: removeUrl,
+      completedImages: removeUrl,
+      updatedAt: fieldValue()
+    }, { merge: true });
+  }
   await createUploadAudit({ fileKind: kind, fileId: Number(id), action: 'Deleted', userId: user.id, role: user.role });
   return file;
 }
@@ -3113,6 +3123,7 @@ async function getEntityMedia(entity, id) {
     technician: [collections.technicians, ['profileImage', 'nicImage', 'certificateUrls']],
     inventory: [collections.inventoryParts, ['image']],
     service: [collections.servicePackages, ['image']],
+    pricingPlan: [collections.pricingPlans, ['image']],
     serviceJob: [collections.serviceJobs, ['beforeImages', 'afterImages', 'damageImages', 'completedImages']]
   };
   if (entity === 'customer') {
@@ -3127,6 +3138,27 @@ async function getEntityMedia(entity, id) {
   const config = entityFields[entity];
   if (!config) return [];
   return mediaValues(await getById(config[0], id), config[1]);
+}
+
+function collectSupabaseUrls(value, urls = new Set()) {
+  if (typeof value === 'string' && /\.supabase\.co\/storage\/v1\/object\/public\//i.test(value)) {
+    urls.add(value);
+  } else if (Array.isArray(value)) {
+    value.forEach((item) => collectSupabaseUrls(item, urls));
+  } else if (value && typeof value === 'object' && !value.toDate) {
+    Object.values(value).forEach((item) => collectSupabaseUrls(item, urls));
+  }
+  return urls;
+}
+
+async function getReferencedMediaUrls() {
+  const mediaCollections = [
+    collections.users, collections.vehicles, collections.technicians, collections.servicePackages,
+    collections.pricingPlans, collections.inventoryParts, collections.serviceJobs, collections.serviceImages,
+    collections.documents, collections.invoices, collections.appSettings
+  ];
+  const records = (await Promise.all(mediaCollections.map((collection) => all(collection)))).flat();
+  return [...collectSupabaseUrls(records.filter((record) => record.archived !== true))];
 }
 
 async function updateTechnicianProgress(userId, data) {
@@ -3749,6 +3781,7 @@ module.exports = {
   getCustomerDashboard,
   getEmergencyRequests,
   getEntityMedia,
+  getReferencedMediaUrls,
   getBookingSlots,
   getInventoryReports,
   getIndividualReportPdf,

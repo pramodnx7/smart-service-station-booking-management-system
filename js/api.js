@@ -152,8 +152,41 @@
     });
   }
 
+  function successDialog() {
+    let dialog = document.getElementById('autocare-success-dialog');
+    if (dialog) return dialog;
+    dialog = document.createElement('dialog');
+    dialog.id = 'autocare-success-dialog';
+    dialog.className = 'autocare-success';
+    dialog.setAttribute('aria-labelledby', 'autocare-success-title');
+    dialog.setAttribute('aria-describedby', 'autocare-success-message');
+    dialog.innerHTML = `
+      <div class="autocare-success__card">
+        <div class="autocare-success__icon" aria-hidden="true">✓</div>
+        <p class="autocare-success__eyebrow">Save Complete</p>
+        <h2 id="autocare-success-title">Saved Successfully</h2>
+        <p id="autocare-success-message"></p>
+        <button class="autocare-success__button" type="button">OK</button>
+      </div>`;
+    dialog.querySelector('.autocare-success__button').addEventListener('click', () => dialog.close());
+    dialog.addEventListener('click', (event) => {
+      if (event.target === dialog) dialog.close();
+    });
+    document.body.appendChild(dialog);
+    return dialog;
+  }
+
+  function showSuccess(message = 'Your changes have been saved successfully.', title = 'Saved Successfully') {
+    const dialog = successDialog();
+    dialog.querySelector('#autocare-success-title').textContent = title;
+    dialog.querySelector('#autocare-success-message').textContent = message;
+    if (!dialog.open) dialog.showModal();
+    dialog.querySelector('.autocare-success__button').focus();
+  }
+
   window.AutoCareApi = {
     confirmAction,
+    showSuccess,
     getSession,
     displayAvatar,
     optimizeProfileImage,

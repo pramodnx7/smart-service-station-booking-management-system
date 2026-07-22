@@ -20,7 +20,9 @@ The queue module handles scheduled appointments, walk-in customers, and manager-
 6. Skip or recall absent customers, manually adjust an assignment, start service, and complete or cancel the queue entry.
 7. Mark an unoccupied bay as **Maintenance** when it must be removed from capacity.
 
-The dashboard refreshes every 10 seconds. The public `queue-display.html` board refreshes every 5 seconds and exposes tokens and workshop assignments only, not customer contact information.
+The admin queue refreshes every 30 seconds, the customer queue every 60 seconds, and the public `queue-display.html` board every 15 seconds. Hidden pages pause their refreshes. The public board exposes tokens and workshop assignments only, not customer contact information.
+
+Queue reads are shared through a short server-side cache. The backend queries only today's queue entries and loads only their referenced records; slow-changing customer, vehicle, service, technician, and bay data is cached separately. Any queue action invalidates the live cache immediately.
 
 ## Technician and customer flow
 
@@ -39,6 +41,8 @@ SERVICE_BAY_COUNT=8
 QUEUE_APPOINTMENT_GRACE_MINUTES=15
 QUEUE_DEFAULT_SERVICE_MINUTES=45
 APP_TIME_ZONE=Asia/Colombo
+QUEUE_CONTEXT_CACHE_MS=60000
+QUEUE_REFERENCE_CACHE_MS=600000
 ```
 
 The module uses the existing Firebase Admin configuration. No credentials are stored in source control.

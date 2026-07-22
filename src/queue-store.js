@@ -9,6 +9,9 @@ const queueTypes = ['Appointment', 'Walk-in', 'Emergency'];
 const serviceBayCount = Math.max(1, Number(process.env.SERVICE_BAY_COUNT || 8));
 const appointmentGraceMinutes = Math.max(0, Number(process.env.QUEUE_APPOINTMENT_GRACE_MINUTES || 15));
 const defaultServiceMinutes = Math.max(10, Number(process.env.QUEUE_DEFAULT_SERVICE_MINUTES || 45));
+const queueContextCacheMs = Math.max(5000, Number(process.env.QUEUE_CONTEXT_CACHE_MS || 60000));
+const referenceCacheMs = Math.max(60000, Number(process.env.QUEUE_REFERENCE_CACHE_MS || 10 * 60 * 1000));
+const cache = new Map();
 
 function assertConfigured() {
   if (db) return;
@@ -31,6 +34,90 @@ async function all(collection) {
   return snapshot.docs.map((document) => ({ id: Number(document.id), ...document.data() }));
 }
 
+function snapshotData(snapshot) {
+  return snapshot.exists ? { id: Number(snapshot.id), ...snapshot.data() } : null;
+}
+
+async function cached(key, ttl, loader) {
+  const existing = cache.get(key);
+  if (existing && existing.expiresAt > Date.now()) return existing.value;
+  const value = Promise.resolve().then(loader);
+  cache.set(key, { expiresAt: Date.now() + ttl, value });
+  try {
+    return await value;
+  } catch (error) {
+    if (cache.get(key)?.value === value) cache.delete(key);
+    throw error;
+  }
+}
+
+function invalidateCache(prefix) {
+  for (const key of cache.keys()) {
+    if (key.startsWith(prefix)) cache.delete(key);
+  }
+}
+
+function invalidateQueueContext() {
+  invalidateCache('queue-context:');
+}
+
+function invalidateReferenceData(...collections) {
+  collections.forEach((collection) => {
+    cache.delete(`collection:${collection}`);
+    invalidateCache(`document:${collection}:`);
+  });
+  invalidateQueueContext();
+}
+
+function invalidateCollectionCache(collection, id) {
+  cache.delete(`collection:${collection}`);
+  if (id !== undefined && id !== null) cache.delete(`document:${collection}:${id}`);
+}
+
+async function cachedCollection(collection) {
+  return cached(`collection:${collection}`, referenceCacheMs, async () => {
+    const items = await all(collection);
+    items.forEach((item) => cache.set(`document:${collection}:${item.id}`, {
+      expiresAt: Date.now() + referenceCacheMs,
+      value: Promise.resolve(item)
+    }));
+    return items;
+  });
+}
+
+async function cachedDocuments(collection, ids) {
+  const uniqueIds = [...new Set(ids.map(Number).filter(Number.isFinite))];
+  if (!uniqueIds.length) return [];
+
+  const results = new Map();
+  const missing = [];
+  await Promise.all(uniqueIds.map(async (id) => {
+    const key = `document:${collection}:${id}`;
+    const existing = cache.get(key);
+    if (existing && existing.expiresAt > Date.now()) {
+      const item = await existing.value;
+      if (item) results.set(id, item);
+    } else {
+      missing.push(id);
+    }
+  }));
+
+  if (missing.length) {
+    const snapshots = await db.getAll(...missing.map((id) => docRef(collection, id)));
+    snapshots.forEach((snapshot, index) => {
+      const id = missing[index];
+      const item = snapshotData(snapshot);
+      cache.set(`document:${collection}:${id}`, {
+        expiresAt: Date.now() + referenceCacheMs,
+        value: Promise.resolve(item)
+      });
+      if (item) results.set(id, item);
+    });
+  }
+
+  return uniqueIds.map((id) => results.get(id)).filter(Boolean);
+}
+
 async function getById(collection, id) {
   assertConfigured();
   const snapshot = await docRef(collection, id).get();
@@ -43,12 +130,15 @@ async function updateDocument(collection, id, changes) {
   if (!snapshot.exists) return null;
   await ref.set({ ...changes, updatedAt: fieldValue() }, { merge: true });
   const updated = await ref.get();
-  return { id: Number(updated.id), ...updated.data() };
+  const item = { id: Number(updated.id), ...updated.data() };
+  invalidateCollectionCache(collection, id);
+  if (collection === queueCollection) invalidateQueueContext();
+  return item;
 }
 
 async function createNumericDocument(collection, data) {
   assertConfigured();
-  return db.runTransaction(async (transaction) => {
+  const item = await db.runTransaction(async (transaction) => {
     const counterRef = db.collection('meta').doc('counters');
     const counterSnapshot = await transaction.get(counterRef);
     const counters = counterSnapshot.exists ? counterSnapshot.data() : {};
@@ -57,6 +147,8 @@ async function createNumericDocument(collection, data) {
     transaction.set(docRef(collection, id), { ...data, id, createdAt: fieldValue() });
     return { ...data, id };
   });
+  invalidateCollectionCache(collection, item.id);
+  return item;
 }
 
 function dateParts(value = new Date()) {
@@ -127,7 +219,7 @@ async function createQueueEntry(data) {
   assertConfigured();
   const prefix = tokenPrefix(data.queueType);
   const queueDate = data.queueDate || today();
-  return db.runTransaction(async (transaction) => {
+  const item = await db.runTransaction(async (transaction) => {
     const counterRef = db.collection('meta').doc('counters');
     const tokenRef = db.collection('meta').doc(`queue-token-${queueDate}-${prefix}`);
     const [counterSnapshot, tokenSnapshot] = await Promise.all([
@@ -152,6 +244,9 @@ async function createQueueEntry(data) {
     transaction.set(docRef(queueCollection, id), entry);
     return { ...data, id, token, queueDate, status: entry.status };
   });
+  invalidateCollectionCache(queueCollection, item.id);
+  invalidateQueueContext();
+  return item;
 }
 
 async function createNotification(userId, type, message) {
@@ -161,19 +256,9 @@ async function createNotification(userId, type, message) {
   });
 }
 
-async function loadContext() {
-  const [entries, users, vehicles, bookings, services, technicians, jobs, savedBays] = await Promise.all([
-    all(queueCollection), all(store.collections.users), all(store.collections.vehicles), all(store.collections.bookings),
-    all(store.collections.servicePackages), all(store.collections.technicians), all(store.collections.serviceJobs), all(serviceBayCollection)
-  ]);
+function createContext(entries, users, vehicles, bookings, services, technicians, jobs, savedBays) {
   return {
-    entries,
-    users,
-    vehicles,
-    bookings,
-    services,
-    technicians,
-    jobs,
+    entries, users, vehicles, bookings, services, technicians, jobs, savedBays,
     usersById: new Map(users.map((item) => [Number(item.id), item])),
     vehiclesById: new Map(vehicles.map((item) => [Number(item.id), item])),
     bookingsById: new Map(bookings.map((item) => [Number(item.id), item])),
@@ -182,6 +267,42 @@ async function loadContext() {
     jobsById: new Map(jobs.map((item) => [Number(item.id), item])),
     savedBaysById: new Map(savedBays.map((item) => [Number(item.id), item]))
   };
+}
+
+async function loadOperationalContext() {
+  const queueDate = today();
+  return cached(`queue-context:${queueDate}`, queueContextCacheMs, async () => {
+    assertConfigured();
+    const [entrySnapshot, technicians, savedBays] = await Promise.all([
+      db.collection(queueCollection).where('queueDate', '==', queueDate).get(),
+      cachedCollection(store.collections.technicians),
+      cachedCollection(serviceBayCollection)
+    ]);
+    const entries = entrySnapshot.docs.map((document) => ({ id: Number(document.id), ...document.data() }));
+    const [users, vehicles, services, jobs] = await Promise.all([
+      cachedDocuments(store.collections.users, [
+        ...entries.map((entry) => entry.customerId),
+        ...technicians.map((technician) => technician.userId)
+      ]),
+      cachedDocuments(store.collections.vehicles, entries.map((entry) => entry.vehicleId)),
+      cachedDocuments(store.collections.servicePackages, entries.map((entry) => entry.servicePackageId)),
+      cachedDocuments(store.collections.serviceJobs, entries.map((entry) => entry.serviceJobId))
+    ]);
+    return createContext(entries, users, vehicles, [], services, technicians, jobs, savedBays);
+  });
+}
+
+async function loadContext({ includeCatalog = false } = {}) {
+  const context = await loadOperationalContext();
+  if (!includeCatalog) return context;
+  const [users, vehicles, services] = await Promise.all([
+    cachedCollection(store.collections.users),
+    cachedCollection(store.collections.vehicles),
+    cachedCollection(store.collections.servicePackages)
+  ]);
+  return createContext(
+    context.entries, users, vehicles, [], services, context.technicians, context.jobs, context.savedBays
+  );
 }
 
 function technicianName(technician, usersById) {
@@ -304,8 +425,7 @@ function queueReports(context, todaysViews, averageMinutes) {
   };
 }
 
-async function getQueueDashboard() {
-  const context = await loadContext();
+function buildQueueDashboard(context, includeCatalog = true) {
   const queue = buildQueueViews(context);
   const views = queue.todaysEntries.map(queue.view);
   return {
@@ -330,15 +450,26 @@ async function getQueueDashboard() {
     technicians: context.technicians.filter((item) => String(item.status || '').toLowerCase() === 'active').map((item) => ({
       id: item.id, name: technicianName(item, context.usersById), specialization: item.specialization || ''
     })),
-    customers: context.users.filter((item) => item.role === 'customer').map((item) => ({ id: item.id, name: item.name, phone: item.phone || '', email: item.email || '' })),
-    vehicles: context.vehicles.map((item) => ({ id: item.id, customerId: item.userId, name: `${item.make || ''} ${item.model || ''}`.trim(), plate: item.plateNumber || '' })),
-    services: context.services.filter((item) => item.active !== false).map((item) => ({ id: item.id, name: item.name, duration: item.duration || '' })),
+    customers: includeCatalog ? context.users.filter((item) => item.role === 'customer').map((item) => ({ id: item.id, name: item.name, phone: item.phone || '', email: item.email || '' })) : [],
+    vehicles: includeCatalog ? context.vehicles.map((item) => ({ id: item.id, customerId: item.userId, name: `${item.make || ''} ${item.model || ''}`.trim(), plate: item.plateNumber || '' })) : [],
+    services: includeCatalog ? context.services.filter((item) => item.active !== false).map((item) => ({ id: item.id, name: item.name, duration: item.duration || '' })) : [],
     reports: queueReports(context, views, queue.averageMinutes)
   };
 }
 
+async function getQueueDashboard() {
+  const context = await loadContext({ includeCatalog: true });
+  return buildQueueDashboard(context);
+}
+
 async function searchAppointments(query) {
-  const context = await loadContext();
+  const bookings = await all(store.collections.bookings);
+  const [users, vehicles, services] = await Promise.all([
+    cachedDocuments(store.collections.users, bookings.map((booking) => booking.userId)),
+    cachedDocuments(store.collections.vehicles, bookings.map((booking) => booking.vehicleId)),
+    cachedDocuments(store.collections.servicePackages, bookings.map((booking) => booking.servicePackageId))
+  ]);
+  const context = createContext([], users, vehicles, bookings, services, [], [], []);
   const search = String(query || '').trim().toLowerCase();
   return context.bookings
     .filter((booking) => !terminalStatuses.includes(booking.status))
@@ -357,13 +488,13 @@ async function searchAppointments(query) {
 }
 
 async function findDuplicateQueue(bookingId) {
-  const entries = await all(queueCollection);
+  const snapshot = await db.collection(queueCollection).where('bookingId', '==', Number(bookingId)).get();
+  const entries = snapshot.docs.map((document) => ({ id: Number(document.id), ...document.data() }));
   return entries.find((entry) => Number(entry.bookingId) === Number(bookingId) && !terminalStatuses.includes(entry.status));
 }
 
 async function checkInAppointment(bookingId, adminUserId) {
-  const context = await loadContext();
-  const booking = context.bookingsById.get(Number(bookingId));
+  const booking = await getById(store.collections.bookings, bookingId);
   if (!booking || terminalStatuses.includes(booking.status)) {
     const error = new Error('Active appointment not found.');
     error.status = 404;
@@ -374,7 +505,7 @@ async function checkInAppointment(bookingId, adminUserId) {
     error.status = 409;
     throw error;
   }
-  const duplicate = context.entries.find((entry) => Number(entry.bookingId) === Number(bookingId) && !terminalStatuses.includes(entry.status));
+  const duplicate = await findDuplicateQueue(bookingId);
   if (duplicate) {
     const error = new Error(`Appointment is already checked in as ${duplicate.token}.`);
     error.status = 409;
@@ -459,6 +590,12 @@ function availableResources(context, entry) {
 async function ensureServiceJob(entry, changes, context, status = 'Assigned') {
   const bookingId = Number(entry.bookingId);
   let job = context.jobs.find((item) => Number(item.bookingId) === bookingId && item.status !== 'Cancelled');
+  if (!job) {
+    const snapshot = await db.collection(store.collections.serviceJobs).where('bookingId', '==', bookingId).get();
+    job = snapshot.docs
+      .map((document) => ({ id: Number(document.id), ...document.data() }))
+      .find((item) => item.status !== 'Cancelled');
+  }
   if (job) return job;
   const service = context.servicesById.get(Number(entry.servicePackageId)) || {};
   job = await createNumericDocument(store.collections.serviceJobs, {
@@ -569,14 +706,18 @@ async function updateServiceBay(id, status) {
   if (!Number.isInteger(bayId) || bayId < 1 || bayId > serviceBayCount || !['Available', 'Maintenance'].includes(status)) {
     throw Object.assign(new Error('Invalid service bay status.'), { status: 400 });
   }
-  const active = (await all(queueCollection)).find((entry) => Number(entry.serviceBayId) === bayId && ['Called', 'In Service'].includes(entry.status));
+  const context = await loadOperationalContext();
+  const active = context.entries.find((entry) => Number(entry.serviceBayId) === bayId && ['Called', 'In Service'].includes(entry.status));
   if (active && status === 'Maintenance') throw Object.assign(new Error(`Bay is occupied by ${active.token}.`), { status: 409 });
   await docRef(serviceBayCollection, bayId).set({ id: bayId, name: `Bay ${String(bayId).padStart(2, '0')}`, status, updatedAt: fieldValue() }, { merge: true });
+  invalidateCollectionCache(serviceBayCollection, bayId);
+  invalidateQueueContext();
   return { id: bayId, status };
 }
 
 async function getPublicDisplay() {
-  const dashboard = await getQueueDashboard();
+  const context = await loadContext();
+  const dashboard = buildQueueDashboard(context, false);
   return {
     generatedAt: dashboard.generatedAt,
     nowServing: dashboard.nowServing.map(({ token, serviceBay, mechanic, elapsedServiceMinutes, status }) => ({ token, serviceBay, mechanic, elapsedServiceMinutes, status })),
@@ -585,7 +726,8 @@ async function getPublicDisplay() {
 }
 
 async function getCustomerQueue(customerId) {
-  const dashboard = await getQueueDashboard();
+  const context = await loadContext();
+  const dashboard = buildQueueDashboard(context, false);
   return dashboard.entries.filter((entry) => Number(entry.customerId) === Number(customerId) && !['Cancelled', 'No Show'].includes(entry.status));
 }
 
@@ -595,6 +737,7 @@ module.exports = {
   getCustomerQueue,
   getPublicDisplay,
   getQueueDashboard,
+  invalidateReferenceData,
   queueCollection,
   registerArrival,
   searchAppointments,

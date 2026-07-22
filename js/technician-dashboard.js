@@ -460,7 +460,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     els.modal.close();
     await hydrateFromApi();
-    showToast(mode === 'complete' ? 'Job completed successfully.' : 'Job update saved.');
+    window.AutoCareApi.showSuccess(mode === 'complete' ? 'The service job was completed successfully.' : 'The service-job update was saved successfully.');
   }
 
   async function handleAction(action, id) {
@@ -546,7 +546,7 @@ document.addEventListener('DOMContentLoaded', () => {
         localStorage.setItem(sessionKey, JSON.stringify({ ...getSession(), ...result.user, authenticated: true }));
         profileForm.elements.avatar.value = '';
         renderProfile();
-        showToast('Technician profile updated successfully.');
+        window.AutoCareApi.showSuccess('The technician profile was saved successfully.');
       } catch (error) {
         showToast(error.message || 'Profile update failed.');
       }

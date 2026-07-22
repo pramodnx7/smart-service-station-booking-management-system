@@ -1253,7 +1253,7 @@ document.addEventListener('DOMContentLoaded', () => {
       await refreshNotifications();
       selectors.modal.close();
       renderNotifications();
-      showToast(draftId ? 'Draft updated.' : 'Message saved to drafts.');
+      window.AutoCareApi.showSuccess(draftId ? 'The notification draft was updated successfully.' : 'The notification was saved to drafts successfully.');
     } finally {
       notificationDraftSaveInProgress = false;
     }
@@ -1281,7 +1281,7 @@ document.addEventListener('DOMContentLoaded', () => {
         renderAll();
         openModal('booking', pendingBookingDraft);
         pendingBookingDraft = null;
-        showToast('New customer added and selected for this appointment.');
+        window.AutoCareApi.showSuccess('The new customer was saved and selected for this appointment.');
         await window.AutoCareImages.commit(imageTransaction);
         return;
       }
@@ -1305,7 +1305,7 @@ document.addEventListener('DOMContentLoaded', () => {
         renderAll();
         openModal('booking', pendingBookingDraft);
         pendingBookingDraft = null;
-        showToast('New vehicle added and selected for this appointment.');
+        window.AutoCareApi.showSuccess('The new vehicle was saved and selected for this appointment.');
         await window.AutoCareImages.commit(imageTransaction);
         return;
       }
@@ -1428,7 +1428,7 @@ document.addEventListener('DOMContentLoaded', () => {
     selectors.modal.close();
     saveState();
     renderAll();
-    showToast(successMessage);
+    window.AutoCareApi.showSuccess(successMessage);
     await window.AutoCareImages.commit(imageTransaction);
     } catch (error) {
       await window.AutoCareImages.rollback(imageTransaction);
@@ -1808,7 +1808,7 @@ document.addEventListener('DOMContentLoaded', () => {
       });
       state.landingContent[section][slot] = result.item;
       renderLandingContentAdmin();
-      showToast(`${section === 'news' ? 'News' : 'Recent work'} updated successfully.`);
+      window.AutoCareApi.showSuccess(`${section === 'news' ? 'News' : 'Recent work'} was updated successfully.`);
     } finally {
       submitButton.disabled = false;
     }
@@ -1910,7 +1910,7 @@ document.addEventListener('DOMContentLoaded', () => {
         localStorage.setItem(sessionKey, JSON.stringify({ ...getSession(), ...result.user, authenticated: true }));
         form.elements.profilePicture.value = '';
         applyAdminProfile(state.profile);
-        showToast('Admin profile updated successfully.');
+        window.AutoCareApi.showSuccess('The admin profile and settings were saved successfully.');
       } catch (error) {
         if (imageTransaction) await window.AutoCareImages.rollback(imageTransaction);
         showToast(error.message || 'Profile update failed.');
@@ -1956,7 +1956,7 @@ document.addEventListener('DOMContentLoaded', () => {
           });
           state.landingStats[fieldName] = result.value;
           renderLandingStats();
-          showToast('Landing page statistic updated successfully.');
+          window.AutoCareApi.showSuccess('The landing-page statistic was saved successfully.');
         } catch (error) {
           showToast(error.message || 'Statistic update failed.');
         } finally {

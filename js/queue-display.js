@@ -24,5 +24,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   updateClock(); refreshDisplay();
   window.setInterval(updateClock, 1000);
-  window.setInterval(refreshDisplay, 5000);
+  window.setInterval(() => { if (!document.hidden) refreshDisplay(); }, 15000);
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) refreshDisplay();
+  });
 });

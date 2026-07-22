@@ -786,7 +786,7 @@ document.addEventListener('DOMContentLoaded', () => {
         body: JSON.stringify(payload)
       });
       id ? Object.assign(state.vehicles.find((item) => item.id === id), savedVehicle) : state.vehicles.push(savedVehicle);
-      showToast('Vehicle saved successfully.');
+      window.AutoCareApi.showSuccess('Your vehicle was saved successfully.');
     }
 
     if (mode === 'booking') {
@@ -816,7 +816,7 @@ document.addEventListener('DOMContentLoaded', () => {
       });
       id ? Object.assign(state.bookings.find((item) => item.id === id), savedBooking) : state.bookings.push(savedBooking);
       clearPendingBooking();
-      showToast('Booking saved successfully.');
+      window.AutoCareApi.showSuccess('Your booking was saved successfully.');
     }
 
     if (mode === 'emergency') {
@@ -1053,7 +1053,7 @@ document.addEventListener('DOMContentLoaded', () => {
         localStorage.setItem(sessionKey, JSON.stringify({ ...getSession(), ...result.user, authenticated: true }));
         saveState();
         renderProfile();
-        showToast('Profile updated successfully.');
+        window.AutoCareApi.showSuccess('Your profile was saved successfully.');
       } catch (error) {
         if (imageTransaction) await window.AutoCareImages.rollback(imageTransaction);
         showToast(error.message || 'Profile update failed.');
@@ -1130,5 +1130,5 @@ document.addEventListener('DOMContentLoaded', () => {
       state.queueEntries = Array.isArray(queueData.entries) ? queueData.entries : [];
       renderCustomerQueue();
     } catch (error) { /* Keep the last known queue state during temporary outages. */ }
-  }, 10000);
+  }, 60000);
 });
