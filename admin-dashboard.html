@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="css/admin-dashboard.css?v=cancel-booking-1" />
+  <link rel="stylesheet" href="css/admin-dashboard.css?v=booking-assignment-1" />
   <link rel="stylesheet" href="css/responsive.css?v=mobile-1" />
   <link rel="stylesheet" href="css/dashboard-refresh.css?v=save-popup-1" />
   <link rel="stylesheet" href="css/image-management.css?v=1" />
@@ -36,6 +36,7 @@
         <button class="side-nav__item" type="button" data-view="documents"><span data-icon="calendar"></span>Photos & Docs</button>
         <button class="side-nav__item" type="button" data-view="services"><span data-icon="tools"></span>Services</button>
         <button class="side-nav__item" type="button" data-view="pricing-plans"><span data-icon="star"></span>Landing Plans</button>
+        <button class="side-nav__item" type="button" data-view="package-approvals"><span data-icon="invoice"></span>Package Approvals</button>
         <button class="side-nav__item" type="button" data-view="billing"><span data-icon="invoice"></span>Billing</button>
         <button class="side-nav__item" type="button" data-view="emergency"><span data-icon="alert"></span>Emergency</button>
         <button class="side-nav__item" type="button" data-view="notifications"><span data-icon="bell"></span>Notifications</button>
@@ -301,6 +302,15 @@
           </div>
         </section>
 
+        <section class="view" data-view-panel="package-approvals">
+          <div class="panel">
+            <div class="panel__header">
+              <div><h2>Customer Package Approvals</h2><p>Review bank receipts or confirm cashier payments before activating customer benefits.</p></div>
+            </div>
+            <div class="table-wrap"><table><thead><tr><th>Request</th><th>Customer</th><th>Package</th><th>Payment</th><th>Status</th><th>Actions</th></tr></thead><tbody id="package-approvals-body"></tbody></table></div>
+          </div>
+        </section>
+
         <section class="view" data-view-panel="landing-content">
           <div class="panel">
             <div class="panel__header"><div><h2>Recent Work</h2><p>Update the photos, captions, and visibility of the three recent-work slides.</p></div></div>
@@ -339,6 +349,10 @@
               <label><span>Station Name</span><input name="stationName" value="AutoCare Service Station" required /></label>
               <label><span>Support Phone</span><input name="supportPhone" value="+94 77 023 4567" required /></label>
               <label><span>Support Email</span><input name="supportEmail" type="email" value="support@autocare.lk" required /></label>
+              <label><span>Payment Bank</span><input name="bankName" placeholder="Commercial Bank of Ceylon" required /></label>
+              <label><span>Bank Account Name</span><input name="bankAccountName" placeholder="AutoCare Service Station" required /></label>
+              <label><span>Bank Account Number</span><input name="bankAccountNumber" placeholder="Enter account number" required /></label>
+              <label><span>Bank Branch</span><input name="bankBranch" placeholder="Colombo" required /></label>
               <label><span>Admin Password</span><input name="password" type="password" placeholder="Change password" /></label>
               <div class="full" id="company-image-settings"></div>
               <div class="database-note">
@@ -387,6 +401,6 @@
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
   <script src="js/api.js?v=save-popup-1"></script>
   <script src="js/image-management.js?v=1"></script>
-  <script src="js/admin-dashboard.js?v=save-popup-1"></script>
+  <script src="js/admin-dashboard.js?v=booking-assignment-1"></script>
 </body>
 </html>

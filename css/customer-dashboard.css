@@ -366,6 +366,281 @@ button { cursor: pointer; }
 .btn--yellow { color: var(--navy); background: var(--yellow); }
 .btn--red { color: #fff; background: var(--red); }
 .btn--ghost { color: var(--ink); background: #f2f5fa; }
+.btn:disabled { cursor: default; opacity: 0.72; }
+
+.current-package-card {
+  padding: clamp(20px, 3vw, 30px);
+  color: #fff;
+  background: linear-gradient(135deg, var(--navy), #153b82);
+  border-radius: 10px;
+  box-shadow: 0 22px 50px rgba(2, 25, 54, 0.2);
+}
+
+.current-package-card__heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.current-package-card__heading h3 {
+  margin: 10px 0 5px;
+  font-size: clamp(25px, 3vw, 36px);
+}
+
+.current-package-card__heading p,
+.current-package-card footer {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.67);
+}
+
+.current-package-card__heading > strong {
+  font-size: clamp(22px, 3vw, 30px);
+  white-space: nowrap;
+}
+
+.current-package-card__heading strong small,
+.customer-package-card > strong small {
+  margin-left: 5px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.package-status {
+  display: inline-flex;
+  padding: 7px 10px;
+  color: var(--navy);
+  background: var(--yellow);
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.current-package-card__benefits {
+  margin: 24px 0 20px;
+  padding: 18px;
+  background: rgba(255, 255, 255, 0.09);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+}
+
+.current-package-card__benefits h4,
+.customer-package-card__benefits h4 {
+  margin: 0 0 12px;
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.current-package-card__benefits ul,
+.customer-package-card__benefits ul {
+  display: grid;
+  gap: 9px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.current-package-card__benefits li::before,
+.customer-package-card__benefits li::before {
+  content: "✓";
+  margin-right: 9px;
+  color: var(--green);
+  font-weight: 900;
+}
+
+.customer-package-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.customer-package-card {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+  padding: 22px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+}
+
+.customer-package-card.is-current {
+  border-color: var(--blue);
+  box-shadow: 0 16px 36px rgba(47, 85, 212, 0.13);
+}
+
+.customer-package-card header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--blue);
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.customer-package-card header b {
+  color: var(--green);
+}
+
+.customer-package-card h3 {
+  margin: 15px 0 10px;
+  font-size: 21px;
+}
+
+.customer-package-card > strong {
+  display: block;
+  color: var(--navy);
+  font-size: 23px;
+}
+
+.customer-package-card__benefits {
+  flex: 1;
+  margin: 20px 0;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.customer-package-card__benefits li {
+  color: #5f6b80;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.package-payment-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.package-payment-summary,
+.bank-details-card {
+  grid-column: 1 / -1;
+  padding: 20px;
+  border-radius: 10px;
+}
+
+.package-payment-summary {
+  color: #fff;
+  background: linear-gradient(135deg, #071f43, #174f9b);
+}
+
+.package-payment-summary span,
+.bank-details-card span {
+  color: #8190aa;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.package-payment-summary span {
+  color: #9fc0f0;
+}
+
+.package-payment-summary h3 {
+  margin: 10px 0 6px;
+  font-size: 25px;
+}
+
+.package-payment-summary > strong {
+  color: var(--yellow);
+  font-size: 23px;
+}
+
+.package-payment-summary p {
+  margin: 14px 0 0;
+  color: rgba(255, 255, 255, .74);
+  line-height: 1.6;
+}
+
+.bank-details-card {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  background: #f7f9fd;
+  border: 1px solid var(--line);
+}
+
+.bank-details-card > div {
+  display: grid;
+  gap: 5px;
+}
+
+.bank-details-card strong {
+  color: var(--navy);
+  overflow-wrap: anywhere;
+}
+
+.package-payment-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.package-request-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.package-request-list > h3 {
+  margin: 0 0 3px;
+  font-size: 16px;
+}
+
+.package-request-list > article {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.package-request-list strong,
+.package-request-list small {
+  display: block;
+}
+
+.package-request-list small {
+  margin-top: 5px;
+  color: var(--muted);
+}
+
+.package-empty {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 24px;
+  color: var(--muted);
+  background: #f9fbff;
+  border: 1px dashed #ccd5e6;
+  border-radius: 8px;
+}
+
+.package-empty > span {
+  width: 44px;
+  height: 44px;
+  color: var(--blue);
+}
+
+.package-empty strong,
+.package-empty p {
+  display: block;
+  margin: 0;
+}
+
+.package-empty p {
+  margin-top: 5px;
+}
 
 .booking-card {
   display: grid;
@@ -946,6 +1221,129 @@ textarea:focus {
   grid-column: 1 / -1;
 }
 
+.modal:has(.booking-form-section) {
+  width: min(860px, calc(100% - 28px));
+  max-height: 94vh;
+}
+
+.modal__card:has(.booking-form-section) {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  max-height: 94vh;
+}
+
+.modal__body:has(.booking-form-section) {
+  overflow-y: auto;
+  background: #f7f9fd;
+}
+
+.booking-form-section {
+  grid-column: 1 / -1;
+  padding: 20px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+
+.booking-form-section__header {
+  display: flex;
+  align-items: flex-start;
+  gap: 13px;
+  margin-bottom: 18px;
+  padding-bottom: 15px;
+  border-bottom: 1px solid var(--line);
+}
+
+.booking-form-section__header > span {
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  background: var(--blue);
+  border-radius: 50%;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.booking-form-section__header h3 {
+  margin: 0;
+  font-size: 17px;
+}
+
+.booking-form-section__header p {
+  margin: 5px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.booking-form-section__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 15px;
+}
+
+.booking-form-section__grid > .full {
+  grid-column: 1 / -1;
+}
+
+.saved-vehicle-picker {
+  display: grid;
+  gap: 11px;
+  padding: 14px;
+  background: #f8fbff;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.saved-vehicle-picker > div:first-child {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.saved-vehicle-picker small {
+  color: var(--muted);
+}
+
+.saved-vehicle-picker__list {
+  display: flex;
+  gap: 9px;
+  overflow-x: auto;
+  padding-bottom: 3px;
+}
+
+.saved-vehicle-picker__list button {
+  min-width: 145px;
+  padding: 11px 12px;
+  color: var(--ink);
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  text-align: left;
+}
+
+.saved-vehicle-picker__list button strong,
+.saved-vehicle-picker__list button small {
+  display: block;
+}
+
+.saved-vehicle-picker__list button small {
+  margin-top: 4px;
+}
+
+.saved-vehicle-picker__list button.is-selected {
+  color: var(--blue);
+  background: var(--blue-soft);
+  border-color: var(--blue);
+  box-shadow: 0 9px 22px rgba(47, 85, 212, 0.12);
+}
+
+.booking-vehicle-image {
+  padding-top: 4px;
+}
+
 .slot-panel {
   grid-column: 1 / -1;
   display: grid;
@@ -1292,18 +1690,6 @@ textarea:focus {
   font-weight: 700;
 }
 
-.new-vehicle-fields {
-  grid-column: 1 / -1;
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 15px;
-  padding-top: 4px;
-}
-
-.new-vehicle-fields[hidden] {
-  display: none;
-}
-
 .vehicle-image-preview {
   min-height: 54px;
   display: flex;
@@ -1452,6 +1838,7 @@ textarea:focus {
   .metric-grid,
   .dashboard-grid,
   .dashboard-grid--even,
+  .customer-package-grid,
   .vehicle-grid,
   .donut-layout,
   .support-grid {
@@ -1484,10 +1871,23 @@ textarea:focus {
     flex-direction: column;
   }
 
+  .current-package-card__heading {
+    flex-direction: column;
+  }
+
+  .package-payment-actions,
+  .package-request-list > article {
+    grid-template-columns: 1fr;
+  }
+
+  .bank-details-card {
+    grid-template-columns: 1fr;
+  }
+
   .profile-form,
   .support-form,
   .modal__body,
-  .new-vehicle-fields {
+  .booking-form-section__grid {
     grid-template-columns: 1fr;
   }
 
@@ -1496,6 +1896,18 @@ textarea:focus {
   .support-form button,
   .modal__body label.full {
     grid-column: auto;
+  }
+
+  .booking-form-section {
+    padding: 15px;
+  }
+
+  .booking-form-section__grid > .full {
+    grid-column: auto;
+  }
+
+  .saved-vehicle-picker > div:first-child {
+    flex-direction: column;
   }
 
   .btn { width: 100%; }

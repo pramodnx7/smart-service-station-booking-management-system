@@ -246,6 +246,35 @@
   font-size: inherit;
 }
 
+.service-reviews {
+  display: grid;
+  gap: 9px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.service-review {
+  margin: 0;
+  padding: 10px 12px;
+  background: #f7f8fc;
+  border-left: 3px solid var(--red);
+}
+
+.service-review p {
+  margin: 0;
+  color: var(--ink);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.service-review footer {
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 800;
+}
+
 .pricing { padding-top: 78px; }
 .pricing__grid {
   display: grid;

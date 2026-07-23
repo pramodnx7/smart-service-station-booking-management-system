@@ -6,6 +6,8 @@ const collections = {
   vehicles: 'vehicles',
   servicePackages: 'servicePackages',
   pricingPlans: 'pricingPlans',
+  customerPackages: 'customerPackages',
+  customerPackageRequests: 'customerPackageRequests',
   bookings: 'bookings',
   invoices: 'invoices',
   emergencyRequests: 'emergencyRequests',
@@ -67,6 +69,72 @@ const serviceBayCount = Number(process.env.SERVICE_BAY_COUNT || 8);
 const serviceDayStartHour = Number(process.env.SERVICE_DAY_START_HOUR || 8);
 const serviceDayEndHour = Number(process.env.SERVICE_DAY_END_HOUR || 17);
 const serviceSlotMinutes = Number(process.env.SERVICE_SLOT_MINUTES || 60);
+const readCache = new Map();
+const stableCollectionCacheMs = {
+  [collections.servicePackages]: Math.max(60000, Number(process.env.SERVICE_PACKAGE_CACHE_MS) || 5 * 60 * 1000),
+  [collections.pricingPlans]: Math.max(60000, Number(process.env.PRICING_PLAN_CACHE_MS) || 5 * 60 * 1000),
+  [collections.inventoryCategories]: Math.max(60000, Number(process.env.INVENTORY_CATEGORY_CACHE_MS) || 10 * 60 * 1000)
+};
+const publicProjectionCacheMs = {
+  serviceRatings: Math.max(15000, Number(process.env.PUBLIC_RATINGS_CACHE_MS) || 60 * 1000),
+  pricingPlans: Math.max(60000, Number(process.env.PUBLIC_PRICING_CACHE_MS) || 5 * 60 * 1000),
+  stats: Math.max(15000, Number(process.env.PUBLIC_STATS_CACHE_MS) || 60 * 1000),
+  landingContent: Math.max(60000, Number(process.env.PUBLIC_CONTENT_CACHE_MS) || 5 * 60 * 1000)
+};
+const publicProjectionDependencies = {
+  [collections.servicePackages]: ['serviceRatings'],
+  [collections.feedback]: ['serviceRatings'],
+  [collections.users]: ['serviceRatings', 'stats'],
+  [collections.pricingPlans]: ['pricingPlans'],
+  [collections.technicians]: ['stats'],
+  [collections.serviceJobs]: ['stats'],
+  [collections.appSettings]: ['stats', 'landingContent']
+};
+const readCacheStats = {
+  startedAt: new Date().toISOString(),
+  hits: 0,
+  misses: 0,
+  invalidations: 0
+};
+
+async function cachedRead(key, ttl, loader) {
+  const existing = readCache.get(key);
+  if (existing && existing.expiresAt > Date.now()) {
+    readCacheStats.hits += 1;
+    return existing.value;
+  }
+
+  readCacheStats.misses += 1;
+  const value = Promise.resolve().then(loader);
+  readCache.set(key, { expiresAt: Date.now() + ttl, value });
+  try {
+    return await value;
+  } catch (error) {
+    if (readCache.get(key)?.value === value) readCache.delete(key);
+    throw error;
+  }
+}
+
+function invalidateReadCaches(collection) {
+  if (readCache.delete(`collection:${collection}`)) readCacheStats.invalidations += 1;
+  (publicProjectionDependencies[collection] || []).forEach((projection) => {
+    if (readCache.delete(`public:${projection}`)) readCacheStats.invalidations += 1;
+  });
+  if (collection === collections.appSettings && readCache.delete('settings:landing-content')) {
+    readCacheStats.invalidations += 1;
+  }
+}
+
+function getFirestoreReadCacheStats() {
+  const now = Date.now();
+  return {
+    ...readCacheStats,
+    activeEntries: [...readCache.entries()]
+      .filter(([, entry]) => entry.expiresAt > now)
+      .map(([key, entry]) => ({ key, expiresInMs: entry.expiresAt - now }))
+      .sort((left, right) => left.key.localeCompare(right.key))
+  };
+}
 
 function fieldValue() {
   return admin.firestore.FieldValue.serverTimestamp();
@@ -185,8 +253,8 @@ function createInvoicePdfBuffer(details) {
       totalPrice: Number(invoice.laborCost)
     }] : []),
     ...(Number(invoice.serviceCharges || 0) > 0 ? [{
-      partName: 'Service Charges',
-      itemType: 'Service',
+      partName: invoice.invoiceType === 'Package' ? `${service?.name || invoice.serviceName || 'Package'} Package` : 'Service Charges',
+      itemType: invoice.invoiceType === 'Package' ? 'Package' : 'Service',
       quantity: 1,
       unitPrice: Number(invoice.serviceCharges),
       totalPrice: Number(invoice.serviceCharges)
@@ -435,8 +503,15 @@ function assertFirebaseConfigured() {
 
 async function all(collection) {
   assertFirebaseConfigured();
-  const snapshot = await db.collection(collection).get();
-  return snapshot.docs.map((doc) => ({ id: Number(doc.id), ...doc.data() }));
+  const loadCollection = async () => {
+    const snapshot = await db.collection(collection).get();
+    return snapshot.docs.map((doc) => ({ id: Number(doc.id), ...doc.data() }));
+  };
+  const ttl = stableCollectionCacheMs[collection];
+  const items = ttl
+    ? await cachedRead(`collection:${collection}`, ttl, loadCollection)
+    : await loadCollection();
+  return items.map((item) => ({ ...item }));
 }
 
 async function allWhere(collection, field, value) {
@@ -495,12 +570,14 @@ async function nextIdsForCollections(transaction, requests) {
 
 async function createDocument(collection, data) {
   assertFirebaseConfigured();
-  return db.runTransaction(async (transaction) => {
+  const item = await db.runTransaction(async (transaction) => {
     const id = await nextId(transaction, collection);
     const ref = docRef(collection, id);
     transaction.set(ref, { ...data, id, createdAt: fieldValue() });
     return { ...data, id };
   });
+  invalidateReadCaches(collection);
+  return item;
 }
 
 async function createQueuedBookingDocument(data) {
@@ -570,12 +647,14 @@ async function updateDocument(collection, id, data) {
   const snapshot = await ref.get();
   if (!snapshot.exists) return null;
   await ref.set({ ...data, updatedAt: fieldValue() }, { merge: true });
+  invalidateReadCaches(collection);
   return getById(collection, id);
 }
 
 async function deleteDocument(collection, id) {
   assertFirebaseConfigured();
   await docRef(collection, id).delete();
+  invalidateReadCaches(collection);
 }
 
 function publicUser(user) {
@@ -627,10 +706,13 @@ function vehicleView(vehicle) {
     id: vehicle.id,
     customerId: vehicle.userId,
     name: vehicleName || `${vehicle.make} ${vehicle.model}`.trim(),
+    vehicleType: vehicle.vehicleType || 'Car',
     make: vehicle.make,
     model: vehicle.model,
     plate: vehicle.plateNumber,
     year: vehicle.year,
+    fuelType: vehicle.fuelType || '',
+    color: vehicle.color || '',
     image: vehicle.frontImage || vehicle.imageUrl || defaultImage,
     frontImage: vehicle.frontImage || vehicle.imageUrl || '',
     rearImage: vehicle.rearImage || '',
@@ -657,11 +739,55 @@ function pricingPlanView(plan) {
   };
 }
 
+function customerPackageView(customerPackage, plan = null) {
+  if (!customerPackage) return null;
+  const benefits = Array.isArray(customerPackage.benefits)
+    ? customerPackage.benefits.filter(Boolean)
+    : Array.isArray(plan?.features) ? plan.features.filter(Boolean) : [];
+  return {
+    id: customerPackage.id,
+    customerId: Number(customerPackage.userId),
+    pricingPlanId: Number(customerPackage.pricingPlanId),
+    name: customerPackage.packageName || plan?.name || 'Service Plan',
+    badge: customerPackage.badge || plan?.badge || '',
+    price: Number(customerPackage.price ?? plan?.price ?? 0),
+    billingPeriod: customerPackage.billingPeriod || plan?.billingPeriod || 'service',
+    benefits,
+    status: customerPackage.status || 'active',
+    activatedAt: formatDate(customerPackage.activatedAt || customerPackage.createdAt),
+    updatedAt: formatDate(customerPackage.updatedAt)
+  };
+}
+
+function packageRequestView(request, usersById = new Map(), plansById = new Map()) {
+  const plan = plansById.get(Number(request.pricingPlanId));
+  return {
+    id: request.id,
+    customerId: Number(request.userId),
+    customerName: usersById.get(Number(request.userId))?.name || 'Customer',
+    pricingPlanId: Number(request.pricingPlanId),
+    packageName: request.packageName || plan?.name || 'Service Plan',
+    price: Number(request.price || 0),
+    benefits: Array.isArray(request.benefits) ? request.benefits.filter(Boolean) : [],
+    paymentMethod: request.paymentMethod || (Number(request.price || 0) <= 0 ? 'Free' : ''),
+    paymentStatus: request.paymentStatus || (Number(request.price || 0) <= 0 ? 'Not Required' : 'Unpaid'),
+    status: request.status || 'Pending Approval',
+    paymentProofUrl: request.paymentProofUrl || '',
+    paymentProofName: request.paymentProofName || '',
+    requestedAt: formatDate(request.requestedAt || request.createdAt),
+    paymentSubmittedAt: formatDate(request.paymentSubmittedAt),
+    approvedAt: formatDate(request.approvedAt),
+    rejectionReason: request.rejectionReason || ''
+  };
+}
+
 async function getPublicPricingPlans() {
-  return (await all(collections.pricingPlans))
-    .map(pricingPlanView)
-    .filter((plan) => plan.active)
-    .sort((a, b) => a.displayOrder - b.displayOrder || a.id - b.id);
+  return cachedRead('public:pricingPlans', publicProjectionCacheMs.pricingPlans, async () => (
+    (await all(collections.pricingPlans))
+      .map(pricingPlanView)
+      .filter((plan) => plan.active)
+      .sort((a, b) => a.displayOrder - b.displayOrder || a.id - b.id)
+  ));
 }
 
 async function createPricingPlan(data) {
@@ -686,8 +812,260 @@ async function updatePricingPlan(id, data) {
 async function deletePricingPlan(id) {
   const plan = await getById(collections.pricingPlans, id);
   if (!plan) return false;
+  const [assignments, requests] = await Promise.all([
+    allWhere(collections.customerPackages, 'pricingPlanId', Number(id)),
+    allWhere(collections.customerPackageRequests, 'pricingPlanId', Number(id))
+  ]);
+  if (assignments.length || requests.length) {
+    await updateDocument(collections.pricingPlans, id, { active: false, archived: true });
+    return true;
+  }
   await deleteDocument(collections.pricingPlans, id);
   return true;
+}
+
+async function selectCustomerPackage(userId, pricingPlanId) {
+  const customerId = Number(userId);
+  const planId = Number(pricingPlanId);
+  if (!Number.isInteger(planId) || planId <= 0) {
+    const error = new Error('Select a valid service package.');
+    error.status = 400;
+    throw error;
+  }
+
+  const customerRef = docRef(collections.users, customerId);
+  const planRef = docRef(collections.pricingPlans, planId);
+  const packageRef = docRef(collections.customerPackages, customerId);
+  const result = await db.runTransaction(async (transaction) => {
+    const [customerSnapshot, planSnapshot, currentSnapshot] = await Promise.all([
+      transaction.get(customerRef),
+      transaction.get(planRef),
+      transaction.get(packageRef)
+    ]);
+    const customer = customerSnapshot.data();
+    const plan = planSnapshot.data();
+    if (!customerSnapshot.exists || customer?.role !== 'customer') {
+      const error = new Error('Customer profile not found.');
+      error.status = 404;
+      throw error;
+    }
+    if (!planSnapshot.exists || plan?.active === false || plan?.archived === true) {
+      const error = new Error('The selected package is not currently available.');
+      error.status = 404;
+      throw error;
+    }
+    const current = currentSnapshot.exists ? currentSnapshot.data() : null;
+    const unchanged = Number(current?.pricingPlanId) === planId && current?.status === 'active';
+    if (!unchanged) {
+      transaction.set(packageRef, {
+        id: customerId,
+        userId: customerId,
+        pricingPlanId: planId,
+        packageName: plan.name || 'Service Plan',
+        badge: plan.badge || '',
+        price: Number(plan.price || 0),
+        billingPeriod: plan.billingPeriod || 'service',
+        benefits: Array.isArray(plan.features) ? plan.features.filter(Boolean) : [],
+        status: 'active',
+        activatedAt: fieldValue(),
+        updatedAt: fieldValue()
+      }, { merge: true });
+    }
+    return { changed: !unchanged, planName: plan.name || 'Service Plan' };
+  });
+
+  const selected = await getById(collections.customerPackages, customerId);
+  const plan = await getById(collections.pricingPlans, selected.pricingPlanId);
+  if (result.changed) {
+    await createUserNotification(
+      customerId,
+      'Package Activated',
+      `${result.planName} is now your active package. Its listed benefits have been applied to your account.`
+    );
+  }
+  return { ...customerPackageView(selected, plan), changed: result.changed };
+}
+
+async function requestCustomerPackage(userId, pricingPlanId, paymentMethod = '', paymentProof = {}) {
+  const customerId = Number(userId);
+  const planId = Number(pricingPlanId);
+  const [customer, plan, existingRequests] = await Promise.all([
+    getById(collections.users, customerId),
+    getById(collections.pricingPlans, planId),
+    allWhere(collections.customerPackageRequests, 'userId', customerId)
+  ]);
+  if (!customer || customer.role !== 'customer') {
+    const error = new Error('Customer profile not found.');
+    error.status = 404;
+    throw error;
+  }
+  if (!plan || plan.active === false || plan.archived === true) {
+    const error = new Error('The selected package is not currently available.');
+    error.status = 404;
+    throw error;
+  }
+  const price = Number(plan.price || 0);
+  const method = price <= 0 ? 'Free' : titleCase(paymentMethod);
+  if (price > 0 && !['Online', 'Cashier'].includes(method)) {
+    const error = new Error('Choose online payment or payment at the cashier.');
+    error.status = 400;
+    throw error;
+  }
+  const paymentProofUrl = String(paymentProof.url || '').trim();
+  const paymentProofName = String(paymentProof.name || '').trim().slice(0, 180);
+  if (price > 0 && method === 'Online' && !paymentProofUrl) {
+    const error = new Error('Upload the bank payment receipt before submitting this request.');
+    error.status = 400;
+    throw error;
+  }
+  const openRequest = existingRequests.find((request) => (
+    Number(request.pricingPlanId) === planId
+    && !['Approved', 'Rejected', 'Cancelled'].includes(request.status)
+  ));
+  if (openRequest) {
+    const error = new Error('You already have a pending request for this package.');
+    error.status = 409;
+    throw error;
+  }
+
+  const request = await createDocument(collections.customerPackageRequests, {
+    userId: customerId,
+    pricingPlanId: planId,
+    packageName: plan.name,
+    badge: plan.badge || '',
+    price,
+    billingPeriod: plan.billingPeriod || 'service',
+    benefits: Array.isArray(plan.features) ? plan.features.filter(Boolean) : [],
+    paymentMethod: method,
+    paymentStatus: price <= 0 ? 'Not Required' : method === 'Online' ? 'Pending Verification' : 'Unpaid',
+    status: price <= 0 ? 'Pending Approval' : method === 'Online' ? 'Payment Proof Submitted' : 'Awaiting Cashier Payment',
+    paymentProofUrl: method === 'Online' ? paymentProofUrl : '',
+    paymentProofName: method === 'Online' ? paymentProofName : '',
+    paymentSubmittedAt: method === 'Online' ? fieldValue() : null,
+    requestedAt: fieldValue()
+  });
+  await notifyAdmins(
+    'Package Approval Requested',
+    `${customer.name} requested ${plan.name}${method === 'Online' ? ' and uploaded a bank payment receipt' : price > 0 ? ' for cashier payment' : ' as a free package'}.`
+  );
+  return packageRequestView(
+    request,
+    new Map([[customerId, customer]]),
+    new Map([[planId, plan]])
+  );
+}
+
+async function confirmCustomerPackageCashierPayment(adminUserId, requestId) {
+  const request = await getById(collections.customerPackageRequests, requestId);
+  if (!request) {
+    const error = new Error('Package request not found.');
+    error.status = 404;
+    throw error;
+  }
+  if (request.paymentMethod !== 'Cashier' || Number(request.price || 0) <= 0) {
+    const error = new Error('This request does not require a cashier payment.');
+    error.status = 400;
+    throw error;
+  }
+  await updateDocument(collections.customerPackageRequests, request.id, {
+    paymentStatus: 'Paid',
+    status: 'Pending Approval',
+    paidAt: fieldValue(),
+    paidByUserId: Number(adminUserId)
+  });
+  await createUserNotification(
+    request.userId,
+    'Cashier Payment Recorded',
+    `Cashier payment for ${request.packageName} was recorded. Your package is waiting for administrator approval.`
+  );
+  return packageRequestView(await getById(collections.customerPackageRequests, request.id));
+}
+
+async function markInvoicePaid(id, adminUserId) {
+  const invoice = await getById(collections.invoices, id);
+  if (!invoice) return null;
+  await updateDocument(collections.invoices, id, {
+    paymentStatus: 'Paid',
+    paidAt: fieldValue(),
+    paidByUserId: Number(adminUserId)
+  });
+  if (invoice.packageRequestId) {
+    await updateDocument(collections.customerPackageRequests, invoice.packageRequestId, {
+      paymentStatus: 'Paid',
+      status: 'Pending Approval',
+      paidAt: fieldValue()
+    });
+    await createUserNotification(invoice.userId, 'Cashier Payment Recorded', `Payment for invoice #INV-${id} was recorded. Your package is waiting for administrator approval.`);
+  }
+  return getById(collections.invoices, id);
+}
+
+async function reviewCustomerPackageRequest(adminUserId, requestId, decision, rejectionReason = '') {
+  const request = await getById(collections.customerPackageRequests, requestId);
+  if (!request) {
+    const error = new Error('Package request not found.');
+    error.status = 404;
+    throw error;
+  }
+  if (!['Approve', 'Reject'].includes(decision)) {
+    const error = new Error('Choose Approve or Reject.');
+    error.status = 400;
+    throw error;
+  }
+  if (decision === 'Approve' && Number(request.price || 0) > 0) {
+    const onlineProofReady = request.paymentMethod === 'Online'
+      && Boolean(request.paymentProofUrl)
+      && ['Pending Verification', 'Paid'].includes(request.paymentStatus);
+    const cashierReady = request.paymentMethod === 'Cashier' && request.paymentStatus === 'Paid';
+    if (!onlineProofReady && !cashierReady) {
+      const error = new Error(request.paymentMethod === 'Online'
+        ? 'Review the uploaded payment receipt before approval.'
+        : 'Record the cashier payment before approval.');
+      error.status = 409;
+      throw error;
+    }
+  }
+  if (decision === 'Reject') {
+    const reason = String(rejectionReason || '').trim();
+    if (reason.length < 3) {
+      const error = new Error('Add a rejection reason.');
+      error.status = 400;
+      throw error;
+    }
+    await updateDocument(collections.customerPackageRequests, request.id, {
+      status: 'Rejected',
+      rejectionReason: reason,
+      reviewedByUserId: Number(adminUserId),
+      reviewedAt: fieldValue()
+    });
+    await createUserNotification(request.userId, 'Package Request Rejected', `${request.packageName} was not approved: ${reason}`);
+    return packageRequestView(await getById(collections.customerPackageRequests, request.id));
+  }
+
+  const packageRef = docRef(collections.customerPackages, request.userId);
+  await packageRef.set({
+    id: Number(request.userId),
+    userId: Number(request.userId),
+    pricingPlanId: Number(request.pricingPlanId),
+    packageName: request.packageName,
+    badge: request.badge || '',
+    price: Number(request.price || 0),
+    billingPeriod: request.billingPeriod || 'service',
+    benefits: Array.isArray(request.benefits) ? request.benefits.filter(Boolean) : [],
+    status: 'active',
+    activatedAt: fieldValue(),
+    approvedByUserId: Number(adminUserId),
+    packageRequestId: request.id,
+    updatedAt: fieldValue()
+  }, { merge: true });
+  await updateDocument(collections.customerPackageRequests, request.id, {
+    status: 'Approved',
+    paymentStatus: Number(request.price || 0) > 0 ? 'Paid' : 'Not Required',
+    approvedAt: fieldValue(),
+    reviewedByUserId: Number(adminUserId)
+  });
+  await createUserNotification(request.userId, 'Package Approved', `${request.packageName} is now active and its benefits have been applied to your account.`);
+  return packageRequestView(await getById(collections.customerPackageRequests, request.id));
 }
 
 function partView(part) {
@@ -819,6 +1197,9 @@ function invoiceView(invoice, serviceById) {
     customerId: invoice.userId,
     serviceJobId: invoice.serviceJobId || null,
     service: service?.name || invoice.serviceName || 'Unknown Service',
+    invoiceType: invoice.invoiceType || 'Service',
+    packageRequestId: invoice.packageRequestId || null,
+    pricingPlanId: invoice.pricingPlanId || null,
     amount: Number(invoice.amount),
     partsTotal: Number(invoice.partsTotal || 0),
     laborCost: Number(invoice.laborCost || 0),
@@ -826,6 +1207,7 @@ function invoiceView(invoice, serviceById) {
     tax: Number(invoice.tax || 0),
     discount: Number(invoice.discount || 0),
     payment: invoice.paymentStatus,
+    paymentMethod: invoice.paymentMethod || '',
     date: formatDate(invoice.invoiceDate),
     customerSignature: invoice.customerSignature || '',
     mechanicSignature: invoice.mechanicSignature || ''
@@ -1012,15 +1394,17 @@ function landingContentView(settings = {}) {
 
 async function getLandingContentSettings() {
   assertFirebaseConfigured();
-  const entries = Object.entries(landingContentDefaults).flatMap(([section, items]) => items.map((_, slot) => ({ section, slot })));
-  const snapshots = await Promise.all(entries.map(({ section, slot }) => (
-    db.collection(collections.appSettings).doc(`${landingContentDocumentPrefix}-${section}-${slot}`).get()
-  )));
-  return entries.reduce((settings, entry, index) => {
-    if (!settings[entry.section]) settings[entry.section] = [];
-    if (snapshots[index].exists) settings[entry.section][entry.slot] = snapshots[index].data();
-    return settings;
-  }, {});
+  return cachedRead('settings:landing-content', publicProjectionCacheMs.landingContent, async () => {
+    const entries = Object.entries(landingContentDefaults).flatMap(([section, items]) => items.map((_, slot) => ({ section, slot })));
+    const snapshots = await Promise.all(entries.map(({ section, slot }) => (
+      db.collection(collections.appSettings).doc(`${landingContentDocumentPrefix}-${section}-${slot}`).get()
+    )));
+    return entries.reduce((settings, entry, index) => {
+      if (!settings[entry.section]) settings[entry.section] = [];
+      if (snapshots[index].exists) settings[entry.section][entry.slot] = snapshots[index].data();
+      return settings;
+    }, {});
+  });
 }
 
 async function findUserByEmailRole(email, role) {
@@ -1102,7 +1486,7 @@ async function createUser({ role, name, email, phone = '', passwordHash, status 
 
 async function getCustomerDashboard(userId) {
   const customerId = Number(userId);
-  const [user, vehicles, bookings, invoices, notifications, serviceMap, jobs, companySettingsSnapshot] = await Promise.all([
+  const [user, vehicles, bookings, invoices, notifications, serviceMap, jobs, pricingPlans, selectedPackage, packageRequests, companySettingsSnapshot] = await Promise.all([
     getById(collections.users, userId),
     allWhere(collections.vehicles, 'userId', customerId),
     allWhere(collections.bookings, 'userId', customerId),
@@ -1110,6 +1494,9 @@ async function getCustomerDashboard(userId) {
     allWhere(collections.notifications, 'userId', customerId),
     servicesById(),
     allWhere(collections.serviceJobs, 'customerId', customerId),
+    all(collections.pricingPlans),
+    getById(collections.customerPackages, customerId),
+    allWhere(collections.customerPackageRequests, 'userId', customerId),
     db.collection(collections.appSettings).doc(companySettingsDocument).get()
   ]);
 
@@ -1153,6 +1540,25 @@ async function getCustomerDashboard(userId) {
     serviceImages: sortById(images).reverse().map((image) => fileView(image, 'photo')),
     documents: sortById(documents).reverse().map((document) => fileView(document, 'document')),
     packages,
+    pricingPlans: pricingPlans
+      .map(pricingPlanView)
+      .filter((plan) => plan.active)
+      .sort((a, b) => a.displayOrder - b.displayOrder || a.id - b.id),
+    currentPackage: customerPackageView(
+      selectedPackage,
+      pricingPlans.find((plan) => Number(plan.id) === Number(selectedPackage?.pricingPlanId))
+    ),
+    packageRequests: sortById(packageRequests).reverse().map((request) => packageRequestView(
+      request,
+      new Map([[customerId, user]]),
+      new Map(pricingPlans.map((plan) => [Number(plan.id), plan]))
+    )),
+    paymentBankDetails: {
+      bankName: companySettingsSnapshot.data()?.bankName || process.env.BANK_NAME || 'Commercial Bank of Ceylon',
+      accountName: companySettingsSnapshot.data()?.bankAccountName || process.env.BANK_ACCOUNT_NAME || 'AutoCare Service Station',
+      accountNumber: companySettingsSnapshot.data()?.bankAccountNumber || process.env.BANK_ACCOUNT_NUMBER || 'Contact AutoCare',
+      branch: companySettingsSnapshot.data()?.bankBranch || process.env.BANK_BRANCH || 'Colombo'
+    },
     companySettings: companySettingsSnapshot.exists ? companySettingsSnapshot.data() : {}
   };
 }
@@ -1287,12 +1693,13 @@ function buildInventoryReports(parts, movements, usages, context = {}) {
 
 async function getAdminDashboard(userId) {
   assertFirebaseConfigured();
-  const [users, vehicles, bookings, packages, pricingPlans, invoices, emergencies, notifications, notificationDrafts, feedback, technicians, serviceJobs, inventoryParts, suppliers, categories, movements, usages, photos, documents, serviceMap, landingStatsSnapshot, landingContentSettings, companySettingsSnapshot] = await Promise.all([
+  const [users, vehicles, bookings, packages, pricingPlans, packageRequests, invoices, emergencies, notifications, notificationDrafts, feedback, technicians, serviceJobs, inventoryParts, suppliers, categories, movements, usages, photos, documents, landingStatsSnapshot, landingContentSettings, companySettingsSnapshot] = await Promise.all([
     all(collections.users),
     all(collections.vehicles),
     all(collections.bookings),
     all(collections.servicePackages),
     all(collections.pricingPlans),
+    all(collections.customerPackageRequests),
     all(collections.invoices),
     all(collections.emergencyRequests),
     all(collections.notifications),
@@ -1307,12 +1714,12 @@ async function getAdminDashboard(userId) {
     all(collections.serviceJobParts),
     all(collections.serviceImages),
     all(collections.documents),
-    servicesById(),
     db.collection(collections.appSettings).doc(landingStatsDocument).get(),
     getLandingContentSettings(),
     db.collection(collections.appSettings).doc(companySettingsDocument).get()
   ]);
 
+  const serviceMap = new Map(packages.map((service) => [Number(service.id), service]));
   const context = {
     usersById: new Map(users.map((user) => [Number(user.id), user])),
     vehiclesById: new Map(vehicles.map((vehicle) => [Number(vehicle.id), vehicle])),
@@ -1350,6 +1757,11 @@ async function getAdminDashboard(userId) {
     technicianPerformance: buildTechnicianPerformance(visibleTechnicians, jobViews, context.usersById),
     packages: sortById(packages.filter((service) => service.archived !== true)).map(({ id, name, price, duration, description, image }) => ({ id, name, price: Number(price), duration, description, image: image || defaultServiceImage })),
     pricingPlans: pricingPlans.map(pricingPlanView).sort((a, b) => a.displayOrder - b.displayOrder || a.id - b.id),
+    packageRequests: sortById(packageRequests).reverse().map((request) => packageRequestView(
+      request,
+      context.usersById,
+      new Map(pricingPlans.map((plan) => [Number(plan.id), plan]))
+    )),
     invoices: sortDateDesc(invoices.map((item) => invoiceView(item, serviceMap)), 'date'),
     emergencies: sortById(emergencies).reverse().map(({ id, userId, customerId, location, problem, status }) => ({ id, customerId: customerId || userId, location, problem, status })),
     notifications: sortById(notifications.filter((item) => Number(item.userId) === Number(userId))).reverse().map(({ id, type, message, unread }) => ({ id, type, message, unread })),
@@ -1369,12 +1781,13 @@ async function getAdminDashboard(userId) {
 
 async function updateCompanySettings(data) {
   assertFirebaseConfigured();
-  const allowed = ['logo', 'invoiceLogo', 'banner'];
+  const allowed = ['logo', 'invoiceLogo', 'banner', 'bankName', 'bankAccountName', 'bankAccountNumber', 'bankBranch'];
   const payload = Object.fromEntries(allowed
     .filter((key) => Object.prototype.hasOwnProperty.call(data, key))
     .map((key) => [key, String(data[key] || '').trim()]));
   payload.updatedAt = fieldValue();
   await db.collection(collections.appSettings).doc(companySettingsDocument).set(payload, { merge: true });
+  invalidateReadCaches(collections.appSettings);
   const snapshot = await db.collection(collections.appSettings).doc(companySettingsDocument).get();
   return snapshot.data() || {};
 }
@@ -1427,10 +1840,13 @@ async function createVehicle(userId, data) {
   const vehicle = await createDocument(collections.vehicles, {
     userId,
     name: String(data.name || `${data.make} ${data.model}`).trim(),
+    vehicleType: String(data.vehicleType || 'Car').trim(),
     make: data.make.trim(),
     model: data.model.trim(),
     plateNumber: data.plate.trim().toUpperCase(),
     year: String(data.year).trim(),
+    fuelType: String(data.fuelType || '').trim(),
+    color: String(data.color || '').trim(),
     imageUrl: String(data.frontImage || data.image || defaultImage).trim(),
     frontImage: String(data.frontImage || data.image || '').trim(),
     rearImage: String(data.rearImage || '').trim(),
@@ -1454,10 +1870,13 @@ async function updateVehicle(id, userId, data, enforceOwner = true) {
   const vehicle = await updateDocument(collections.vehicles, id, {
     userId,
     name: String(data.name || `${data.make} ${data.model}`).trim(),
+    vehicleType: String(data.vehicleType ?? current.vehicleType ?? 'Car').trim(),
     make: data.make.trim(),
     model: data.model.trim(),
     plateNumber: data.plate.trim().toUpperCase(),
     year: String(data.year).trim(),
+    fuelType: String(data.fuelType ?? current.fuelType ?? '').trim(),
+    color: String(data.color ?? current.color ?? '').trim(),
     imageUrl: String(data.frontImage || data.image || current.frontImage || current.imageUrl || defaultImage).trim(),
     frontImage: String(data.frontImage ?? current.frontImage ?? data.image ?? current.imageUrl ?? '').trim(),
     rearImage: String(data.rearImage ?? current.rearImage ?? '').trim(),
@@ -1970,30 +2389,43 @@ async function createFeedback(userId, data) {
 }
 
 async function getPublicServiceRatings() {
-  const [services, feedback] = await Promise.all([
-    all(collections.servicePackages),
-    all(collections.feedback)
-  ]);
+  return cachedRead('public:serviceRatings', publicProjectionCacheMs.serviceRatings, async () => {
+    const [services, feedback, users] = await Promise.all([
+      all(collections.servicePackages),
+      all(collections.feedback),
+      all(collections.users)
+    ]);
+    const usersById = new Map(users.map((user) => [Number(user.id), user]));
 
-  return services
-    .filter((service) => service.active !== false)
-    .map((service) => {
-      const reviews = feedback.filter((review) => (
-        Number(review.servicePackageId) === Number(service.id)
-        || String(review.serviceName || '').toLowerCase() === String(service.name).toLowerCase()
-      ));
-      const total = reviews.reduce((sum, review) => sum + Number(review.rating || 0), 0);
-      return {
-        id: service.id,
-        name: service.name,
-        price: Number(service.price || 0),
-        duration: service.duration || '',
-        description: service.description || '',
-        image: service.image || defaultServiceImage,
-        averageRating: reviews.length ? Number((total / reviews.length).toFixed(1)) : 0,
-        reviewCount: reviews.length
-      };
-    });
+    return services
+      .filter((service) => service.active !== false)
+      .map((service) => {
+        const reviews = feedback.filter((review) => (
+          Number(review.servicePackageId) === Number(service.id)
+          || String(review.serviceName || '').toLowerCase() === String(service.name).toLowerCase()
+        ));
+        const total = reviews.reduce((sum, review) => sum + Number(review.rating || 0), 0);
+        return {
+          id: service.id,
+          name: service.name,
+          price: Number(service.price || 0),
+          duration: service.duration || '',
+          description: service.description || '',
+          image: service.image || defaultServiceImage,
+          averageRating: reviews.length ? Number((total / reviews.length).toFixed(1)) : 0,
+          reviewCount: reviews.length,
+          recentReviews: reviews
+            .sort((left, right) => Number(right.id) - Number(left.id))
+            .slice(0, 2)
+            .map((review) => ({
+              id: review.id,
+              rating: Number(review.rating || 0),
+              comment: review.comment || '',
+              customerName: usersById.get(Number(review.userId))?.name || 'AutoCare customer'
+            }))
+        };
+      });
+  });
 }
 
 function landingStatsView(settings, users, technicians, jobs) {
@@ -2014,27 +2446,31 @@ function landingStatsView(settings, users, technicians, jobs) {
 
 async function getPublicStats() {
   assertFirebaseConfigured();
-  const [users, technicians, jobs, settingsSnapshot] = await Promise.all([
-    all(collections.users),
-    all(collections.technicians),
-    all(collections.serviceJobs),
-    db.collection(collections.appSettings).doc(landingStatsDocument).get()
-  ]);
-  const settings = settingsSnapshot.exists ? settingsSnapshot.data() : {};
-  return landingStatsView(
-    settings,
-    users.filter((user) => user.archived !== true),
-    technicians.filter((technician) => technician.archived !== true),
-    jobs
-  );
+  return cachedRead('public:stats', publicProjectionCacheMs.stats, async () => {
+    const [users, technicians, jobs, settingsSnapshot] = await Promise.all([
+      all(collections.users),
+      all(collections.technicians),
+      all(collections.serviceJobs),
+      db.collection(collections.appSettings).doc(landingStatsDocument).get()
+    ]);
+    const settings = settingsSnapshot.exists ? settingsSnapshot.data() : {};
+    return landingStatsView(
+      settings,
+      users.filter((user) => user.archived !== true),
+      technicians.filter((technician) => technician.archived !== true),
+      jobs
+    );
+  });
 }
 
 async function getPublicLandingContent() {
-  const content = landingContentView(await getLandingContentSettings());
-  return {
-    recentWork: content.recentWork.filter((item) => item.active),
-    news: content.news.filter((item) => item.active)
-  };
+  return cachedRead('public:landingContent', publicProjectionCacheMs.landingContent, async () => {
+    const content = landingContentView(await getLandingContentSettings());
+    return {
+      recentWork: content.recentWork.filter((item) => item.active),
+      news: content.news.filter((item) => item.active)
+    };
+  });
 }
 
 async function updateLandingContentItem(section, slot, data) {
@@ -2046,6 +2482,7 @@ async function updateLandingContentItem(section, slot, data) {
   }
   const ref = db.collection(collections.appSettings).doc(`${landingContentDocumentPrefix}-${section}-${slot}`);
   await ref.set({ ...data, slot, updatedAt: fieldValue() }, { merge: true });
+  invalidateReadCaches(collections.appSettings);
   return { ...data, slot };
 }
 
@@ -2069,6 +2506,7 @@ async function updateLandingStat(field, value) {
     [field]: numericValue,
     updatedAt: fieldValue()
   }, { merge: true });
+  invalidateReadCaches(collections.appSettings);
   return { field, value: numericValue };
 }
 
@@ -2132,7 +2570,7 @@ async function deleteCustomer(id) {
   const customer = await getById(collections.users, id);
   if (!customer || customer.role !== 'customer') return false;
 
-  const [vehicles, bookings, invoices, jobs, emergencies, feedback, notifications, notificationDrafts, queueEntries] = await Promise.all([
+  const [vehicles, bookings, invoices, jobs, emergencies, feedback, notifications, notificationDrafts, queueEntries, customerPackage] = await Promise.all([
     all(collections.vehicles),
     all(collections.bookings),
     all(collections.invoices),
@@ -2141,7 +2579,8 @@ async function deleteCustomer(id) {
     all(collections.feedback),
     all(collections.notifications),
     all(collections.notificationDrafts),
-    all(collections.queueEntries)
+    all(collections.queueEntries),
+    getById(collections.customerPackages, id)
   ]);
   const customerId = Number(id);
   const dependencies = [
@@ -2173,13 +2612,19 @@ async function deleteCustomer(id) {
     });
     customerNotifications.forEach((item) => batch.delete(docRef(collections.notifications, item.id)));
     customerDrafts.forEach((item) => batch.delete(docRef(collections.notificationDrafts, item.id)));
+    if (customerPackage) {
+      batch.set(docRef(collections.customerPackages, customerId), {
+        status: 'cancelled', cancelledAt: timestamp, updatedAt: timestamp
+      }, { merge: true });
+    }
     await batch.commit();
     return true;
   }
 
   await Promise.all([
     ...customerNotifications.map((item) => deleteDocument(collections.notifications, item.id)),
-    ...customerDrafts.map((item) => deleteDocument(collections.notificationDrafts, item.id))
+    ...customerDrafts.map((item) => deleteDocument(collections.notificationDrafts, item.id)),
+    ...(customerPackage ? [deleteDocument(collections.customerPackages, customerId)] : [])
   ]);
   await deleteDocument(collections.users, id);
   return true;
@@ -2745,7 +3190,8 @@ async function createServiceJob(data) {
     throw error;
   }
 
-  const existing = (await all(collections.serviceJobs)).find((job) => Number(job.bookingId) === Number(data.bookingId) && job.status !== 'Cancelled');
+  const existing = (await allWhere(collections.serviceJobs, 'bookingId', Number(data.bookingId)))
+    .find((job) => job.status !== 'Cancelled');
   if (existing) {
     const error = new Error('A service job already exists for this booking.');
     error.status = 409;
@@ -2799,6 +3245,38 @@ async function createServiceJob(data) {
 
   const context = await dashboardContext();
   return serviceJobView(job, context);
+}
+
+async function assignBookingTechnician(bookingId, technicianId, data = {}) {
+  const booking = await getById(collections.bookings, bookingId);
+  if (!booking) {
+    const error = new Error('Booking not found.');
+    error.status = 404;
+    throw error;
+  }
+  if (booking.status !== 'Approved') {
+    const error = new Error('Approve the booking before assigning a technician.');
+    error.status = 409;
+    throw error;
+  }
+
+  const existingJob = (await allWhere(collections.serviceJobs, 'bookingId', Number(bookingId)))
+    .find((job) => job.status !== 'Cancelled');
+  if (existingJob) return assignTechnician(existingJob.id, technicianId);
+
+  const service = booking.servicePackageId
+    ? await getById(collections.servicePackages, booking.servicePackageId)
+    : null;
+  return createServiceJob({
+    bookingId: Number(bookingId),
+    vehicleId: booking.vehicleId,
+    customerId: booking.userId,
+    serviceType: service?.name || booking.serviceName || 'General Service',
+    assignedTechnicianId: Number(technicianId),
+    priority: data.priority || 'Normal',
+    startDate: data.startDate || formatDate(booking.bookingDate),
+    expectedCompletionDate: data.expectedCompletionDate || formatDate(booking.bookingDate)
+  });
 }
 
 async function assignTechnician(serviceJobId, technicianId) {
@@ -3690,9 +4168,10 @@ async function getInvoicePdf(id, requester) {
   const invoice = await getById(collections.invoices, id);
   if (!invoice || (requester.role !== 'admin' && invoice.userId !== requester.id)) return null;
 
-  const [user, service, job, parts, vehicles, technicians, users] = await Promise.all([
+  const [user, servicePackage, pricingPlan, job, parts, vehicles, technicians, users] = await Promise.all([
     getById(collections.users, invoice.userId),
-    getById(collections.servicePackages, invoice.servicePackageId),
+    invoice.servicePackageId ? getById(collections.servicePackages, invoice.servicePackageId) : null,
+    invoice.pricingPlanId ? getById(collections.pricingPlans, invoice.pricingPlanId) : null,
     invoice.serviceJobId ? getById(collections.serviceJobs, invoice.serviceJobId) : null,
     all(collections.serviceJobParts),
     all(collections.vehicles),
@@ -3707,7 +4186,7 @@ async function getInvoicePdf(id, requester) {
   return createInvoicePdfBuffer({
     invoice,
     user,
-    service,
+    service: servicePackage || pricingPlan || { name: invoice.serviceName || 'Service Package' },
     job,
     vehicle,
     technicianName: technicianUser?.name || technician?.name || 'Unassigned',
@@ -3744,6 +4223,7 @@ module.exports = {
   addTechnicianNote,
   addUsedPart,
   advanceBooking,
+  assignBookingTechnician,
   assignTechnician,
   cancelBooking,
   checkConnection,
@@ -3788,6 +4268,7 @@ module.exports = {
   getOverallSalesReportPdf,
   getOverallSystemReportPdf,
   getFileForDownload,
+  getFirestoreReadCacheStats,
   getInvoicePdf,
   getPartUsagePhotoForDownload,
   getPublicLandingContent,
@@ -3803,14 +4284,19 @@ module.exports = {
   recordStoredDocument,
   recordStoredPhoto,
   requestAdditionalParts,
+  requestCustomerPackage,
+  reviewCustomerPackageRequest,
   returnUnusedPart,
+  selectCustomerPackage,
   deleteStoredFile,
   markInvoiceEmailed,
+  markInvoicePaid,
   markAllCustomerNotificationsRead,
   markAllUserNotificationsRead,
   markCustomerNotificationRead,
   markUserNotificationRead,
   completeTechnicianJob,
+  confirmCustomerPackageCashierPayment,
   updateBooking,
   updateCustomer,
   updateCompanySettings,

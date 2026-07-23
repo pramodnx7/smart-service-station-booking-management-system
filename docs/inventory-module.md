@@ -8,7 +8,7 @@
 - `inventoryMovements`
 - `serviceJobParts`
 - `replacedParts`
-- `serviceImages`
+- `servicePhotos`
 - `notifications`
 
 Stock updates for part usage and returns are performed inside Firestore transactions to prevent negative stock and keep movement logs in sync.
@@ -28,16 +28,15 @@ erDiagram
   VEHICLES ||--o{ INVENTORY_MOVEMENTS : vehicle
   SERVICE_JOBS ||--o{ REPLACED_PARTS : removed
   TECHNICIANS ||--o{ REPLACED_PARTS : records
-  SERVICE_JOBS ||--o{ SERVICE_IMAGES : photos
+  SERVICE_JOBS ||--o{ SERVICE_PHOTOS : photos
   SERVICE_JOBS ||--o{ INVOICES : billing
 ```
 
-## Migration Order
+## Firestore Setup Order
 
-1. `database/schema.sql`
-2. `database/technician-module.sql`
-3. `database/inventory-module.sql`
-4. Run `npm run firebase:seed` for Firestore seed data.
+1. Run `npm run firebase:provision`.
+2. Run `npm run firebase:seed-system`.
+3. Run `npm run firebase:check-system`.
 
 ## Reports
 

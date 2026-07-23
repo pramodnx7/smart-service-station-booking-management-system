@@ -14,6 +14,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const icons = {
     dashboard: '<svg viewBox="0 0 24 24"><path d="M3 13h8V3H3v10Zm10 8h8V11h-8v10ZM3 21h8v-6H3v6Zm10-12h8V3h-8v6Z"/></svg>',
     calendar: '<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M8 2v4M16 2v4M3 10h18"/></svg>',
+    package: '<svg viewBox="0 0 24 24"><path d="m4 7 8-4 8 4-8 4-8-4Z"/><path d="m4 7 8 4 8-4v10l-8 4-8-4V7Z"/><path d="M12 11v10"/></svg>',
     car: '<svg viewBox="0 0 24 24"><path d="m3 13 2-5a3 3 0 0 1 3-2h8a3 3 0 0 1 3 2l2 5"/><path d="M5 13h14v5H5z"/><circle cx="7.5" cy="18" r="1.5"/><circle cx="16.5" cy="18" r="1.5"/></svg>',
     tools: '<svg viewBox="0 0 24 24"><path d="m14.7 6.3 3-3a4 4 0 0 1-5 5l-7 7a2 2 0 1 0 3 3l7-7a4 4 0 0 1 5-5l-3 3"/></svg>',
     invoice: '<svg viewBox="0 0 24 24"><path d="M6 2h9l3 3v17l-3-2-3 2-3-2-3 2V2Z"/><path d="M9 9h6M9 13h6M9 17h4"/></svg>',
@@ -37,6 +38,15 @@ document.addEventListener('DOMContentLoaded', () => {
     notifications: [],
     rewardPoints: 0,
     packages: [],
+    pricingPlans: [],
+    currentPackage: null,
+    packageRequests: [],
+    paymentBankDetails: {
+      bankName: 'Commercial Bank of Ceylon',
+      accountName: 'AutoCare Service Station',
+      accountNumber: 'Contact AutoCare',
+      branch: 'Colombo'
+    },
     queueEntries: [],
     companySettings: {}
   };
@@ -44,6 +54,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let state = structuredClone(emptyState);
   let activeNotificationFilter = 'all';
   let notificationRefreshTimer = null;
+  let queueRefreshTimer = null;
 
   const els = {
     sidebar: document.getElementById('customer-sidebar'),
@@ -105,6 +116,9 @@ document.addEventListener('DOMContentLoaded', () => {
         documents: Array.isArray(data.documents) ? data.documents : [],
         notifications: Array.isArray(data.notifications) ? data.notifications : [],
         packages: Array.isArray(data.packages) ? data.packages : [],
+        pricingPlans: Array.isArray(data.pricingPlans) ? data.pricingPlans : [],
+        currentPackage: data.currentPackage || null,
+        packageRequests: Array.isArray(data.packageRequests) ? data.packageRequests : [],
         rewardPoints: Number(data.rewardPoints || 0),
         queueEntries: Array.isArray(queueData.entries) ? queueData.entries : []
       };
@@ -122,6 +136,30 @@ document.addEventListener('DOMContentLoaded', () => {
     saveState();
     renderMetrics();
     renderNotifications();
+  }
+
+  async function refreshCustomerQueue() {
+    if (document.hidden) return;
+    const queueData = await window.AutoCareApi.request('/api/customer/queue');
+    state.queueEntries = Array.isArray(queueData.entries) ? queueData.entries : [];
+    renderCustomerQueue();
+  }
+
+  function scheduleQueueRefresh() {
+    window.clearTimeout(queueRefreshTimer);
+    const hasActiveQueueEntry = state.queueEntries.some((entry) => (
+      !['Completed', 'Cancelled', 'No Show'].includes(entry.status)
+    ));
+    const refreshDelay = hasActiveQueueEntry ? 60 * 1000 : 5 * 60 * 1000;
+    queueRefreshTimer = window.setTimeout(async () => {
+      try {
+        await refreshCustomerQueue();
+      } catch (error) {
+        // Keep the last known queue state during temporary outages.
+      } finally {
+        scheduleQueueRefresh();
+      }
+    }, refreshDelay);
   }
 
   function injectIcons() {
@@ -145,14 +183,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function displayVehicleName(vehicle) {
     return vehicle.name || `${vehicle.make} ${vehicle.model}`.trim();
-  }
-
-  function splitVehicleName(name) {
-    const parts = String(name || '').trim().split(/\s+/).filter(Boolean);
-    return {
-      make: parts[0] || 'Custom',
-      model: parts.slice(1).join(' ') || 'Vehicle'
-    };
   }
 
   function statusClass(status) {
@@ -220,7 +250,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const metrics = [
       ['Completed Services', completed, 'View details', 'tools', 'tone-green'],
       ['Total Spending', formatMoney(totalSpend), 'Payment history', 'invoice', 'tone-orange'],
-      ['Reward Points', state.rewardPoints || 0, 'Available points', 'dashboard', 'tone-blue'],
+      ['Current Package', state.currentPackage?.name || 'Not selected', 'Manage your benefits', 'package', 'tone-blue'],
       ['Notifications', unread, 'Unread updates', 'bell', 'tone-red']
     ];
 
@@ -396,6 +426,91 @@ document.addEventListener('DOMContentLoaded', () => {
         ${item.unread ? `<button class="mini-btn" type="button" data-action="mark-notification-read" data-id="${item.id}">Mark Read</button>` : ''}
       </article>
     `).join('') : '<article class="notification-empty"><strong>No notifications here.</strong><p>New updates will appear automatically.</p></article>';
+    injectIcons();
+  }
+
+  function packageBenefits(benefits) {
+    const items = Array.isArray(benefits) ? benefits.filter(Boolean) : [];
+    return items.length
+      ? `<ul>${items.map((benefit) => `<li>${escapeHtml(benefit)}</li>`).join('')}</ul>`
+      : '<p>No package benefits are currently listed.</p>';
+  }
+
+  function renderCustomerPackages() {
+    const currentContainer = document.getElementById('current-package');
+    const packageGrid = document.getElementById('customer-package-grid');
+    if (!currentContainer || !packageGrid) return;
+
+    const openRequests = state.packageRequests.filter((request) => !['Approved', 'Rejected', 'Cancelled'].includes(request.status));
+    const requestMarkup = openRequests.length ? `
+      <div class="package-request-list">
+        <h3>Requests Waiting For Completion</h3>
+        ${openRequests.map((request) => `
+          <article>
+            <div><strong>${escapeHtml(request.packageName)}</strong><small>${escapeHtml(request.status)} · ${escapeHtml(request.paymentMethod)}</small></div>
+            <span class="badge badge--${request.paymentStatus === 'Paid' || request.paymentStatus === 'Not Required' ? 'completed' : 'pending'}">${escapeHtml(request.paymentStatus)}</span>
+            <div class="row-actions">
+              ${request.paymentProofUrl ? `<a class="mini-btn" href="${escapeHtml(request.paymentProofUrl)}" target="_blank" rel="noopener">View Receipt</a>` : ''}
+            </div>
+          </article>
+        `).join('')}
+      </div>
+    ` : '';
+
+    if (state.currentPackage) {
+      currentContainer.innerHTML = `
+        <article class="current-package-card">
+          <div class="current-package-card__heading">
+            <div>
+              <span class="package-status">Active Package</span>
+              <h3>${escapeHtml(state.currentPackage.name)}</h3>
+              <p>${escapeHtml(state.currentPackage.badge || 'Customer service package')}</p>
+            </div>
+            <strong>${formatMoney(state.currentPackage.price)}<small>/ ${escapeHtml(state.currentPackage.billingPeriod)}</small></strong>
+          </div>
+          <div class="current-package-card__benefits">
+            <h4>Benefits Applied To Your Account</h4>
+            ${packageBenefits(state.currentPackage.benefits)}
+          </div>
+          <footer>Activated ${escapeHtml(state.currentPackage.activatedAt || 'today')} · Status: ${escapeHtml(state.currentPackage.status)}</footer>
+        </article>
+        ${requestMarkup}
+      `;
+    } else {
+      currentContainer.innerHTML = `
+        <article class="package-empty">
+          <span data-icon="package"></span>
+          <div><strong>No package selected</strong><p>Choose an available package below to activate its benefits.</p></div>
+        </article>
+        ${requestMarkup}
+      `;
+    }
+
+    packageGrid.innerHTML = state.pricingPlans.length ? state.pricingPlans.map((plan) => {
+      const isCurrent = Number(state.currentPackage?.pricingPlanId) === Number(plan.id);
+      return `
+        <article class="customer-package-card ${isCurrent ? 'is-current' : ''}">
+          <header>
+            <span>${escapeHtml(plan.badge || 'Service Package')}</span>
+            ${isCurrent ? '<b>Current</b>' : ''}
+          </header>
+          <h3>${escapeHtml(plan.name)}</h3>
+          <strong>${formatMoney(plan.price)}<small>/ ${escapeHtml(plan.billingPeriod)}</small></strong>
+          <div class="customer-package-card__benefits">
+            <h4>Included Benefits</h4>
+            ${packageBenefits(plan.features)}
+          </div>
+          ${isCurrent ? '<button class="btn btn--ghost" type="button" disabled>Current Package</button>' : Number(plan.price) <= 0 ? `
+            <button class="btn btn--blue" type="button" data-action="request-free-package" data-id="${plan.id}">Request Free Package</button>
+          ` : `
+            <div class="package-payment-actions">
+              <button class="btn btn--blue" type="button" data-action="request-package-online" data-id="${plan.id}">Pay Online</button>
+              <button class="btn btn--ghost" type="button" data-action="request-package-cashier" data-id="${plan.id}">Pay At Cashier</button>
+            </div>
+          `}
+        </article>
+      `;
+    }).join('') : '<article class="package-empty"><div><strong>No packages available</strong><p>Please check again later.</p></div></article>';
     injectIcons();
   }
 
@@ -602,6 +717,7 @@ document.addEventListener('DOMContentLoaded', () => {
     renderProgress();
     renderSpending();
     renderNotifications();
+    renderCustomerPackages();
     renderFeedbackServices();
   }
 
@@ -634,19 +750,79 @@ document.addEventListener('DOMContentLoaded', () => {
     return `<label><span>${label}</span><input name="${name}" type="${type}" value="${value}"${requiredAttribute} /></label>`;
   }
 
-  function newVehicleFields() {
+  function bookingSlotPanel() {
+    return '<div class="full slot-panel" data-booking-slots><p>Select a service and date to view available time slots.</p></div>';
+  }
+
+  function bookingVehicleFields(selectedVehicle = null) {
+    const vehicleTypes = ['Car', 'SUV', 'Van', 'Pickup Truck', 'Truck', 'Motorcycle', 'Three-Wheeler', 'Other'];
+    const fuelTypes = ['Petrol', 'Diesel', 'Hybrid', 'Electric', 'LPG', 'Other'];
+    const savedVehicleButtons = state.vehicles.length ? `
+      <div class="saved-vehicle-picker full">
+        <div><strong>Use a saved vehicle</strong><small>Optional — selecting one fills the details below.</small></div>
+        <div class="saved-vehicle-picker__list">
+          ${state.vehicles.map((vehicle) => `
+            <button class="${Number(selectedVehicle?.id) === Number(vehicle.id) ? 'is-selected' : ''}" type="button" data-saved-vehicle-id="${vehicle.id}">
+              <strong>${escapeHtml(displayVehicleName(vehicle))}</strong>
+              <small>${escapeHtml(vehicle.plate)}</small>
+            </button>
+          `).join('')}
+          <button class="${selectedVehicle ? '' : 'is-selected'}" type="button" data-use-new-booking-vehicle>
+            <strong>Different Vehicle</strong>
+            <small>Enter new details</small>
+          </button>
+        </div>
+      </div>
+    ` : '';
+
     return `
-      <div class="new-vehicle-fields full" data-new-vehicle-fields hidden>
-        ${field('newVehicleName', 'New Vehicle Name', 'text', '', [], false)}
-        ${field('newVehiclePlate', 'Number Plate', 'text', '', [], false)}
-        ${field('newVehicleYear', 'Year', 'number', '2026', [], false)}
-        ${window.AutoCareImages.uploader({ name: 'newVehicleFrontImage', label: 'Front Vehicle Image', folder: 'vehicles' })}
+      <input type="hidden" name="vehicleId" value="${selectedVehicle?.id || ''}" />
+      ${savedVehicleButtons}
+      ${field('vehicleType', 'Vehicle Type', 'select', selectedVehicle?.vehicleType || 'Car', vehicleTypes.map((item) => ({ value: item, label: item })))}
+      ${field('vehicleMake', 'Vehicle Make', 'text', selectedVehicle?.make || '')}
+      ${field('vehicleModel', 'Vehicle Name / Model', 'text', selectedVehicle?.model || selectedVehicle?.name || '')}
+      ${field('vehiclePlate', 'Number Plate', 'text', selectedVehicle?.plate || '')}
+      ${field('vehicleYear', 'Manufacture Year', 'number', selectedVehicle?.year || String(new Date().getFullYear()))}
+      ${field('fuelType', 'Fuel Type', 'select', selectedVehicle?.fuelType || 'Petrol', fuelTypes.map((item) => ({ value: item, label: item })))}
+      ${field('vehicleColor', 'Vehicle Color (optional)', 'text', selectedVehicle?.color || '', [], false)}
+      <div class="booking-vehicle-image full">
+        ${window.AutoCareImages.uploader({
+          name: 'vehicleFrontImage',
+          label: 'Vehicle Image (optional)',
+          folder: 'vehicles',
+          value: ''
+        })}
       </div>
     `;
   }
 
-  function bookingSlotPanel() {
-    return '<div class="full slot-panel" data-booking-slots><p>Select a service and date to view available time slots.</p></div>';
+  function bookingForm(record = {}) {
+    const selectedVehicle = state.vehicles.find((vehicle) => (
+      Number(vehicle.id) === Number(record.vehicleId)
+    )) || (!record.id ? state.vehicles[0] : null);
+    return `
+      <section class="booking-form-section full">
+        <header class="booking-form-section__header">
+          <span>1</span>
+          <div><h3>Service & Appointment</h3><p>Choose the service, date, and an available time slot.</p></div>
+        </header>
+        <div class="booking-form-section__grid">
+          ${field('service', 'Service Required', 'select', record.service || state.packages[0], state.packages.map((item) => ({ value: item, label: item })))}
+          ${field('date', 'Appointment Date', 'date', record.date || '')}
+          <input type="hidden" name="time" value="${record.time || ''}" required />
+          ${bookingSlotPanel()}
+        </div>
+      </section>
+      <section class="booking-form-section full">
+        <header class="booking-form-section__header">
+          <span>2</span>
+          <div><h3>Vehicle Details</h3><p>Add the vehicle information for this service appointment.</p></div>
+        </header>
+        <div class="booking-form-section__grid" data-booking-vehicle-details>
+          ${bookingVehicleFields(selectedVehicle)}
+        </div>
+      </section>
+    `;
   }
 
   function slotStatusText(slot) {
@@ -670,6 +846,8 @@ document.addEventListener('DOMContentLoaded', () => {
     els.modalBody.querySelectorAll('[data-slot-time]').forEach((button) => {
       button.classList.toggle('is-selected', button.dataset.slotTime === time);
     });
+    const selected = els.modalBody.querySelector('[data-selected-slot]');
+    if (selected) selected.textContent = time ? `Selected: ${time}` : 'Select an available time';
   }
 
   async function refreshBookingSlots() {
@@ -689,7 +867,7 @@ document.addEventListener('DOMContentLoaded', () => {
       panel.innerHTML = `
         <div class="slot-panel__header">
           <strong>Available time slots</strong>
-          <span>${dateInput.value}</span>
+          <span data-selected-slot>${timeInput.value ? `Selected: ${timeInput.value}` : dateInput.value}</span>
         </div>
         <div class="slot-grid">
           ${slots.map((slot) => `
@@ -710,23 +888,55 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  function toggleNewVehicleFields() {
-    const fields = els.modalBody.querySelector('[data-new-vehicle-fields]');
-    const vehicleSelect = els.modalBody.querySelector('select[name="vehicleId"]');
-    if (!fields || !vehicleSelect) return;
-
-    const isNewVehicle = vehicleSelect.value === 'new';
-    fields.hidden = !isNewVehicle;
-    fields.querySelectorAll('input').forEach((input) => {
-      input.required = isNewVehicle;
+  function selectBookingVehicle(vehicleId = null) {
+    const vehicle = state.vehicles.find((item) => Number(item.id) === Number(vehicleId));
+    const values = {
+      vehicleId: vehicle?.id || '',
+      vehicleType: vehicle?.vehicleType || 'Car',
+      vehicleMake: vehicle?.make || '',
+      vehicleModel: vehicle?.model || vehicle?.name || '',
+      vehiclePlate: vehicle?.plate || '',
+      vehicleYear: vehicle?.year || String(new Date().getFullYear()),
+      fuelType: vehicle?.fuelType || 'Petrol',
+      vehicleColor: vehicle?.color || ''
+    };
+    Object.entries(values).forEach(([name, value]) => {
+      const input = els.modalBody.querySelector(`[name="${name}"]`);
+      if (input) input.value = value;
     });
+    els.modalBody.querySelectorAll('[data-saved-vehicle-id]').forEach((button) => {
+      button.classList.toggle('is-selected', Number(button.dataset.savedVehicleId) === Number(vehicle?.id));
+    });
+    els.modalBody.querySelector('[data-use-new-booking-vehicle]')?.classList.toggle('is-selected', !vehicle);
+  }
+
+  function packagePaymentForm(plan) {
+    const bank = state.paymentBankDetails || {};
+    return `
+      <section class="package-payment-summary full">
+        <span>Package payment</span>
+        <h3>${escapeHtml(plan.name)}</h3>
+        <strong>${formatMoney(plan.price)}</strong>
+        <p>Transfer the exact amount to the account below, then upload your bank receipt. An administrator will verify it before activating your package.</p>
+      </section>
+      <section class="bank-details-card full" aria-label="Bank transfer details">
+        <div><span>Bank</span><strong>${escapeHtml(bank.bankName)}</strong></div>
+        <div><span>Account name</span><strong>${escapeHtml(bank.accountName)}</strong></div>
+        <div><span>Account number</span><strong>${escapeHtml(bank.accountNumber)}</strong></div>
+        <div><span>Branch</span><strong>${escapeHtml(bank.branch)}</strong></div>
+      </section>
+      ${window.AutoCareImages.uploader({
+        name: 'paymentProofReceipt',
+        label: 'Bank Payment Receipt',
+        folder: 'documents',
+        optional: false,
+        acceptPdf: true
+      })}
+      <p class="package-payment-note full">Accepted: JPG, PNG, WebP, or PDF up to 5 MB. No invoice is generated for this package request.</p>
+    `;
   }
 
   function openModal(mode, record = {}) {
-    const vehicleOptions = state.vehicles.map((vehicle) => ({ value: vehicle.id, label: `${displayVehicleName(vehicle)} - ${vehicle.plate}` }));
-    if (!record.id) {
-      vehicleOptions.push({ value: 'new', label: '+ Add New Vehicle' });
-    }
     const config = {
       vehicle: {
         title: record.id ? 'Edit Vehicle' : 'Add Vehicle',
@@ -741,11 +951,15 @@ document.addEventListener('DOMContentLoaded', () => {
       },
       booking: {
         title: record.id ? 'Reschedule Booking' : 'Book Service Appointment',
-        body: field('vehicleId', 'Vehicle', 'select', record.vehicleId || vehicleOptions[0]?.value, vehicleOptions) + field('service', 'Service', 'select', record.service || state.packages[0], state.packages.map((item) => ({ value: item, label: item }))) + field('date', 'Date', 'date', record.date || '') + field('time', 'Time', 'time', record.time || '') + bookingSlotPanel() + newVehicleFields()
+        body: bookingForm(record)
       },
       emergency: {
         title: 'Emergency Service Request',
         body: field('location', 'Share Location', 'text', record.location || '') + field('problem', 'Describe Vehicle Problem', 'textarea', record.problem || '')
+      },
+      packagePayment: {
+        title: `Pay For ${record.name}`,
+        body: packagePaymentForm(record)
       }
     };
 
@@ -754,8 +968,8 @@ document.addEventListener('DOMContentLoaded', () => {
     els.modalTitle.textContent = config[mode].title;
     els.modalBody.innerHTML = config[mode].body;
     window.AutoCareImages.enhance(els.modalBody);
-    toggleNewVehicleFields();
     if (mode === 'booking') refreshBookingSlots();
+    if (mode === 'packagePayment' && els.modalSubmit) els.modalSubmit.textContent = 'Submit Receipt';
     els.modal.showModal();
   }
 
@@ -775,9 +989,35 @@ document.addEventListener('DOMContentLoaded', () => {
     const data = Object.fromEntries(formData.entries());
     const mode = els.modalForm.dataset.mode;
     const id = Number(els.modalForm.dataset.id);
+    if (mode === 'booking' && !data.time) {
+      showToast('Select an available time slot before saving.', 'warning');
+      return;
+    }
     const imageTransaction = await window.AutoCareImages.collect(els.modalForm);
     Object.assign(data, imageTransaction.values);
     try {
+
+    if (mode === 'packagePayment') {
+      if (!data.paymentProofReceipt) {
+        throw new Error('Upload your bank payment receipt before submitting.');
+      }
+      const upload = imageTransaction.uploads[0] || {};
+      await window.AutoCareApi.request('/api/customer/package', {
+        method: 'PUT',
+        body: JSON.stringify({
+          pricingPlanId: id,
+          paymentMethod: 'Online',
+          paymentProofUrl: data.paymentProofReceipt,
+          paymentProofName: upload.fileName || 'Bank payment receipt'
+        })
+      });
+      await window.AutoCareImages.commit(imageTransaction);
+      els.modal.close();
+      resetModalActions();
+      await hydrateFromApi({ silent: true });
+      showToast('Receipt sent to the administrator for verification and package approval.');
+      return;
+    }
 
     if (mode === 'vehicle') {
       const payload = { ...data, name: data.name, make: data.make, model: data.model, plate: data.plate, year: data.year, image: data.frontImage };
@@ -790,26 +1030,35 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     if (mode === 'booking') {
-      let vehicleId = Number(data.vehicleId);
-      if (data.vehicleId === 'new') {
-        const vehicleParts = splitVehicleName(data.newVehicleName);
-        const savedVehicle = await window.AutoCareApi.request('/api/customer/vehicles', {
-          method: 'POST',
-          body: JSON.stringify({
-            name: data.newVehicleName,
-            make: vehicleParts.make,
-            model: vehicleParts.model,
-            plate: data.newVehiclePlate,
-            year: data.newVehicleYear,
-            frontImage: data.newVehicleFrontImage,
-            image: data.newVehicleFrontImage
-          })
-        });
+      const vehicleId = Number(data.vehicleId);
+      const vehiclePayload = {
+        name: `${data.vehicleMake} ${data.vehicleModel}`.trim(),
+        vehicleType: data.vehicleType,
+        make: data.vehicleMake,
+        model: data.vehicleModel,
+        plate: data.vehiclePlate,
+        year: data.vehicleYear,
+        fuelType: data.fuelType,
+        color: data.vehicleColor
+      };
+      if (data.vehicleFrontImage) {
+        vehiclePayload.frontImage = data.vehicleFrontImage;
+        vehiclePayload.image = data.vehicleFrontImage;
+      }
+      const savedVehicle = await window.AutoCareApi.request(
+        vehicleId ? `/api/customer/vehicles/${vehicleId}` : '/api/customer/vehicles',
+        {
+          method: vehicleId ? 'PUT' : 'POST',
+          body: JSON.stringify(vehiclePayload)
+        }
+      );
+      if (vehicleId) {
+        Object.assign(state.vehicles.find((item) => Number(item.id) === vehicleId), savedVehicle);
+      } else {
         state.vehicles.push(savedVehicle);
-        vehicleId = savedVehicle.id;
       }
 
-      const payload = { vehicleId, service: data.service, date: data.date, time: data.time };
+      const payload = { vehicleId: savedVehicle.id, service: data.service, date: data.date, time: data.time };
       const savedBooking = await window.AutoCareApi.request(id ? `/api/customer/bookings/${id}` : '/api/customer/bookings', {
         method: id ? 'PUT' : 'POST',
         body: JSON.stringify(payload)
@@ -830,7 +1079,9 @@ document.addEventListener('DOMContentLoaded', () => {
     els.modal.close();
     saveState();
     renderAll();
-    await hydrateFromApi({ silent: true });
+    await refreshNotifications().catch(() => {});
+    await refreshCustomerQueue().catch(() => {});
+    scheduleQueueRefresh();
     await window.AutoCareImages.commit(imageTransaction);
     } catch (error) {
       await window.AutoCareImages.rollback(imageTransaction);
@@ -906,6 +1157,29 @@ document.addEventListener('DOMContentLoaded', () => {
     if (action === 'new-booking') {
       openModal('booking');
     }
+    if (action === 'request-package-online') {
+      const plan = state.pricingPlans.find((item) => Number(item.id) === numericId);
+      if (plan) openModal('packagePayment', plan);
+    }
+    if (['request-free-package', 'request-package-cashier'].includes(action)) {
+      const plan = state.pricingPlans.find((item) => Number(item.id) === numericId);
+      if (!plan) return;
+      const paymentMethod = action === 'request-package-cashier' ? 'Cashier' : 'Free';
+      if (!await window.AutoCareApi.confirmAction({
+        title: `Request ${plan.name}?`,
+        message: Number(plan.price) <= 0
+          ? 'This free package will be sent to an administrator for approval.'
+          : `${formatMoney(plan.price)} will be paid at the cashier.`,
+        details: 'The package becomes active only after an administrator approves it.',
+        confirmLabel: 'Send Request'
+      })) return;
+      await window.AutoCareApi.request('/api/customer/package', {
+        method: 'PUT',
+        body: JSON.stringify({ pricingPlanId: numericId, paymentMethod })
+      });
+      await hydrateFromApi({ silent: true });
+      showToast('Package request sent for admin approval.');
+    }
     if (action === 'new-booking-for-vehicle') {
       const vehicle = state.vehicles.find((item) => item.id === numericId);
       if (!vehicle) return;
@@ -929,7 +1203,11 @@ document.addEventListener('DOMContentLoaded', () => {
       booking.queue = 0;
       saveState();
       renderAll();
-      await hydrateFromApi({ silent: true });
+      await Promise.all([
+        refreshNotifications().catch(() => {}),
+        refreshCustomerQueue().catch(() => {})
+      ]);
+      scheduleQueueRefresh();
       showToast('Booking cancelled. The queue has been updated.');
     }
     if (action === 'delete-booking') {
@@ -1011,9 +1289,6 @@ document.addEventListener('DOMContentLoaded', () => {
       handleModalSubmit(event).catch((error) => showToast(error.message || 'Save failed.'));
     });
     els.modalForm.addEventListener('change', (event) => {
-      if (event.target.name === 'vehicleId') {
-        toggleNewVehicleFields();
-      }
       if (event.target.type === 'file') {
         renderFilePreview(event.target.name, event.target.files?.[0]);
       }
@@ -1026,6 +1301,15 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
     els.modalForm.addEventListener('click', (event) => {
+      const savedVehicleButton = event.target.closest('[data-saved-vehicle-id]');
+      if (savedVehicleButton) {
+        selectBookingVehicle(savedVehicleButton.dataset.savedVehicleId);
+        return;
+      }
+      if (event.target.closest('[data-use-new-booking-vehicle]')) {
+        selectBookingVehicle();
+        return;
+      }
       const slotButton = event.target.closest('[data-slot-time]');
       if (!slotButton) return;
       const timeInput = els.modalBody.querySelector('[name="time"]');
@@ -1069,7 +1353,7 @@ document.addEventListener('DOMContentLoaded', () => {
           body: JSON.stringify(data)
         });
         event.currentTarget.reset();
-        await hydrateFromApi({ silent: true });
+        await refreshNotifications().catch(() => {});
         showToast('Thank you for your feedback.');
       } catch (error) {
         showToast(error.message || 'Feedback was not submitted.');
@@ -1121,14 +1405,13 @@ document.addEventListener('DOMContentLoaded', () => {
   if (pendingBooking) {
     window.setTimeout(() => openPendingBooking(), 300);
   }
-  hydrateFromApi();
+  hydrateFromApi().finally(scheduleQueueRefresh);
   startNotificationRefresh();
-  window.setInterval(async () => {
+  document.addEventListener('visibilitychange', () => {
     if (document.hidden) return;
-    try {
-      const queueData = await window.AutoCareApi.request('/api/customer/queue');
-      state.queueEntries = Array.isArray(queueData.entries) ? queueData.entries : [];
-      renderCustomerQueue();
-    } catch (error) { /* Keep the last known queue state during temporary outages. */ }
-  }, 60000);
+    Promise.all([
+      refreshNotifications().catch(() => {}),
+      refreshCustomerQueue().catch(() => {})
+    ]).finally(scheduleQueueRefresh);
+  });
 });

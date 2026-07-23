@@ -35,8 +35,13 @@ while Supabase Storage stores uploaded images and documents.
 
 - Secure customer registration and role-based login
 - Customer profile management
+- Service-package selection with a persistent current package and applied benefits
+- Free-package approval requests and receipt-based paid package approvals
+- Bank-transfer receipt upload or cashier payment selection for paid packages
 - Vehicle registration and management
-- Service appointment booking and rescheduling
+- Service-first appointment booking with time-slot selection
+- Structured vehicle details including type, make, model, plate, year, fuel, color, and optional image
+- Appointment rescheduling
 - Available booking-slot lookup
 - Booking cancellation
 - Live queue position and estimated waiting time
@@ -51,7 +56,7 @@ while Supabase Storage stores uploaded images and documents.
 - Operational dashboard and statistics
 - Customer, vehicle, and technician management
 - Service and pricing-plan management
-- Booking approval, editing, rescheduling, and cancellation
+- Booking approval with immediate technician-assignment popup, editing, rescheduling, and cancellation
 - Service-job creation and technician assignment
 - Appointment, walk-in, and emergency queue handling
 - Service-bay management
@@ -355,6 +360,7 @@ request and response fields.
 ### Customer API
 
 - Dashboard and live queue
+- Current package selection and applied package benefits
 - Notification reading
 - Vehicle creation, update, and deletion
 - Booking-slot lookup
@@ -367,6 +373,7 @@ request and response fields.
 
 - Dashboard and live queue operations
 - Customer, technician, vehicle, service, and pricing management
+- Package-payment verification, approval, and rejection
 - Booking and service-job management
 - Technician assignment
 - Inventory items and suppliers
@@ -398,22 +405,31 @@ request and response fields.
 Important Firestore collections include:
 
 - `users`
+- `technicians`
 - `vehicles`
 - `servicePackages`
+- `pricingPlans`
+- `customerPackages`
+- `customerPackageRequests`
 - `bookings`
 - `serviceJobs`
-- `technicians`
+- `technicianNotes`
+- `technicianProgress`
+- `serviceJobParts`
+- `replacedParts`
 - `notifications`
 - `notificationDrafts`
 - `invoices`
 - `emergencyRequests`
 - `feedback`
+- `newsletterSubscriptions`
+- `inventoryCategories`
 - `inventoryParts`
 - `inventorySuppliers`
 - `inventoryMovements`
-- `serviceJobParts`
 - `servicePhotos`
 - `documents`
+- `uploadAuditLogs`
 - `queueEntries`
 - `serviceBays`
 - `appSettings`
@@ -444,6 +460,38 @@ npm run audit:browser
 ```
 
 The connection test expects valid active accounts for all three roles.
+
+Create the complete demonstration dataset once, or verify it without writing:
+
+```powershell
+npm run firebase:seed-system
+npm run firebase:check-system
+npm run firebase:seed-reviews
+npm run firebase:check-reviews
+npm run firebase:seed-customer-packages
+npm run firebase:check-customer-packages
+```
+
+The comprehensive seed creates ten representative records for each operational
+area. This includes bookings, jobs, queue entries, invoices, reviews,
+emergencies, notifications, inventory activity, technician updates, and
+replaced parts. It deliberately does not create or upload images, service
+photos, documents, or upload audit records.
+
+The review seed ensures every active service has at least three linked customer
+reviews. The public **Our Services** cards display each service's average
+rating, total review count, and two recent customer comments.
+
+The customer-package seed assigns one active pricing plan to every active
+customer that does not already have one. Existing choices are preserved.
+
+Package activation uses an approval workflow. Free packages wait directly for
+administrator approval. Online package payments show the configured bank
+details and require a JPG, PNG, WebP, or PDF receipt upload; no package invoice
+is generated. Cashier payments are confirmed directly by an administrator.
+The administrator reviews the receipt or confirms cashier payment before
+activating the package benefits. Payment bank details are managed from the
+administrator dashboard under **System Settings**.
 
 ## Troubleshooting
 
@@ -479,6 +527,24 @@ A healthy response resembles:
   "database": "firebase-firestore"
 }
 ```
+
+### Firestore read optimization
+
+The server uses short, in-memory caches for public landing-page projections and
+stable reference collections. Relevant create, update, and delete operations
+invalidate those entries immediately, so normal administrator changes do not
+wait for the time-to-live value. Cache durations can be tuned with the
+`*_CACHE_MS` variables in `.env.example`.
+
+The customer dashboard refreshes queue data every minute only while the
+customer has an active queue entry. When no entry is active, it refreshes every
+five minutes, pauses while the tab is hidden, and refreshes immediately when
+the tab becomes visible. Common booking and vehicle actions update local state
+and fetch only queue/notification changes instead of reloading the full
+dashboard.
+
+An administrator can inspect cache hits, misses, invalidations, and active
+entries at `GET /api/admin/firestore-read-cache`.
 
 ### Login says the email, password, or role is invalid
 

@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="css/customer-dashboard.css?v=right-toast-1" />
+  <link rel="stylesheet" href="css/customer-dashboard.css?v=package-receipt-1" />
   <link rel="stylesheet" href="css/responsive.css?v=mobile-1" />
   <link rel="stylesheet" href="css/dashboard-refresh.css?v=save-popup-1" />
   <link rel="stylesheet" href="css/image-management.css?v=1" />
@@ -26,6 +26,7 @@
       <nav class="side-nav" aria-label="Customer navigation">
         <button class="side-nav__item is-active" type="button" data-view="overview"><span data-icon="dashboard"></span>Dashboard</button>
         <button class="side-nav__item" type="button" data-view="bookings"><span data-icon="calendar"></span>My Bookings</button>
+        <button class="side-nav__item" type="button" data-view="packages"><span data-icon="package"></span>My Package</button>
         <button class="side-nav__item" type="button" data-view="vehicles"><span data-icon="car"></span>My Vehicles</button>
         <button class="side-nav__item" type="button" data-view="history"><span data-icon="tools"></span>Service History</button>
         <button class="side-nav__item" type="button" data-view="parts"><span data-icon="invoice"></span>Parts Used</button>
@@ -76,6 +77,7 @@
             <article class="panel quick-actions">
               <div class="panel__header"><h2>Quick Actions</h2></div>
               <button type="button" data-action="new-booking"><span data-icon="calendar"></span><strong>Book New Service</strong><small>Schedule your next service</small></button>
+              <button type="button" data-view-shortcut="packages"><span data-icon="package"></span><strong>My Package</strong><small>View and manage package benefits</small></button>
               <button type="button" data-action="new-emergency"><span data-icon="alert"></span><strong>Emergency Request</strong><small>Breakdown assistance</small></button>
               <button type="button" data-view-shortcut="history"><span data-icon="tools"></span><strong>Track Your Service</strong><small>Check service stages</small></button>
               <button type="button" data-view-shortcut="billing"><span data-icon="invoice"></span><strong>Download Invoice</strong><small>Receipts and payment history</small></button>
@@ -117,6 +119,22 @@
               <button class="btn btn--blue" type="button" data-action="new-booking">Book Appointment</button>
             </div>
             <div class="table-wrap"><table><thead><tr><th>Service</th><th>Vehicle</th><th>Date & Time</th><th>Status</th><th>Queue</th><th>Actions</th></tr></thead><tbody id="booking-body"></tbody></table></div>
+          </div>
+        </section>
+
+        <section class="view" data-view-panel="packages">
+          <div class="panel">
+            <div class="panel__header">
+              <div><h2>My Current Package</h2><p>Your active package and the benefits currently applied to your account.</p></div>
+            </div>
+            <div id="current-package"></div>
+          </div>
+
+          <div class="panel">
+            <div class="panel__header">
+              <div><h2>Available Packages</h2><p>Select a package to activate its service benefits for your account.</p></div>
+            </div>
+            <div class="customer-package-grid" id="customer-package-grid"></div>
           </div>
         </section>
 
@@ -237,6 +255,6 @@
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
   <script src="js/api.js?v=save-popup-1"></script>
   <script src="js/image-management.js?v=1"></script>
-  <script src="js/customer-dashboard.js?v=save-popup-1"></script>
+  <script src="js/customer-dashboard.js?v=package-receipt-1"></script>
 </body>
 </html>

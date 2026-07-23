@@ -39,7 +39,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const summary = service.reviewCount
           ? `<strong>${service.averageRating.toFixed(1)}</strong> (${service.reviewCount} ${reviewLabel})`
           : 'No reviews yet';
-        return `<article data-service-card="${escapeHtml(service.name)}"><img src="${escapeHtml(service.image)}" alt="${escapeHtml(service.name)}" /><strong>${escapeHtml(service.name)}</strong><span>LKR ${Number(service.price).toLocaleString('en-LK')}</span><small>${escapeHtml(service.duration)}</small><p>${escapeHtml(service.description)}</p><div class="service-rating" data-service-rating aria-label="${service.reviewCount ? `${service.averageRating} out of 5 stars from ${service.reviewCount} reviews` : 'No customer reviews yet'}"><div class="stars" aria-hidden="true" style="--rating-fill:${Math.max(0, Math.min(100, service.averageRating * 20))}%"><span>★★★★★</span><span class="stars__fill">★★★★★</span></div><small>${summary}</small></div></article>`;
+        const reviewComments = (service.recentReviews || []).map((review) => (
+          `<blockquote class="service-review"><p>“${escapeHtml(review.comment)}”</p><footer>${escapeHtml(review.customerName)} · ${Number(review.rating)} / 5</footer></blockquote>`
+        )).join('');
+        return `<article data-service-card="${escapeHtml(service.name)}"><img src="${escapeHtml(service.image)}" alt="${escapeHtml(service.name)}" /><strong>${escapeHtml(service.name)}</strong><span>LKR ${Number(service.price).toLocaleString('en-LK')}</span><small>${escapeHtml(service.duration)}</small><p>${escapeHtml(service.description)}</p><div class="service-rating" data-service-rating aria-label="${service.reviewCount ? `${service.averageRating} out of 5 stars from ${service.reviewCount} reviews` : 'No customer reviews yet'}"><div class="stars" aria-hidden="true" style="--rating-fill:${Math.max(0, Math.min(100, service.averageRating * 20))}%"><span>★★★★★</span><span class="stars__fill">★★★★★</span></div><small>${summary}</small></div><div class="service-reviews" aria-label="Recent customer comments">${reviewComments}</div></article>`;
       }).join('') : '<p>No active services are currently available.</p>';
 
       const reviewSummary = document.getElementById('review-summary');

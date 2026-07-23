@@ -11,7 +11,7 @@ The running application stores the module in Firestore through the Express repos
 - `technicianProgress`
 - `serviceJobParts`
 - `inventoryParts`
-- `serviceImages`
+- `servicePhotos`
 - `notifications`
 
 Firestore does not enforce foreign keys natively. The API layer enforces ownership, assignment, stock, duplicate-job, duplicate-assignment, completion, and billing rules before each write.
@@ -34,15 +34,15 @@ erDiagram
   SERVICE_JOBS ||--o{ SERVICE_JOB_PARTS : "service_job_id"
   INVENTORY_PARTS ||--o{ SERVICE_JOB_PARTS : "part_id"
   TECHNICIANS ||--o{ SERVICE_JOB_PARTS : "used_by_technician"
-  SERVICE_JOBS ||--o{ SERVICE_IMAGES : "service_job_id"
-  TECHNICIANS ||--o{ SERVICE_IMAGES : "technician_id"
+  SERVICE_JOBS ||--o{ SERVICE_PHOTOS : "service_job_id"
+  TECHNICIANS ||--o{ SERVICE_PHOTOS : "technician_id"
 ```
 
-## Migration Order
+## Firestore Setup Order
 
-1. `database/schema.sql`
-2. `database/technician-module.sql`
-3. Seed technician users, technician profiles, inventory parts, and initial service jobs.
+1. Run `npm run firebase:provision`.
+2. Run `npm run firebase:seed-system`.
+3. Run `npm run firebase:check-system`.
 
 ## Workflow
 

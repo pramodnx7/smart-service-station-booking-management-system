@@ -37,6 +37,7 @@ document.addEventListener('DOMContentLoaded', () => {
     bookings: [],
     packages: [],
     pricingPlans: [],
+    packageRequests: [],
     invoices: [],
     emergencies: [],
     notifications: [],
@@ -1009,6 +1010,31 @@ document.addEventListener('DOMContentLoaded', () => {
     `).join('');
   }
 
+  function renderPackageApprovals() {
+    const body = document.getElementById('package-approvals-body');
+    if (!body) return;
+    body.innerHTML = state.packageRequests?.length ? state.packageRequests.map((request) => {
+      const receiptReady = request.paymentMethod === 'Online'
+        && Boolean(request.paymentProofUrl)
+        && ['Pending Verification', 'Paid'].includes(request.paymentStatus);
+      const paymentReady = Number(request.price) <= 0 || request.paymentStatus === 'Paid' || receiptReady;
+      return `
+        <tr>
+          <td><span class="row-title">#PKG-${request.id}</span><span class="row-sub">${request.requestedAt || '-'}</span></td>
+          <td>${escapeHtml(request.customerName || customerName(request.customerId))}</td>
+          <td><span class="row-title">${escapeHtml(request.packageName)}</span><span class="row-sub">${formatMoney(request.price)}</span></td>
+          <td><span class="badge badge--${paymentReady ? 'completed' : 'pending'}">${escapeHtml(request.paymentStatus)}</span><span class="row-sub">${escapeHtml(request.paymentMethod)}</span></td>
+          <td><span class="badge badge--${request.status === 'Approved' ? 'completed' : request.status === 'Rejected' ? 'cancelled' : 'pending'}">${escapeHtml(request.status)}</span></td>
+          <td><div class="row-actions">
+            ${request.paymentProofUrl ? `<a class="mini-btn" href="${escapeHtml(request.paymentProofUrl)}" target="_blank" rel="noopener">View Receipt</a>` : ''}
+            ${request.paymentMethod === 'Cashier' && request.paymentStatus !== 'Paid' && !['Approved', 'Rejected'].includes(request.status) ? `<button class="mini-btn" type="button" data-action="confirm-cashier-package-payment" data-id="${request.id}">Confirm Cashier Payment</button>` : ''}
+            ${!['Approved', 'Rejected'].includes(request.status) ? `<button class="mini-btn" type="button" data-action="approve-package-request" data-id="${request.id}" ${paymentReady ? '' : 'disabled'}>Approve</button><button class="mini-btn mini-btn--red" type="button" data-action="reject-package-request" data-id="${request.id}">Reject</button>` : ''}
+          </div></td>
+        </tr>
+      `;
+    }).join('') : '<tr><td colspan="6" class="table-empty">No package requests yet.</td></tr>';
+  }
+
   function renderLandingStats() {
     document.querySelectorAll('[data-landing-stat]').forEach((form) => {
       const value = state.landingStats?.[form.dataset.landingStat];
@@ -1047,12 +1073,20 @@ document.addEventListener('DOMContentLoaded', () => {
     renderDocuments();
     renderPackages();
     renderPricingPlans();
+    renderPackageApprovals();
     renderBilling();
     renderEmergency();
     renderNotifications();
     renderFeedback();
     renderLandingStats();
     renderLandingContentAdmin();
+    const settingsForm = document.getElementById('settings-form');
+    if (settingsForm && state.companySettings) {
+      settingsForm.elements.bankName.value = state.companySettings.bankName || '';
+      settingsForm.elements.bankAccountName.value = state.companySettings.bankAccountName || '';
+      settingsForm.elements.bankAccountNumber.value = state.companySettings.bankAccountNumber || '';
+      settingsForm.elements.bankBranch.value = state.companySettings.bankBranch || '';
+    }
     const companyContainer = document.getElementById('company-image-settings');
     if (companyContainer && state.companySettings && !companyContainer.dataset.ready) {
       companyContainer.dataset.ready = 'true';
@@ -1158,6 +1192,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const technicianSpecializations = state.packages.map((service) => service.name);
     const supplierOptions = (state.inventorySuppliers || []).map((supplier) => ({ value: supplier.id, label: supplier.name }));
     const paymentOptions = ['Unpaid', 'Paid'].map((payment) => ({ value: payment, label: payment }));
+    const approvedBookingAssignment = technicianOptions.length
+      ? field('technicianId', 'Assign Active Technician', 'select', technicianOptions[0]?.value, technicianOptions)
+        + field('priority', 'Job Priority', 'select', 'Normal', ['Low', 'Normal', 'High', 'Urgent'].map((priority) => ({ value: priority, label: priority })))
+        + field('expectedCompletionDate', 'Expected Completion', 'date', record.date || new Date().toISOString().slice(0, 10))
+      : '<div class="assignment-prompt__empty full"><strong>No active technicians are available.</strong><p>You can approve this booking now and assign a technician later from Service Jobs.</p></div>';
     const config = {
       customer: {
         title: record.id ? 'Edit Customer' : 'Register Customer',
@@ -1182,6 +1221,18 @@ document.addEventListener('DOMContentLoaded', () => {
       assignTechnician: {
         title: 'Assign Technician',
         body: field('technicianId', 'Technician', 'select', record.assignedTechnicianId || technicianOptions[0]?.value, technicianOptions)
+      },
+      assignApprovedBooking: {
+        title: `Assign Technician To Booking #BK-${record.id}`,
+        body: `
+          <div class="assignment-prompt full">
+            <span>Booking approved successfully</span>
+            <h3>${escapeHtml(record.service)}</h3>
+            <p>${escapeHtml(record.customerName || customerName(record.customerId))} · ${escapeHtml(record.vehicleName || vehicleName(record.vehicleId))}</p>
+            <small>${escapeHtml(record.date)} at ${escapeHtml(record.time)}</small>
+          </div>
+          ${approvedBookingAssignment}
+        `
       },
       inventoryItem: {
         title: record.id ? 'Edit Inventory Item' : 'Add Inventory Item',
@@ -1224,6 +1275,12 @@ document.addEventListener('DOMContentLoaded', () => {
       <button class="btn btn--blue" type="submit" id="modal-submit">${mode === 'notification' ? 'Send' : 'Save'}</button>
     `;
     selectors.modalSubmit = document.getElementById('modal-submit');
+    if (mode === 'assignApprovedBooking') {
+      selectors.modalKicker.textContent = 'Booking Approved';
+      selectors.modalActions.querySelector('[data-action="close-modal"]').textContent = 'Assign Later';
+      selectors.modalSubmit.textContent = 'Assign Technician';
+      selectors.modalSubmit.disabled = technicianOptions.length === 0;
+    }
     selectors.modalActions.hidden = false;
     selectors.modal.showModal();
   }
@@ -1357,6 +1414,22 @@ document.addEventListener('DOMContentLoaded', () => {
       Object.assign(state.serviceJobs.find((item) => item.id === id), savedJob);
     }
 
+    if (mode === 'assignApprovedBooking') {
+      const savedJob = await window.AutoCareApi.request(`/api/admin/bookings/${id}/assign-technician`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          technicianId: Number(data.technicianId),
+          priority: data.priority,
+          expectedCompletionDate: data.expectedCompletionDate
+        })
+      });
+      const existingJob = state.serviceJobs.find((item) => Number(item.id) === Number(savedJob.id));
+      existingJob ? Object.assign(existingJob, savedJob) : state.serviceJobs.push(savedJob);
+      const booking = state.bookings.find((item) => Number(item.id) === id);
+      if (booking) booking.assignedTechnicianId = Number(data.technicianId);
+      successMessage = `${technicianName(data.technicianId)} assigned to booking #BK-${id}.`;
+    }
+
     if (mode === 'inventoryItem') {
       const supplier = (state.inventorySuppliers || []).find((item) => Number(item.id) === Number(data.supplierId));
       const payload = {
@@ -1440,12 +1513,18 @@ document.addEventListener('DOMContentLoaded', () => {
     const flow = ['Pending', 'Approved', 'In Progress', 'Completed'];
     const booking = state.bookings.find((item) => item.id === Number(id));
     if (!booking || booking.status === 'Cancelled') return;
+    const previousStatus = booking.status;
     await window.AutoCareApi.request(`/api/admin/bookings/${id}/status`, { method: 'PUT' });
     const next = flow[Math.min(flow.indexOf(booking.status) + 1, flow.length - 1)];
     booking.status = next;
     booking.progress = next === 'Approved' ? 35 : next === 'In Progress' ? 70 : next === 'Completed' ? 100 : booking.progress;
     saveState();
     renderAll();
+    if (previousStatus === 'Pending' && next === 'Approved') {
+      showToast(`Booking #BK-${id} approved. Assign a technician now or choose Assign Later.`);
+      openModal('assignApprovedBooking', booking);
+      return;
+    }
     showToast(`Booking moved to ${next}.`);
   }
 
@@ -1673,10 +1752,41 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     if (action === 'mark-paid') {
       await window.AutoCareApi.request(`/api/admin/invoices/${numericId}/pay`, { method: 'PUT' });
-      state.invoices.find((item) => item.id === numericId).payment = 'Paid';
-      saveState();
-      renderAll();
+      await hydrateFromApi();
       showToast('Payment marked as paid.');
+    }
+    if (action === 'confirm-cashier-package-payment') {
+      const request = state.packageRequests.find((item) => item.id === numericId);
+      if (!request || !await window.AutoCareApi.confirmAction({
+        title: 'Confirm Cashier Payment?',
+        message: `Confirm that ${request.customerName} paid ${formatMoney(request.price)} for ${request.packageName} at the cashier?`,
+        details: 'The package can be approved immediately after the payment is recorded.',
+        confirmLabel: 'Confirm Payment'
+      })) return;
+      await window.AutoCareApi.request(`/api/admin/package-requests/${numericId}/confirm-cashier-payment`, { method: 'PUT' });
+      await hydrateFromApi();
+      showToast('Cashier payment confirmed. The package is ready for approval.');
+    }
+    if (action === 'approve-package-request') {
+      const request = state.packageRequests.find((item) => item.id === numericId);
+      if (!request || !await window.AutoCareApi.confirmAction({
+        title: `Approve ${request.packageName}?`,
+        message: `Activate this package for ${request.customerName}?`,
+        details: 'The package benefits will become active immediately.', confirmLabel: 'Approve Package'
+      })) return;
+      await window.AutoCareApi.request(`/api/admin/package-requests/${numericId}/approve`, { method: 'PUT' });
+      await hydrateFromApi();
+      showToast('Customer package approved and activated.');
+    }
+    if (action === 'reject-package-request') {
+      const reason = window.prompt('Reason for rejecting this package request:');
+      if (!reason?.trim()) return;
+      await window.AutoCareApi.request(`/api/admin/package-requests/${numericId}/reject`, {
+        method: 'PUT',
+        body: JSON.stringify({ reason: reason.trim() })
+      });
+      await hydrateFromApi();
+      showToast('Package request rejected.');
     }
     if (action === 'download-invoice-pdf') await downloadInvoicePdf(numericId);
     if (action === 'download-sales-report') {
@@ -1904,7 +2014,13 @@ document.addEventListener('DOMContentLoaded', () => {
         state.profile = result.user;
         state.companySettings = await window.AutoCareApi.request('/api/admin/company-settings', {
           method: 'PUT',
-          body: JSON.stringify(imageTransaction.values)
+          body: JSON.stringify({
+            ...imageTransaction.values,
+            bankName: form.elements.bankName.value,
+            bankAccountName: form.elements.bankAccountName.value,
+            bankAccountNumber: form.elements.bankAccountNumber.value,
+            bankBranch: form.elements.bankBranch.value
+          })
         });
         await window.AutoCareImages.commit(imageTransaction);
         localStorage.setItem(sessionKey, JSON.stringify({ ...getSession(), ...result.user, authenticated: true }));

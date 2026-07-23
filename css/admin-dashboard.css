@@ -1368,6 +1368,51 @@ td {
   grid-column: 1 / -1;
 }
 
+.assignment-prompt,
+.assignment-prompt__empty {
+  grid-column: 1 / -1;
+  padding: 20px;
+  border-radius: 10px;
+}
+
+.assignment-prompt {
+  color: #fff;
+  background: linear-gradient(135deg, #081f43, #205ac2);
+}
+
+.assignment-prompt > span {
+  color: #a9c7ff;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+
+.assignment-prompt h3 {
+  margin: 10px 0 7px;
+  font-size: 24px;
+}
+
+.assignment-prompt p {
+  margin: 0 0 8px;
+  color: rgba(255, 255, 255, .78);
+}
+
+.assignment-prompt small {
+  color: var(--yellow);
+  font-weight: 800;
+}
+
+.assignment-prompt__empty {
+  color: #7f4b00;
+  background: #fff6df;
+  border: 1px solid #f4d58b;
+}
+
+.assignment-prompt__empty p {
+  margin: 7px 0 0;
+}
+
 .landing-stats-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));

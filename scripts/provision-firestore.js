@@ -19,6 +19,7 @@ const counterCollections = [
   'vehicles',
   'servicePackages',
   'pricingPlans',
+  'customerPackageRequests',
   'bookings',
   'invoices',
   'emergencyRequests',

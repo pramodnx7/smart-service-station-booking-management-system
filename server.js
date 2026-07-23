@@ -444,7 +444,13 @@ app.delete('/api/images', requireAuth(), async (req, res, next) => {
 });
 
 function pricingPlanPayload(body) {
-  requireFields(body, ['name', 'badge', 'price', 'image', 'buttonText']);
+  requireFields(body, ['name', 'badge', 'image', 'buttonText']);
+  const price = Number(body.price);
+  if (!Number.isFinite(price) || price < 0) {
+    const error = new Error('Plan price must be zero or a positive number.');
+    error.status = 400;
+    throw error;
+  }
   const image = landingImage(body.image, 'Plan image');
   const features = Array.isArray(body.features) ? body.features : String(body.features || '').split(/\r?\n/);
   const cleanedFeatures = features.map((item) => String(item).trim()).filter(Boolean).slice(0, 10);
@@ -453,7 +459,7 @@ function pricingPlanPayload(body) {
     error.status = 400;
     throw error;
   }
-  return { ...body, image, features: cleanedFeatures, featured: body.featured === true, active: body.active !== false };
+  return { ...body, price, image, features: cleanedFeatures, featured: body.featured === true, active: body.active !== false };
 }
 
 function servicePayload(body) {
@@ -575,6 +581,30 @@ app.get('/api/customer/dashboard', requireAuth('customer'), async (req, res, nex
   }
 });
 
+app.put('/api/customer/package', requireAuth('customer'), async (req, res, next) => {
+  try {
+    requireFields(req.body, ['pricingPlanId']);
+    const paymentMethod = String(req.body.paymentMethod || '');
+    const paymentProofUrl = String(req.body.paymentProofUrl || '').trim();
+    if (paymentMethod.toLowerCase() === 'online') {
+      const storagePath = imageStorage.pathFromPublicUrl(paymentProofUrl);
+      if (!storagePath.startsWith('documents/')) {
+        const error = new Error('Upload a valid bank payment receipt.');
+        error.status = 400;
+        throw error;
+      }
+    }
+    res.status(201).json(await store.requestCustomerPackage(
+      req.user.id,
+      req.body.pricingPlanId,
+      paymentMethod,
+      { url: paymentProofUrl, name: req.body.paymentProofName }
+    ));
+  } catch (error) {
+    next(error);
+  }
+});
+
 app.get('/api/customer/queue', requireAuth('customer'), async (req, res, next) => {
   try { res.json({ entries: await withDatabaseTimeout(queueStore.getCustomerQueue(req.user.id)) }); } catch (error) { next(error); }
 });
@@ -611,6 +641,10 @@ app.get('/api/admin/dashboard', requireAuth('admin'), async (req, res, next) => 
   } catch (error) {
     next(error);
   }
+});
+
+app.get('/api/admin/firestore-read-cache', requireAuth('admin'), (req, res) => {
+  res.json(store.getFirestoreReadCacheStats());
 });
 
 app.get('/api/admin/queue', requireAuth('admin'), async (req, res, next) => {
@@ -1034,6 +1068,17 @@ app.put('/api/admin/bookings/:id/status', requireAuth('admin'), async (req, res,
     const booking = await store.advanceBooking(req.params.id);
     if (!booking) return res.status(404).json({ message: 'Booking not found.' });
     res.json(booking);
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.put('/api/admin/bookings/:id/assign-technician', requireAuth('admin'), async (req, res, next) => {
+  try {
+    requireFields(req.body, ['technicianId']);
+    const job = await store.assignBookingTechnician(req.params.id, req.body.technicianId, req.body);
+    queueStore.invalidateReferenceData('serviceJobs');
+    res.json(job);
   } catch (error) {
     next(error);
   }
@@ -1539,9 +1584,34 @@ app.post('/api/admin/invoices', requireAuth('admin'), async (req, res, next) => 
 
 app.put('/api/admin/invoices/:id/pay', requireAuth('admin'), async (req, res, next) => {
   try {
-    const invoice = await store.updateDocument(store.collections.invoices, req.params.id, { paymentStatus: 'Paid' });
+    const invoice = await store.markInvoicePaid(req.params.id, req.user.id);
     if (!invoice) return res.status(404).json({ message: 'Invoice not found.' });
     res.json({ ok: true });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.put('/api/admin/package-requests/:id/approve', requireAuth('admin'), async (req, res, next) => {
+  try {
+    res.json(await store.reviewCustomerPackageRequest(req.user.id, req.params.id, 'Approve'));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.put('/api/admin/package-requests/:id/confirm-cashier-payment', requireAuth('admin'), async (req, res, next) => {
+  try {
+    res.json(await store.confirmCustomerPackageCashierPayment(req.user.id, req.params.id));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.put('/api/admin/package-requests/:id/reject', requireAuth('admin'), async (req, res, next) => {
+  try {
+    requireFields(req.body, ['reason']);
+    res.json(await store.reviewCustomerPackageRequest(req.user.id, req.params.id, 'Reject', req.body.reason));
   } catch (error) {
     next(error);
   }
