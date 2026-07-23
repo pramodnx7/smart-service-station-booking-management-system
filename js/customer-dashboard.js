@@ -140,9 +140,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
   async function refreshCustomerQueue() {
     if (document.hidden) return;
-    const queueData = await window.AutoCareApi.request('/api/customer/queue');
+    const [queueData, progressData] = await Promise.all([
+      window.AutoCareApi.request('/api/customer/queue'),
+      window.AutoCareApi.request('/api/customer/bookings/progress')
+    ]);
     state.queueEntries = Array.isArray(queueData.entries) ? queueData.entries : [];
+    (progressData.bookings || []).forEach((update) => {
+      const booking = state.bookings.find((item) => Number(item.id) === Number(update.id));
+      if (booking) Object.assign(booking, update);
+    });
     renderCustomerQueue();
+    renderMetrics();
+    renderUpcoming();
+    renderTables();
+    renderProgress();
   }
 
   function scheduleQueueRefresh() {
@@ -205,18 +216,24 @@ document.addEventListener('DOMContentLoaded', () => {
   function showToast(message, type = toastType(message)) {
     window.clearTimeout(els.toast.hideTimer);
     const icon = document.createElement('span');
+    const content = document.createElement('div');
+    const title = document.createElement('strong');
     const text = document.createElement('span');
     const close = document.createElement('button');
     icon.className = 'toast__icon';
-    icon.textContent = type === 'error' ? '!' : type === 'warning' ? '!' : '✓';
+    icon.textContent = 'i';
+    content.className = 'toast__content';
+    title.className = 'toast__title';
+    title.textContent = 'Notification';
     text.className = 'toast__message';
     text.textContent = message;
+    content.append(title, text);
     close.className = 'toast__close';
     close.type = 'button';
     close.setAttribute('aria-label', 'Close notification');
     close.textContent = '×';
     close.addEventListener('click', () => els.toast.classList.remove('is-visible'));
-    els.toast.replaceChildren(icon, text, close);
+    els.toast.replaceChildren(icon, content, close);
     els.toast.className = `toast toast--${type} is-visible`;
     els.toast.hideTimer = window.setTimeout(() => els.toast.classList.remove('is-visible'), 3600);
   }
@@ -225,8 +242,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const profileInitials = initials(state.profile.name);
     document.getElementById('profile-initials').textContent = profileInitials;
     document.getElementById('customer-avatar-initials').textContent = profileInitials;
-    window.AutoCareApi.displayAvatar(state.profile.avatar, document.getElementById('profile-image'), document.getElementById('profile-initials'));
-    window.AutoCareApi.displayAvatar(state.profile.avatar, document.getElementById('customer-avatar-preview'), document.getElementById('customer-avatar-initials'));
+    displayCustomerAvatar(state.profile.avatar || state.profile.profileImage || '');
     document.getElementById('profile-name').textContent = state.profile.name;
     document.getElementById('profile-email').textContent = state.profile.email;
     document.getElementById('customer-sidebar-name').textContent = state.profile.name;
@@ -241,6 +257,22 @@ document.addEventListener('DOMContentLoaded', () => {
       });
       window.AutoCareImages.enhance(profileUploader);
     }
+  }
+
+  function displayCustomerAvatar(avatar) {
+    window.AutoCareApi.displayAvatar(avatar, document.getElementById('profile-image'), document.getElementById('profile-initials'));
+    window.AutoCareApi.displayAvatar(avatar, document.getElementById('customer-avatar-preview'), document.getElementById('customer-avatar-initials'));
+  }
+
+  function previewCustomerAvatar(file) {
+    if (!file) {
+      displayCustomerAvatar(state.profile.avatar || state.profile.profileImage || '');
+      return;
+    }
+    const reader = new FileReader();
+    reader.addEventListener('load', () => displayCustomerAvatar(String(reader.result || '')));
+    reader.addEventListener('error', () => showToast('The selected profile image could not be previewed.'));
+    reader.readAsDataURL(file);
   }
 
   function renderMetrics() {
@@ -267,12 +299,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function renderUpcoming() {
     const booking = state.bookings.find((item) => item.status !== 'Completed' && item.status !== 'Cancelled') || state.bookings[0];
+    const actions = booking ? bookingActionButtons(booking, false) : '';
     document.getElementById('upcoming-booking').innerHTML = booking ? `
       <h3>${booking.service}</h3>
       <p>${vehicleName(booking.vehicleId)}</p>
       <div class="booking-meta"><span>${booking.date}</span><span>${booking.time}</span><span>Queue #${booking.queue || '-'}</span></div>
       <span class="badge badge--${statusClass(booking.status)}">${booking.status}</span>
-      <div class="row-actions"><button class="mini-btn" type="button" data-action="reschedule-booking" data-id="${booking.id}">Reschedule</button><button class="mini-btn mini-btn--red" type="button" data-action="cancel-booking" data-id="${booking.id}">Cancel</button></div>
+      ${actions ? `<div class="row-actions">${actions}</div>` : ''}
     ` : '<p>No upcoming bookings.</p>';
   }
 
@@ -296,7 +329,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const images = [vehicle.frontImage || vehicle.image, vehicle.rearImage, vehicle.leftImage, vehicle.rightImage, vehicle.interiorImage, vehicle.engineImage].filter(Boolean);
       return `
       <article class="vehicle-card">
-        <img src="${vehicle.image || 'https://ieliygatevqevgssroze.supabase.co/storage/v1/object/public/service-station/company/system-assets/hero-blue-workshop.png'}" alt="${vehicle.make} ${vehicle.model}" data-image-viewer />
+        ${vehicle.image ? `<img src="${escapeHtml(vehicle.image)}" alt="${escapeHtml(`${vehicle.make} ${vehicle.model}`)}" data-image-viewer />` : '<div class="media-placeholder" role="img" aria-label="No photo available"><span>No photo available</span></div>'}
         <h3>${displayVehicleName(vehicle)}</h3>
         <p>${vehicle.plate}</p>
         <div class="vehicle-image-gallery">${images.map((image, index) => `<img src="${image}" alt="${vehicle.make} ${vehicle.model} view ${index + 1}" data-image-viewer />`).join('')}</div>
@@ -305,12 +338,23 @@ document.addEventListener('DOMContentLoaded', () => {
       </article>
     `; }).join('') + `
       <article class="vehicle-card">
-        <img src="https://ieliygatevqevgssroze.supabase.co/storage/v1/object/public/service-station/company/system-assets/hero_car.svg" alt="" />
+        <div class="media-placeholder" role="img" aria-label="No photo available"><span>No photo available</span></div>
         <h3>Add New Vehicle</h3>
         <p>Register another vehicle.</p>
         <div class="row-actions"><button class="mini-btn" type="button" data-action="new-vehicle">Add Vehicle</button></div>
       </article>
     `;
+  }
+
+  function bookingActionButtons(booking, includeDelete = true) {
+    const deleteButton = includeDelete
+      ? `<button class="mini-btn mini-btn--danger" type="button" data-action="delete-booking" data-id="${booking.id}">Delete</button>`
+      : '';
+    if (booking.status === 'Completed') {
+      return `<button class="mini-btn mini-btn--files" type="button" data-action="leave-feedback" data-id="${booking.id}">Leave Feedback</button>${deleteButton}`;
+    }
+    if (booking.status === 'Cancelled') return deleteButton;
+    return `<button class="mini-btn" type="button" data-action="reschedule-booking" data-id="${booking.id}">Reschedule</button><button class="mini-btn mini-btn--red" type="button" data-action="cancel-booking" data-id="${booking.id}">Cancel</button>${deleteButton}`;
   }
 
   function bookingRows() {
@@ -321,7 +365,7 @@ document.addEventListener('DOMContentLoaded', () => {
         <td>${booking.date}<span class="row-sub">${booking.time}</span></td>
         <td><span class="badge badge--${statusClass(booking.status)}">${booking.status}</span></td>
         <td>${booking.queue ? `#${booking.queue}` : '-'}</td>
-        <td><div class="row-actions"><button class="mini-btn" type="button" data-action="reschedule-booking" data-id="${booking.id}">Reschedule</button><button class="mini-btn mini-btn--red" type="button" data-action="cancel-booking" data-id="${booking.id}">Cancel</button><button class="mini-btn mini-btn--danger" type="button" data-action="delete-booking" data-id="${booking.id}">Delete</button></div></td>
+        <td><div class="row-actions">${bookingActionButtons(booking)}</div></td>
       </tr>
     `).join('');
   }
@@ -614,10 +658,16 @@ document.addEventListener('DOMContentLoaded', () => {
             </thead>
             <tbody>
               <tr>
-                <td>${invoice.service || 'Service Package'}</td>
+                <td>${invoice.service || 'Service Package'} - Labor</td>
                 <td>1</td>
                 <td>${formatMoney(laborCost)}</td>
                 <td>${formatMoney(laborCost)}</td>
+              </tr>
+              <tr>
+                <td>${invoice.service || 'Service Package'} - Service Charge</td>
+                <td>1</td>
+                <td>${formatMoney(serviceCharges)}</td>
+                <td>${formatMoney(serviceCharges)}</td>
               </tr>
               ${rows}
             </tbody>
@@ -1185,7 +1235,29 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!vehicle) return;
       openModal('booking', { vehicleId: vehicle.id });
     }
-    if (action === 'reschedule-booking') openModal('booking', state.bookings.find((item) => item.id === numericId));
+    if (action === 'leave-feedback') {
+      const booking = state.bookings.find((item) => item.id === numericId);
+      if (!booking || booking.status !== 'Completed') {
+        showToast('Feedback is available after the service is completed.');
+        return;
+      }
+      switchView('support', 'Support');
+      renderFeedbackServices();
+      const serviceSelect = document.getElementById('feedback-service');
+      if ([...serviceSelect.options].some((option) => option.value === booking.service)) {
+        serviceSelect.value = booking.service;
+      }
+      document.getElementById('feedback-form').scrollIntoView({ behavior: 'smooth', block: 'center' });
+      document.querySelector('#feedback-form textarea[name="feedback"]')?.focus({ preventScroll: true });
+    }
+    if (action === 'reschedule-booking') {
+      const booking = state.bookings.find((item) => item.id === numericId);
+      if (!booking || ['Completed', 'Cancelled'].includes(booking.status)) {
+        showToast('Only active bookings can be rescheduled.');
+        return;
+      }
+      openModal('booking', booking);
+    }
     if (action === 'cancel-booking') {
       const booking = state.bookings.find((item) => item.id === numericId);
       if (!booking || ['Completed', 'Cancelled'].includes(booking.status)) {
@@ -1285,6 +1357,22 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     document.getElementById('mobile-menu').addEventListener('click', () => els.sidebar.classList.toggle('is-open'));
+    const profileForm = document.getElementById('profile-form');
+    profileForm.addEventListener('change', (event) => {
+      if (event.target.matches('#customer-profile-uploader input[type="file"]')) {
+        previewCustomerAvatar(event.target.files?.[0]);
+      }
+    });
+    profileForm.addEventListener('click', (event) => {
+      const removeButton = event.target.closest('[data-remove-file], [data-remove-default]');
+      if (!removeButton) return;
+      window.setTimeout(() => {
+        const uploader = document.querySelector('#customer-profile-uploader [data-image-uploader]');
+        const selectedFile = uploader?._selectedFiles?.[0];
+        if (selectedFile) previewCustomerAvatar(selectedFile);
+        else displayCustomerAvatar(uploader?._removedDefaults ? '' : (state.profile.avatar || state.profile.profileImage || ''));
+      }, 0);
+    });
     els.modalForm.addEventListener('submit', (event) => {
       handleModalSubmit(event).catch((error) => showToast(error.message || 'Save failed.'));
     });
@@ -1336,6 +1424,9 @@ document.addEventListener('DOMContentLoaded', () => {
         state.profile = { ...state.profile, ...result.user };
         localStorage.setItem(sessionKey, JSON.stringify({ ...getSession(), ...result.user, authenticated: true }));
         saveState();
+        const profileUploader = document.getElementById('customer-profile-uploader');
+        profileUploader.dataset.ready = '';
+        profileUploader.replaceChildren();
         renderProfile();
         window.AutoCareApi.showSuccess('Your profile was saved successfully.');
       } catch (error) {

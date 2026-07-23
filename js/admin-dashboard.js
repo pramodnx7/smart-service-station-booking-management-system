@@ -69,6 +69,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let state = structuredClone(emptyState);
   let activeBookingStatus = 'All';
   const overviewBookingFilters = { search: '', status: 'All', service: 'All', dateRange: 'All' };
+  const billingFilters = { search: '', payment: 'All', service: 'All', dateRange: 'All' };
   let activeMessageTab = 'received';
   let pendingBookingDraft = null;
   let notificationDraftSaveInProgress = false;
@@ -281,10 +282,16 @@ document.addEventListener('DOMContentLoaded', () => {
             </thead>
             <tbody>
               <tr>
-                <td>${serviceName}</td>
+                <td>${serviceName} - Labor</td>
                 <td>1</td>
                 <td>${formatMoney(laborCost)}</td>
                 <td>${formatMoney(laborCost)}</td>
+              </tr>
+              <tr>
+                <td>${serviceName} - Service Charge</td>
+                <td>1</td>
+                <td>${formatMoney(serviceCharges)}</td>
+                <td>${formatMoney(serviceCharges)}</td>
               </tr>
               ${rows}
             </tbody>
@@ -395,26 +402,42 @@ document.addEventListener('DOMContentLoaded', () => {
     state.sentNotifications = messageCenter.sent || [];
     state.notificationDrafts = messageCenter.drafts || [];
     state.emergencies = emergencies || [];
+    state.notifications
+      .filter((notification) => notification.action === 'open-completed-billing' && notification.serviceJobId)
+      .forEach((notification) => {
+        const job = state.serviceJobs.find((item) => Number(item.id) === Number(notification.serviceJobId));
+        if (job) {
+          job.status = 'Completed';
+          job.progress = 100;
+        }
+      });
     saveState();
     renderEmergency();
     renderNotifications();
+    renderBilling();
   }
 
   function showToast(message, type = toastType(message)) {
     window.clearTimeout(selectors.toast.hideTimer);
     const icon = document.createElement('span');
+    const content = document.createElement('div');
+    const title = document.createElement('strong');
     const text = document.createElement('span');
     const close = document.createElement('button');
     icon.className = 'toast__icon';
-    icon.textContent = type === 'error' ? '!' : type === 'warning' ? '!' : '✓';
+    icon.textContent = 'i';
+    content.className = 'toast__content';
+    title.className = 'toast__title';
+    title.textContent = 'Notification';
     text.className = 'toast__message';
     text.textContent = message;
+    content.append(title, text);
     close.className = 'toast__close';
     close.type = 'button';
     close.setAttribute('aria-label', 'Close notification');
     close.textContent = '×';
     close.addEventListener('click', () => selectors.toast.classList.remove('is-visible'));
-    selectors.toast.replaceChildren(icon, text, close);
+    selectors.toast.replaceChildren(icon, content, close);
     selectors.toast.className = `toast toast--${type} is-visible`;
     selectors.toast.hideTimer = window.setTimeout(() => selectors.toast.classList.remove('is-visible'), 3600);
   }
@@ -606,7 +629,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function renderVehicles() {
     document.getElementById('vehicle-grid').innerHTML = state.vehicles.map((vehicle) => `
       <article class="vehicle-card">
-        <img src="${vehicle.image}" alt="${vehicle.make} ${vehicle.model}" />
+        ${vehicle.image ? `<img src="${escapeHtml(vehicle.image)}" alt="${escapeHtml(`${vehicle.make} ${vehicle.model}`)}" />` : '<div class="media-placeholder" role="img" aria-label="No photo available"><span>No photo available</span></div>'}
         <h3>${vehicle.make} ${vehicle.model}</h3>
         <p>${customerName(vehicle.customerId)}</p>
         <div class="card-meta"><span>${vehicle.plate}</span><span>${vehicle.year}</span></div>
@@ -910,7 +933,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function renderPackages() {
     document.getElementById('package-grid').innerHTML = state.packages.map((item) => `
       <article class="package-card">
-        <img class="package-card__image" src="${escapeHtml(item.image)}" alt="${escapeHtml(item.name)}" />
+        ${item.image ? `<img class="package-card__image" src="${escapeHtml(item.image)}" alt="${escapeHtml(item.name)}" />` : '<div class="package-card__image media-placeholder" role="img" aria-label="No photo available"><span>No photo available</span></div>'}
         <h3>${escapeHtml(item.name)}</h3>
         <p>${escapeHtml(item.description)}</p>
         <strong>${formatMoney(item.price)}</strong>
@@ -923,7 +946,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const grid = document.getElementById('admin-pricing-plan-grid');
     grid.innerHTML = state.pricingPlans?.length ? state.pricingPlans.map((plan) => `
       <article class="admin-plan-card ${plan.featured ? 'is-featured' : ''}">
-        <div class="admin-plan-card__image"><img src="${escapeHtml(plan.image)}" alt="" /><span>${escapeHtml(plan.badge)}</span></div>
+        <div class="admin-plan-card__image">${plan.image ? `<img src="${escapeHtml(plan.image)}" alt="${escapeHtml(plan.name)}" />` : '<div class="media-placeholder" role="img" aria-label="No photo available"><span>No photo available</span></div>'}<span>${escapeHtml(plan.badge)}</span></div>
         <div class="admin-plan-card__body"><div><small>Order ${plan.displayOrder} · ${plan.active ? 'Visible' : 'Hidden'}</small><h3>${escapeHtml(plan.name)}</h3></div><strong>${formatMoney(plan.price)}</strong><p>${plan.features.map(escapeHtml).join(' · ')}</p></div>
         <div class="row-actions"><button class="mini-btn" type="button" data-action="edit-pricing-plan" data-id="${plan.id}">Edit</button><button class="mini-btn mini-btn--red" type="button" data-action="delete-pricing-plan" data-id="${plan.id}">Delete</button></div>
       </article>
@@ -931,16 +954,70 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function renderBilling() {
-    document.getElementById('billing-body').innerHTML = state.invoices.map((invoice) => `
+    const invoicedJobIds = new Set(state.invoices.map((invoice) => Number(invoice.serviceJobId)).filter(Boolean));
+    const completedWork = state.serviceJobs
+      .filter((job) => job.status === 'Completed' && !invoicedJobIds.has(Number(job.id)))
+      .sort((left, right) => Number(right.id) - Number(left.id));
+    const completedWorkContainer = document.getElementById('completed-billing-work');
+    completedWorkContainer.innerHTML = completedWork.length ? `
+      <div class="completed-billing-work__header">
+        <div><span>Ready for billing</span><strong>${completedWork.length} newly completed job${completedWork.length === 1 ? '' : 's'}</strong></div>
+        <small>Newest completed work is shown first.</small>
+      </div>
+      <div class="completed-billing-work__list">
+        ${completedWork.slice(0, 6).map((job) => `
+          <article>
+            <div><strong>#SJ-${job.id} · ${escapeHtml(job.serviceType)}</strong><span>${escapeHtml(job.customerName || customerName(job.customerId))} · ${escapeHtml(job.vehicleNumber || job.vehicleName || 'Vehicle')}</span></div>
+            <button class="mini-btn" type="button" data-action="create-invoice-for-job" data-id="${job.id}">Create Invoice</button>
+          </article>
+        `).join('')}
+      </div>
+    ` : '';
+
+    const serviceFilter = document.getElementById('billing-service-filter');
+    const currentService = billingFilters.service;
+    const services = [...new Set(state.invoices.map((invoice) => invoice.service).filter(Boolean))].sort();
+    serviceFilter.innerHTML = '<option value="All">All services</option>'
+      + services.map((service) => `<option value="${escapeHtml(service)}">${escapeHtml(service)}</option>`).join('');
+    serviceFilter.value = services.includes(currentService) ? currentService : 'All';
+    billingFilters.service = serviceFilter.value;
+
+    const now = new Date();
+    const todayValue = now.toISOString().slice(0, 10);
+    const monthValue = todayValue.slice(0, 7);
+    const cutoff = new Date(now);
+    cutoff.setDate(cutoff.getDate() - 30);
+    cutoff.setHours(0, 0, 0, 0);
+    const search = billingFilters.search.trim().toLowerCase();
+    const invoices = state.invoices
+      .filter((invoice) => {
+        const customer = customerName(invoice.customerId);
+        const matchesSearch = !search || [
+          `INV-${invoice.id}`, customer, invoice.service
+        ].some((value) => String(value || '').toLowerCase().includes(search));
+        const matchesPayment = billingFilters.payment === 'All' || invoice.payment === billingFilters.payment;
+        const matchesService = billingFilters.service === 'All' || invoice.service === billingFilters.service;
+        const invoiceDate = String(invoice.date || '');
+        const matchesDate = billingFilters.dateRange === 'All'
+          || (billingFilters.dateRange === 'Today' && invoiceDate === todayValue)
+          || (billingFilters.dateRange === 'Month' && invoiceDate.startsWith(monthValue))
+          || (billingFilters.dateRange === '30' && new Date(`${invoiceDate}T00:00:00`) >= cutoff);
+        return matchesSearch && matchesPayment && matchesService && matchesDate;
+      })
+      .sort((left, right) => String(right.date).localeCompare(String(left.date)) || Number(right.id) - Number(left.id));
+
+    document.getElementById('billing-result-count').textContent = `${invoices.length} invoice${invoices.length === 1 ? '' : 's'}`;
+    document.getElementById('billing-body').innerHTML = invoices.length ? invoices.map((invoice) => `
       <tr>
         <td><span class="row-title">#INV-${invoice.id}</span><span class="row-sub">${invoice.date}</span></td>
-        <td>${customerName(invoice.customerId)}</td>
-        <td>${invoice.service}</td>
+        <td>${escapeHtml(customerName(invoice.customerId))}</td>
+        <td>${escapeHtml(invoice.service)}</td>
         <td>${formatMoney(invoice.amount)}</td>
         <td><span class="badge badge--${invoice.payment === 'Paid' ? 'completed' : 'pending'}">${invoice.payment}</span></td>
-        <td><div class="row-actions"><button class="mini-btn" type="button" data-action="preview-invoice" data-id="${invoice.id}">View</button><button class="mini-btn" type="button" data-action="mark-paid" data-id="${invoice.id}">Mark Paid</button><button class="mini-btn" type="button" data-action="download-invoice-pdf" data-id="${invoice.id}">Download PDF</button></div></td>
+        <td><div class="row-actions"><button class="mini-btn" type="button" data-action="preview-invoice" data-id="${invoice.id}">View</button>${invoice.payment !== 'Paid' ? `<button class="mini-btn" type="button" data-action="mark-paid" data-id="${invoice.id}">Mark Paid</button>` : ''}<button class="mini-btn" type="button" data-action="download-invoice-pdf" data-id="${invoice.id}">Download PDF</button></div></td>
       </tr>
-    `).join('');
+    `).join('') : '<tr><td colspan="6"><div class="table-empty-state"><strong>No invoices match these filters.</strong><span>Clear the filters or create an invoice from completed work.</span></div></td></tr>';
+    injectIcons();
   }
 
   function renderEmergency() {
@@ -994,7 +1071,10 @@ document.addEventListener('DOMContentLoaded', () => {
         <article class="notification-item notification-item--${item.unread ? 'unread' : 'read'}">
           <span data-icon="bell"></span>
           <div><strong>${escapeHtml(item.type)}</strong><p>${escapeHtml(item.message)}</p></div>
-          ${item.unread ? `<button class="mini-btn" type="button" data-action="mark-admin-notification-read" data-id="${item.id}">Mark Read</button>` : ''}
+          <div class="row-actions">
+            ${item.action === 'open-completed-billing' && item.serviceJobId ? `<button class="mini-btn" type="button" data-action="open-completed-billing" data-id="${item.serviceJobId}" data-notification-id="${item.id}">Open Billing</button>` : ''}
+            ${item.unread ? `<button class="mini-btn" type="button" data-action="mark-admin-notification-read" data-id="${item.id}">Mark Read</button>` : ''}
+          </div>
         </article>`;
     }).join('') : `<article class="notification-empty"><strong>No ${activeMessageTab} messages.</strong><p>${activeMessageTab === 'received' ? 'Bookings, emergencies, completed jobs, and stock alerts appear here.' : 'Messages will appear here when they are created.'}</p></article>`;
     injectIcons();
@@ -1046,7 +1126,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const isNews = section === 'news';
     return `
       <form class="landing-content-card" data-content-section="${section}" data-content-slot="${index}">
-        <img src="${escapeHtml(item.image)}" alt="" />
+        ${item.image ? `<img src="${escapeHtml(item.image)}" alt="" />` : '<div class="media-placeholder" role="img" aria-label="No photo available"><span>No photo available</span></div>'}
         <label><span>${isNews ? 'Headline' : 'Work Caption'}</span><input name="title" maxlength="${isNews ? 140 : 100}" value="${escapeHtml(item.title)}" required /></label>
         ${isNews ? `<div class="landing-content-fields"><label><span>Date</span><input name="date" type="date" value="${escapeHtml(item.date)}" required /></label><label><span>Category</span><input name="category" maxlength="50" value="${escapeHtml(item.category)}" required /></label></div>` : ''}
         <label><span>Replace Photo</span><input name="contentImage" type="file" accept="image/jpeg,image/png,image/webp" /></label>
@@ -1110,6 +1190,86 @@ document.addEventListener('DOMContentLoaded', () => {
     return `<label><span>${escapeHtml(label)}</span><input name="${escapeHtml(name)}" type="${escapeHtml(type)}" value="${escapeHtml(value)}"${requiredAttribute} /></label>`;
   }
 
+  function serviceBillingDefaults(serviceName) {
+    const service = state.packages.find((item) => item.name === serviceName);
+    return {
+      service,
+      laborCost: Number(service?.laborCost || 0),
+      serviceCharges: Number(service?.serviceCharges ?? service?.price ?? 0)
+    };
+  }
+
+  function invoicePartsForJob(serviceJobId) {
+    return (state.partUsageHistory || []).filter((item) => Number(item.serviceJobId) === Number(serviceJobId));
+  }
+
+  function invoicePartsMarkup(serviceJobId) {
+    const parts = invoicePartsForJob(serviceJobId);
+    const rows = parts.length
+      ? parts.map((part) => `
+          <tr>
+            <td><strong>${escapeHtml(part.partName || part.name || 'Spare part')}</strong><small>${escapeHtml(part.itemCode || '')}</small></td>
+            <td>${Number(part.quantity || 0)}</td>
+            <td>${formatMoney(part.unitPrice || 0)}</td>
+            <td>${formatMoney(part.totalPrice || 0)}</td>
+          </tr>
+        `).join('')
+      : '<tr><td colspan="4" class="table-empty">No parts were recorded for this service job.</td></tr>';
+    return `
+      <section class="invoice-builder full">
+        <div class="invoice-builder__header">
+          <div><strong>Parts Used</strong><small>Automatically loaded from the completed service job.</small></div>
+          <span>${parts.length} item${parts.length === 1 ? '' : 's'}</span>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Part</th><th>Qty</th><th>Unit Price</th><th>Total</th></tr></thead>
+            <tbody id="invoice-parts-body">${rows}</tbody>
+          </table>
+        </div>
+        <div class="invoice-builder__totals">
+          <div><span>Parts Total</span><strong id="invoice-parts-total">${formatMoney(parts.reduce((sum, part) => sum + Number(part.totalPrice || 0), 0))}</strong></div>
+          <div><span>Estimated Invoice Total</span><strong id="invoice-estimated-total">LKR 0</strong></div>
+        </div>
+      </section>`;
+  }
+
+  function updateInvoiceBuilderTotals() {
+    if (selectors.modalForm.dataset.mode !== 'invoice') return;
+    const serviceJobId = Number(selectors.modalForm.elements.serviceJobId?.value);
+    const partsTotal = invoicePartsForJob(serviceJobId).reduce((sum, part) => sum + Number(part.totalPrice || 0), 0);
+    const laborCost = Number(selectors.modalForm.elements.laborCost?.value || 0);
+    const serviceCharges = Number(selectors.modalForm.elements.serviceCharges?.value || 0);
+    const tax = Number(selectors.modalForm.elements.tax?.value || 0);
+    const discount = Number(selectors.modalForm.elements.discount?.value || 0);
+    const estimatedTotal = Math.max(0, partsTotal + laborCost + serviceCharges + tax - discount);
+    const partsTotalElement = document.getElementById('invoice-parts-total');
+    const estimatedTotalElement = document.getElementById('invoice-estimated-total');
+    if (partsTotalElement) partsTotalElement.textContent = formatMoney(partsTotal);
+    if (estimatedTotalElement) estimatedTotalElement.textContent = formatMoney(estimatedTotal);
+  }
+
+  function syncInvoiceFormFromJob(serviceJobId) {
+    const job = state.serviceJobs.find((item) => Number(item.id) === Number(serviceJobId));
+    if (!job || selectors.modalForm.dataset.mode !== 'invoice') return;
+    const defaults = serviceBillingDefaults(job.serviceType);
+    if (selectors.modalForm.elements.customerId) selectors.modalForm.elements.customerId.value = String(job.customerId);
+    if (selectors.modalForm.elements.service) selectors.modalForm.elements.service.value = job.serviceType;
+    if (selectors.modalForm.elements.laborCost) selectors.modalForm.elements.laborCost.value = String(defaults.laborCost);
+    if (selectors.modalForm.elements.serviceCharges) selectors.modalForm.elements.serviceCharges.value = String(defaults.serviceCharges);
+    const builder = selectors.modalBody.querySelector('.invoice-builder');
+    if (builder) builder.outerHTML = invoicePartsMarkup(job.id);
+    updateInvoiceBuilderTotals();
+  }
+
+  function syncInvoiceChargesFromService(serviceName) {
+    if (selectors.modalForm.dataset.mode !== 'invoice') return;
+    const defaults = serviceBillingDefaults(serviceName);
+    selectors.modalForm.elements.laborCost.value = String(defaults.laborCost);
+    selectors.modalForm.elements.serviceCharges.value = String(defaults.serviceCharges);
+    updateInvoiceBuilderTotals();
+  }
+
   function vehicleImageUpload(record = {}) {
     return [
       window.AutoCareImages.uploader({ name: 'frontImage', label: 'Front Image', folder: 'vehicles', value: record.frontImage || record.image }),
@@ -1166,6 +1326,63 @@ document.addEventListener('DOMContentLoaded', () => {
     reader.readAsDataURL(file);
   }
 
+  function hideAssignmentWarning() {
+    const warning = selectors.modal.querySelector('.assignment-conflict');
+    if (warning) warning.hidden = true;
+  }
+
+  function showAssignmentWarning(message) {
+    let warning = selectors.modal.querySelector('.assignment-conflict');
+    if (!warning) {
+      warning = document.createElement('div');
+      warning.className = 'assignment-conflict';
+      warning.setAttribute('role', 'alertdialog');
+      warning.setAttribute('aria-modal', 'true');
+      warning.innerHTML = `
+        <div class="assignment-conflict__icon" aria-hidden="true">!</div>
+        <div>
+          <strong>Technician is no longer available</strong>
+          <p></p>
+        </div>
+        <button type="button" aria-label="Close technician warning">Close</button>
+      `;
+      warning.querySelector('button').addEventListener('click', hideAssignmentWarning);
+      selectors.modal.appendChild(warning);
+    }
+    warning.querySelector('p').textContent = message || 'This technician already has a booking at this time. Please select another suitable technician.';
+    warning.hidden = false;
+    warning.querySelector('button').focus();
+  }
+
+  function refreshAssignmentTechnicianOptions(technicians) {
+    const select = selectors.modalForm.elements.technicianId;
+    if (!select) return;
+
+    if (!technicians.length) {
+      select.closest('label')?.replaceWith(Object.assign(document.createElement('div'), {
+        className: 'assignment-prompt__empty full',
+        innerHTML: '<strong>No suitable technicians are available.</strong><p>Keep this booking Pending or reschedule it for another time.</p>'
+      }));
+      selectors.modalSubmit.disabled = true;
+      return;
+    }
+
+    select.innerHTML = technicians
+      .map((technician) => `<option value="${technician.id}">${escapeHtml(technician.name)} - ${escapeHtml(technician.specialization)}</option>`)
+      .join('');
+    selectors.modalSubmit.disabled = false;
+  }
+
+  async function loadSuitableTechnicians(bookingId) {
+    const response = await window.AutoCareApi.request(`/api/admin/bookings/${bookingId}/available-technicians`);
+    return Array.isArray(response.technicians) ? response.technicians : [];
+  }
+
+  async function openBookingApprovalModal(booking) {
+    const availableTechnicians = await loadSuitableTechnicians(booking.id);
+    openModal('assignApprovedBooking', { ...booking, availableTechnicians });
+  }
+
   function openModal(mode, record = {}) {
     const customerOptions = state.customers.map((customer) => ({ value: customer.id, label: customer.name }));
     const bookingCustomerOptions = [
@@ -1177,26 +1394,37 @@ document.addEventListener('DOMContentLoaded', () => {
       { value: '__new_vehicle__', label: '+ Add New Vehicle' },
       ...vehicleOptions
     ];
-    const technicianOptions = state.technicians
+    const activeTechnicianOptions = state.technicians
       .filter((technician) => technician.status === 'Active' || Number(technician.id) === Number(record.assignedTechnicianId))
       .map((technician) => ({ value: technician.id, label: `${technician.name} - ${technician.specialization}` }));
+    const suitableTechnicianOptions = (Array.isArray(record.availableTechnicians) ? record.availableTechnicians : [])
+      .map((technician) => ({ value: technician.id, label: `${technician.name} - ${technician.specialization}` }));
+    const technicianOptions = mode === 'assignApprovedBooking'
+      ? suitableTechnicianOptions
+      : activeTechnicianOptions;
     const notificationRecipientOptions = [
       ...state.customers.map((customer) => ({ value: customer.id, label: `Customer: ${customer.name}` })),
       ...state.technicians.map((technician) => ({ value: technician.userId, label: `Technician: ${technician.name}` }))
     ];
     const bookingOptions = state.bookings.map((booking) => ({ value: booking.id, label: `#BK-${booking.id} - ${customerName(booking.customerId)} - ${booking.service}` }));
+    const invoicedJobIds = new Set(state.invoices.map((invoice) => Number(invoice.serviceJobId)).filter(Boolean));
     const completedJobOptions = state.serviceJobs
-      .filter((job) => job.status === 'Completed')
+      .filter((job) => job.status === 'Completed' && !invoicedJobIds.has(Number(job.id)))
+      .sort((left, right) => Number(right.id) - Number(left.id))
       .map((job) => ({ value: job.id, label: `#SJ-${job.id} - ${job.serviceType} - ${job.customerName || customerName(job.customerId)}` }));
+    const invoiceJobId = Number(record.serviceJobId || completedJobOptions[0]?.value);
+    const invoiceJob = state.serviceJobs.find((job) => Number(job.id) === invoiceJobId);
+    const invoiceServiceName = record.service || invoiceJob?.serviceType || state.packages[0]?.name || '';
+    const invoiceDefaults = serviceBillingDefaults(invoiceServiceName);
     const categoryOptions = (state.inventoryCategories || []).map((category) => ({ value: category.name, label: category.name }));
     const technicianSpecializations = state.packages.map((service) => service.name);
     const supplierOptions = (state.inventorySuppliers || []).map((supplier) => ({ value: supplier.id, label: supplier.name }));
     const paymentOptions = ['Unpaid', 'Paid'].map((payment) => ({ value: payment, label: payment }));
     const approvedBookingAssignment = technicianOptions.length
-      ? field('technicianId', 'Assign Active Technician', 'select', technicianOptions[0]?.value, technicianOptions)
+      ? field('technicianId', 'Suitable Technician', 'select', technicianOptions[0]?.value, technicianOptions)
         + field('priority', 'Job Priority', 'select', 'Normal', ['Low', 'Normal', 'High', 'Urgent'].map((priority) => ({ value: priority, label: priority })))
         + field('expectedCompletionDate', 'Expected Completion', 'date', record.date || new Date().toISOString().slice(0, 10))
-      : '<div class="assignment-prompt__empty full"><strong>No active technicians are available.</strong><p>You can approve this booking now and assign a technician later from Service Jobs.</p></div>';
+      : '<div class="assignment-prompt__empty full"><strong>No suitable technicians are available for this service and time.</strong><p>Keep this booking Pending or reschedule it for another time.</p></div>';
     const config = {
       customer: {
         title: record.id ? 'Edit Customer' : 'Register Customer',
@@ -1223,10 +1451,10 @@ document.addEventListener('DOMContentLoaded', () => {
         body: field('technicianId', 'Technician', 'select', record.assignedTechnicianId || technicianOptions[0]?.value, technicianOptions)
       },
       assignApprovedBooking: {
-        title: `Assign Technician To Booking #BK-${record.id}`,
+        title: `Approve & Assign Booking #BK-${record.id}`,
         body: `
           <div class="assignment-prompt full">
-            <span>Booking approved successfully</span>
+            <span>Technician required for approval</span>
             <h3>${escapeHtml(record.service)}</h3>
             <p>${escapeHtml(record.customerName || customerName(record.customerId))} · ${escapeHtml(record.vehicleName || vehicleName(record.vehicleId))}</p>
             <small>${escapeHtml(record.date)} at ${escapeHtml(record.time)}</small>
@@ -1244,15 +1472,15 @@ document.addEventListener('DOMContentLoaded', () => {
       },
       service: {
         title: record.id ? 'Edit Service Package' : 'Add Service Package',
-        body: field('name', 'Package Name', 'text', record.name || '') + field('price', 'Price', 'number', record.price || '') + field('duration', 'Duration', 'text', record.duration || '') + window.AutoCareImages.uploader({ name: 'image', label: 'Service Photo', folder: 'services', value: record.image }) + field('description', 'Description', 'textarea', record.description || '')
+        body: field('name', 'Package Name', 'text', record.name || '') + field('laborCost', 'Default Labor Cost (LKR)', 'number', record.laborCost ?? '0') + field('serviceCharges', 'Default Service Charge (LKR)', 'number', record.serviceCharges ?? record.price ?? '0') + field('duration', 'Duration', 'text', record.duration || '') + window.AutoCareImages.uploader({ name: 'image', label: 'Service Photo', folder: 'services', value: record.image }) + field('description', 'Description', 'textarea', record.description || '')
       },
       pricingPlan: {
         title: record.id ? 'Edit Landing Plan' : 'Add Landing Plan',
-        body: field('name', 'Plan Name', 'text', record.name || '') + field('badge', 'Image Badge', 'text', record.badge || '') + field('price', 'Price (LKR)', 'number', record.price || '') + field('billingPeriod', 'Billing Period', 'text', record.billingPeriod || 'month') + field('buttonText', 'Button Text', 'text', record.buttonText || '') + field('displayOrder', 'Display Order', 'number', record.displayOrder || (state.pricingPlans.length + 1)) + field('featured', 'Highlight Plan', 'select', String(Boolean(record.featured)), [{ value: 'false', label: 'No' }, { value: 'true', label: 'Yes - Most Popular' }]) + field('active', 'Visibility', 'select', String(record.active !== false), [{ value: 'true', label: 'Visible' }, { value: 'false', label: 'Hidden' }]) + field('image', 'Current Image URL', 'text', record.image || 'https://ieliygatevqevgssroze.supabase.co/storage/v1/object/public/service-station/company/system-assets/workshop-lift-mechanic.png') + '<label class="full"><span>Upload New Image (optional)</span><input name="planImage" type="file" accept="image/jpeg,image/png,image/webp" /></label>' + field('features', 'Features (one per line)', 'textarea', (record.features || []).join('\n'))
+        body: field('name', 'Plan Name', 'text', record.name || '') + field('badge', 'Image Badge', 'text', record.badge || '') + field('price', 'Price (LKR)', 'number', record.price || '') + field('billingPeriod', 'Billing Period', 'text', record.billingPeriod || 'month') + field('buttonText', 'Button Text', 'text', record.buttonText || '') + field('displayOrder', 'Display Order', 'number', record.displayOrder || (state.pricingPlans.length + 1)) + field('featured', 'Highlight Plan', 'select', String(Boolean(record.featured)), [{ value: 'false', label: 'No' }, { value: 'true', label: 'Yes - Most Popular' }]) + field('active', 'Visibility', 'select', String(record.active !== false), [{ value: 'true', label: 'Visible' }, { value: 'false', label: 'Hidden' }]) + field('image', 'Current Image URL', 'text', record.image || '') + '<label class="full"><span>Upload New Image (optional)</span><input name="planImage" type="file" accept="image/jpeg,image/png,image/webp" /></label>' + field('features', 'Features (one per line)', 'textarea', (record.features || []).join('\n'))
       },
       invoice: {
         title: 'Create Invoice',
-        body: field('serviceJobId', 'Completed Service Job', 'select', record.serviceJobId || completedJobOptions[0]?.value, completedJobOptions) + field('customerId', 'Customer', 'select', record.customerId || customerOptions[0]?.value, customerOptions) + field('service', 'Service', 'select', record.service || state.packages[0]?.name, state.packages.map((item) => ({ value: item.name, label: item.name }))) + field('laborCost', 'Labor Cost', 'number', record.laborCost || '') + field('serviceCharges', 'Service Charges', 'number', record.serviceCharges || '0') + field('tax', 'Tax', 'number', record.tax || '0') + field('discount', 'Discount', 'number', record.discount || '0') + field('payment', 'Payment Status', 'select', record.payment || 'Unpaid', paymentOptions) + field('date', 'Date', 'date', record.date || new Date().toISOString().slice(0, 10)) + window.AutoCareImages.uploader({ name: 'customerSignature', label: 'Customer Signature', folder: 'documents' }) + window.AutoCareImages.uploader({ name: 'mechanicSignature', label: 'Mechanic Signature', folder: 'documents' })
+        body: field('serviceJobId', 'Completed Service Job', 'select', invoiceJobId, completedJobOptions) + field('customerId', 'Customer', 'select', record.customerId || invoiceJob?.customerId || customerOptions[0]?.value, customerOptions) + field('service', 'Service', 'select', invoiceServiceName, state.packages.map((item) => ({ value: item.name, label: item.name }))) + field('laborCost', 'Labor Cost (Editable)', 'number', record.laborCost ?? invoiceDefaults.laborCost) + field('serviceCharges', 'Service Charge (Editable)', 'number', record.serviceCharges ?? invoiceDefaults.serviceCharges) + invoicePartsMarkup(invoiceJobId) + field('tax', 'Tax', 'number', record.tax || '0') + field('discount', 'Discount', 'number', record.discount || '0') + field('payment', 'Payment Status', 'select', record.payment || 'Unpaid', paymentOptions) + field('date', 'Date', 'date', record.date || new Date().toISOString().slice(0, 10)) + window.AutoCareImages.uploader({ name: 'customerSignature', label: 'Customer Signature', folder: 'documents' }) + window.AutoCareImages.uploader({ name: 'mechanicSignature', label: 'Mechanic Signature', folder: 'documents' })
       },
       emergency: {
         title: 'Emergency Service Request',
@@ -1266,6 +1494,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     selectors.modalForm.dataset.mode = mode;
     selectors.modalForm.dataset.id = record.id || '';
+    hideAssignmentWarning();
     selectors.modalKicker.textContent = 'Admin Action';
     selectors.modalTitle.textContent = config[mode].title;
     selectors.modalBody.innerHTML = config[mode].body;
@@ -1276,18 +1505,20 @@ document.addEventListener('DOMContentLoaded', () => {
     `;
     selectors.modalSubmit = document.getElementById('modal-submit');
     if (mode === 'assignApprovedBooking') {
-      selectors.modalKicker.textContent = 'Booking Approved';
-      selectors.modalActions.querySelector('[data-action="close-modal"]').textContent = 'Assign Later';
-      selectors.modalSubmit.textContent = 'Assign Technician';
+      selectors.modalKicker.textContent = 'Approval Required';
+      selectors.modalActions.querySelector('[data-action="close-modal"]').textContent = 'Cancel';
+      selectors.modalSubmit.textContent = 'Approve & Assign';
       selectors.modalSubmit.disabled = technicianOptions.length === 0;
     }
     selectors.modalActions.hidden = false;
     selectors.modal.showModal();
+    if (mode === 'invoice') syncInvoiceFormFromJob(invoiceJobId);
   }
 
   async function closeModalAndSaveDraft() {
     if (notificationDraftSaveInProgress) return;
     if (selectors.modalForm.dataset.mode !== 'notification') {
+      hideAssignmentWarning();
       selectors.modal.close();
       return;
     }
@@ -1348,7 +1579,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const payload = {
         ...data,
         customerId: Number(data.customerId),
-        image: data.frontImage || 'https://ieliygatevqevgssroze.supabase.co/storage/v1/object/public/service-station/company/system-assets/hero-blue-workshop.png'
+        image: data.frontImage || ''
       };
       const savedVehicle = await window.AutoCareApi.request(id ? `/api/admin/vehicles/${id}` : '/api/admin/vehicles', {
         method: id ? 'PUT' : 'POST',
@@ -1426,8 +1657,12 @@ document.addEventListener('DOMContentLoaded', () => {
       const existingJob = state.serviceJobs.find((item) => Number(item.id) === Number(savedJob.id));
       existingJob ? Object.assign(existingJob, savedJob) : state.serviceJobs.push(savedJob);
       const booking = state.bookings.find((item) => Number(item.id) === id);
-      if (booking) booking.assignedTechnicianId = Number(data.technicianId);
-      successMessage = `${technicianName(data.technicianId)} assigned to booking #BK-${id}.`;
+      if (booking) {
+        booking.status = 'Approved';
+        booking.progress = 35;
+        booking.assignedTechnicianId = Number(data.technicianId);
+      }
+      successMessage = `Booking #BK-${id} approved and assigned to ${technicianName(data.technicianId)}.`;
     }
 
     if (mode === 'inventoryItem') {
@@ -1457,7 +1692,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     if (mode === 'service') {
-      const payload = { ...data, image: data.image || 'https://ieliygatevqevgssroze.supabase.co/storage/v1/object/public/service-station/company/system-assets/service-wheel-closeup.png', price: Number(data.price) };
+      const laborCost = Number(data.laborCost || 0);
+      const serviceCharges = Number(data.serviceCharges || 0);
+      const payload = { ...data, image: data.image || '', laborCost, serviceCharges, price: laborCost + serviceCharges };
       const savedService = await window.AutoCareApi.request(id ? `/api/admin/services/${id}` : '/api/admin/services', {
         method: id ? 'PUT' : 'POST',
         body: JSON.stringify(payload)
@@ -1467,7 +1704,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (mode === 'pricingPlan') {
       const imageFile = selectors.modalForm.elements.planImage.files[0];
-      const image = imageFile ? await window.AutoCareApi.optimizeProfileImage(imageFile) : data.image;
+      const uploadedImage = imageFile ? await window.AutoCareImages.upload(imageFile, 'company') : null;
+      if (uploadedImage) imageTransaction.uploads.push(uploadedImage);
+      const image = uploadedImage?.url || data.image;
       const payload = { ...data, image, price: Number(data.price), displayOrder: Number(data.displayOrder), featured: data.featured === 'true', active: data.active === 'true', features: data.features.split(/\r?\n/).map((item) => item.trim()).filter(Boolean) };
       delete payload.planImage;
       const savedPlan = await window.AutoCareApi.request(id ? `/api/admin/pricing-plans/${id}` : '/api/admin/pricing-plans', { method: id ? 'PUT' : 'POST', body: JSON.stringify(payload) });
@@ -1478,7 +1717,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (mode === 'invoice') {
       const savedInvoice = await window.AutoCareApi.request('/api/admin/invoices', {
         method: 'POST',
-        body: JSON.stringify({ ...data, serviceJobId: Number(data.serviceJobId), customerId: Number(data.customerId), amount: Number(data.laborCost || 0), laborCost: Number(data.laborCost || 0), serviceCharges: Number(data.serviceCharges || 0), tax: Number(data.tax || 0), discount: Number(data.discount || 0) })
+        body: JSON.stringify({ ...data, serviceJobId: Number(data.serviceJobId), customerId: Number(data.customerId), laborCost: Number(data.laborCost || 0), serviceCharges: Number(data.serviceCharges || 0), tax: Number(data.tax || 0), discount: Number(data.discount || 0) })
       });
       state.invoices.push(savedInvoice);
     }
@@ -1498,6 +1737,7 @@ document.addEventListener('DOMContentLoaded', () => {
       await refreshNotifications();
     }
 
+    hideAssignmentWarning();
     selectors.modal.close();
     saveState();
     renderAll();
@@ -1513,18 +1753,18 @@ document.addEventListener('DOMContentLoaded', () => {
     const flow = ['Pending', 'Approved', 'In Progress', 'Completed'];
     const booking = state.bookings.find((item) => item.id === Number(id));
     if (!booking || booking.status === 'Cancelled') return;
-    const previousStatus = booking.status;
+
+    if (booking.status === 'Pending') {
+      await openBookingApprovalModal(booking);
+      return;
+    }
+
     await window.AutoCareApi.request(`/api/admin/bookings/${id}/status`, { method: 'PUT' });
     const next = flow[Math.min(flow.indexOf(booking.status) + 1, flow.length - 1)];
     booking.status = next;
     booking.progress = next === 'Approved' ? 35 : next === 'In Progress' ? 70 : next === 'Completed' ? 100 : booking.progress;
     saveState();
     renderAll();
-    if (previousStatus === 'Pending' && next === 'Approved') {
-      showToast(`Booking #BK-${id} approved. Assign a technician now or choose Assign Later.`);
-      openModal('assignApprovedBooking', booking);
-      return;
-    }
     showToast(`Booking moved to ${next}.`);
   }
 
@@ -1736,11 +1976,49 @@ document.addEventListener('DOMContentLoaded', () => {
       saveState(); renderAll(); showToast('Landing plan deleted.'); return;
     }
     if (action === 'new-invoice') {
-      if (!state.serviceJobs.some((job) => job.status === 'Completed')) {
-        showToast('Complete a service job before generating billing.');
+      const invoicedJobIds = new Set(state.invoices.map((invoice) => Number(invoice.serviceJobId)).filter(Boolean));
+      if (!state.serviceJobs.some((job) => job.status === 'Completed' && !invoicedJobIds.has(Number(job.id)))) {
+        showToast('There are no completed jobs waiting for an invoice.');
         return;
       }
       openModal('invoice');
+    }
+    if (action === 'create-invoice-for-job' || action === 'open-completed-billing') {
+      if (action === 'open-completed-billing') {
+        document.querySelector('.side-nav__item[data-view="billing"]')?.click();
+        const notificationId = Number(element.dataset.notificationId);
+        const notification = state.notifications.find((item) => Number(item.id) === notificationId);
+        if (notification?.unread) {
+          await window.AutoCareApi.request(`/api/admin/notifications/${notificationId}/read`, { method: 'PUT' });
+          notification.unread = false;
+          renderNotifications();
+        }
+      }
+
+      const existingInvoice = state.invoices.find((invoice) => Number(invoice.serviceJobId) === numericId);
+      if (existingInvoice) {
+        await openInvoicePreview(existingInvoice.id);
+        return;
+      }
+      const job = state.serviceJobs.find((item) => Number(item.id) === numericId && item.status === 'Completed');
+      if (!job) {
+        showToast('The completed service job could not be found.');
+        return;
+      }
+      openModal('invoice', {
+        serviceJobId: job.id,
+        customerId: job.customerId,
+        service: job.serviceType,
+        date: new Date().toISOString().slice(0, 10)
+      });
+    }
+    if (action === 'clear-billing-filters') {
+      Object.assign(billingFilters, { search: '', payment: 'All', service: 'All', dateRange: 'All' });
+      document.getElementById('billing-search').value = '';
+      document.getElementById('billing-payment-filter').value = 'All';
+      document.getElementById('billing-service-filter').value = 'All';
+      document.getElementById('billing-date-filter').value = 'All';
+      renderBilling();
     }
     if (action === 'preview-invoice') {
       await openInvoicePreview(numericId);
@@ -1901,11 +2179,13 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!currentItem) throw new Error('Landing content slot is unavailable.');
     const submitButton = form.querySelector('button[type="submit"]');
     submitButton.disabled = true;
+    let uploadedImage;
     try {
       const imageFile = form.elements.contentImage.files[0];
+      uploadedImage = imageFile ? await window.AutoCareImages.upload(imageFile, 'company') : null;
       const payload = {
         title: form.elements.title.value.trim(),
-        image: imageFile ? await window.AutoCareApi.optimizeProfileImage(imageFile) : currentItem.image,
+        image: uploadedImage?.url || currentItem.image,
         active: form.elements.active.value === 'true'
       };
       if (section === 'news') {
@@ -1919,6 +2199,9 @@ document.addEventListener('DOMContentLoaded', () => {
       state.landingContent[section][slot] = result.item;
       renderLandingContentAdmin();
       window.AutoCareApi.showSuccess(`${section === 'news' ? 'News' : 'Recent work'} was updated successfully.`);
+    } catch (error) {
+      if (uploadedImage) await window.AutoCareImages.rollback({ uploads: [uploadedImage] });
+      throw error;
     } finally {
       submitButton.disabled = false;
     }
@@ -1944,8 +2227,38 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     document.getElementById('mobile-menu').addEventListener('click', () => selectors.sidebar.classList.toggle('is-open'));
+    document.getElementById('billing-search').addEventListener('input', (event) => {
+      billingFilters.search = event.target.value;
+      renderBilling();
+    });
+    document.getElementById('billing-payment-filter').addEventListener('change', (event) => {
+      billingFilters.payment = event.target.value;
+      renderBilling();
+    });
+    document.getElementById('billing-service-filter').addEventListener('change', (event) => {
+      billingFilters.service = event.target.value;
+      renderBilling();
+    });
+    document.getElementById('billing-date-filter').addEventListener('change', (event) => {
+      billingFilters.dateRange = event.target.value;
+      renderBilling();
+    });
     selectors.modalForm.addEventListener('submit', (event) => {
-      handleModalSubmit(event).catch((error) => showToast(error.message || 'Action failed.'));
+      const mode = selectors.modalForm.dataset.mode;
+      const bookingId = Number(selectors.modalForm.dataset.id);
+      handleModalSubmit(event).catch(async (error) => {
+        if (mode !== 'assignApprovedBooking') {
+          showToast(error.message || 'Action failed.');
+          return;
+        }
+
+        showAssignmentWarning(error.message || 'This technician already has a booking at this time. Please select another suitable technician.');
+        try {
+          refreshAssignmentTechnicianOptions(await loadSuitableTechnicians(bookingId));
+        } catch (refreshError) {
+          selectors.modalSubmit.disabled = true;
+        }
+      });
     });
     selectors.modal.addEventListener('cancel', (event) => {
       if (selectors.modalForm.dataset.mode !== 'notification') return;
@@ -1953,6 +2266,14 @@ document.addEventListener('DOMContentLoaded', () => {
       closeModalAndSaveDraft().catch((error) => showToast(error.message || 'Draft could not be saved.'));
     });
     selectors.modalForm.addEventListener('change', (event) => {
+      if (selectors.modalForm.dataset.mode === 'invoice' && event.target.name === 'serviceJobId') {
+        syncInvoiceFormFromJob(event.target.value);
+        return;
+      }
+      if (selectors.modalForm.dataset.mode === 'invoice' && event.target.name === 'service') {
+        syncInvoiceChargesFromService(event.target.value);
+        return;
+      }
       if (selectors.modalForm.dataset.mode === 'booking'
         && event.target.name === 'customerId'
         && event.target.value === '__new_customer__') {
@@ -1973,6 +2294,12 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       if (event.target.name === 'vehicleImage') {
         renderVehicleFilePreview(event.target.name, event.target.files?.[0]);
+      }
+    });
+    selectors.modalForm.addEventListener('input', (event) => {
+      if (selectors.modalForm.dataset.mode === 'invoice'
+        && ['laborCost', 'serviceCharges', 'tax', 'discount'].includes(event.target.name)) {
+        updateInvoiceBuilderTotals();
       }
     });
 
@@ -2006,7 +2333,9 @@ document.addEventListener('DOMContentLoaded', () => {
       try {
         imageTransaction = await window.AutoCareImages.collect(form);
         const avatarFile = form.elements.profilePicture.files[0];
-        const avatar = avatarFile ? await window.AutoCareApi.optimizeProfileImage(avatarFile) : (state.profile?.avatar || '');
+        const uploadedAvatar = avatarFile ? await window.AutoCareImages.upload(avatarFile, 'customers') : null;
+        if (uploadedAvatar) imageTransaction.uploads.push(uploadedAvatar);
+        const avatar = uploadedAvatar?.url || state.profile?.avatar || '';
         const result = await window.AutoCareApi.request('/api/profile', {
           method: 'PUT',
           body: JSON.stringify({ name: form.elements.name.value, email: form.elements.email.value, phone: form.elements.phone.value, avatar })

@@ -1,6 +1,7 @@
 (function () {
   const sessionKey = 'autocare-session';
   const apiBase = window.location.protocol === 'file:' ? 'http://localhost:3000' : '';
+  const activeGetRequests = new Map();
 
   function getSession() {
     try {
@@ -10,7 +11,7 @@
     }
   }
 
-  async function request(path, options = {}) {
+  async function performRequest(path, options = {}) {
     const headers = {
       'Content-Type': 'application/json',
       ...(options.headers || {})
@@ -36,6 +37,23 @@
     }
 
     return payload;
+  }
+
+  function request(path, options = {}) {
+    const method = String(options.method || 'GET').toUpperCase();
+    if (method !== 'GET' || options.dedupe === false) {
+      return performRequest(path, options);
+    }
+
+    const key = `${method}:${path}`;
+    const existing = activeGetRequests.get(key);
+    if (existing) return existing;
+
+    const pending = performRequest(path, options).finally(() => {
+      if (activeGetRequests.get(key) === pending) activeGetRequests.delete(key);
+    });
+    activeGetRequests.set(key, pending);
+    return pending;
   }
 
   async function requestBlob(path, options = {}) {

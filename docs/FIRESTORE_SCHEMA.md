@@ -66,10 +66,11 @@ creates the first administrator when that administrator does not already exist.
 | `customerPackageRequests` | `userId -> users.id`, `pricingPlanId -> pricingPlans.id`; stores payment method, optional bank-receipt URL, verification state, and admin approval |
 | `technicians` | `userId -> users.id` |
 | `vehicles` | `userId -> users.id`; stores type, make, model, plate, year, fuel type, color, and optional image references |
+| `servicePackages` | Stores editable `laborCost` and `serviceCharges`; `price` is their combined customer-facing amount |
 | `bookings` | `userId -> users.id`, `vehicleId -> vehicles.id`, `servicePackageId -> servicePackages.id`, optional `assignedTechnicianId -> technicians.id` |
 | `serviceJobs` | `bookingId -> bookings.id`, `customerId -> users.id`, `vehicleId -> vehicles.id`, `assignedTechnicianId -> technicians.id` |
-| `invoices` | `userId -> users.id`; service invoices link to completed service work and are separate from package approval |
-| `notifications` | `userId -> users.id`, optional `senderUserId -> users.id` |
+| `invoices` | `userId -> users.id`; service invoices link to completed service work and snapshot labor, service, parts, tax, and discount totals |
+| `notifications` | `userId -> users.id`, optional `senderUserId -> users.id`; actionable completion alerts may include `action`, `serviceJobId`, and `invoiceId` |
 | `serviceJobParts` | `serviceJobId -> serviceJobs.id`, `partId -> inventoryParts.id` |
 | `servicePhotos` | `serviceJobId -> serviceJobs.id` |
 | `documents` | `serviceJobId -> serviceJobs.id`, optional `customerId -> users.id` |
@@ -114,11 +115,13 @@ Cancelled examples. Service jobs and queue entries also include completed,
 active, waiting, cancelled, skipped, and no-show variations. Invoices include
 both paid and unpaid examples.
 
-When an administrator advances a booking from `Pending` to `Approved`, the
-dashboard immediately offers active technicians. Assigning one creates the
-linked `serviceJobs` document when needed, or updates the existing job, and
-stores `assignedTechnicianId` on both the booking and service job. Server-side
-availability and specialization checks still apply.
+When an administrator tries to advance a `Pending` booking, the dashboard first
+requires an active technician. Only a successful technician assignment changes
+the booking to `Approved`; closing the popup leaves it `Pending`. The combined
+action creates the linked `serviceJobs` document when needed, or updates the
+existing job, and stores `assignedTechnicianId` on both records. The status API
+also rejects direct attempts to approve a pending booking without a technician.
+Server-side availability and specialization checks still apply.
 
 ## Customer Package Approval Workflow
 

@@ -11,6 +11,7 @@ const appointmentGraceMinutes = Math.max(0, Number(process.env.QUEUE_APPOINTMENT
 const defaultServiceMinutes = Math.max(10, Number(process.env.QUEUE_DEFAULT_SERVICE_MINUTES || 45));
 const queueContextCacheMs = Math.max(5000, Number(process.env.QUEUE_CONTEXT_CACHE_MS || 60000));
 const referenceCacheMs = Math.max(60000, Number(process.env.QUEUE_REFERENCE_CACHE_MS || 10 * 60 * 1000));
+const cacheMaxEntries = Math.max(100, Number(process.env.QUEUE_CACHE_MAX_ENTRIES || 1000));
 const cache = new Map();
 
 function assertConfigured() {
@@ -41,6 +42,17 @@ function snapshotData(snapshot) {
 async function cached(key, ttl, loader) {
   const existing = cache.get(key);
   if (existing && existing.expiresAt > Date.now()) return existing.value;
+  if (cache.size >= cacheMaxEntries) {
+    const now = Date.now();
+    for (const [cachedKey, entry] of cache.entries()) {
+      if (entry.expiresAt <= now) cache.delete(cachedKey);
+    }
+    while (cache.size >= cacheMaxEntries) {
+      const oldestKey = cache.keys().next().value;
+      if (oldestKey === undefined) break;
+      cache.delete(oldestKey);
+    }
+  }
   const value = Promise.resolve().then(loader);
   cache.set(key, { expiresAt: Date.now() + ttl, value });
   try {
@@ -120,8 +132,11 @@ async function cachedDocuments(collection, ids) {
 
 async function getById(collection, id) {
   assertConfigured();
-  const snapshot = await docRef(collection, id).get();
-  return snapshot.exists ? { id: Number(snapshot.id), ...snapshot.data() } : null;
+  const item = await cached(`document:${collection}:${id}`, referenceCacheMs, async () => {
+    const snapshot = await docRef(collection, id).get();
+    return snapshotData(snapshot);
+  });
+  return item ? { ...item } : null;
 }
 
 async function updateDocument(collection, id, changes) {
@@ -129,8 +144,7 @@ async function updateDocument(collection, id, changes) {
   const snapshot = await ref.get();
   if (!snapshot.exists) return null;
   await ref.set({ ...changes, updatedAt: fieldValue() }, { merge: true });
-  const updated = await ref.get();
-  const item = { id: Number(updated.id), ...updated.data() };
+  const item = { id: Number(snapshot.id), ...snapshot.data(), ...changes };
   invalidateCollectionCache(collection, id);
   if (collection === queueCollection) invalidateQueueContext();
   return item;
@@ -396,6 +410,8 @@ async function syncStoredPositions(context) {
     }, { merge: true });
   });
   await batch.commit();
+  changes.forEach((entry) => invalidateCollectionCache(queueCollection, entry.id));
+  invalidateQueueContext();
   await Promise.all(changes.filter((entry) => Number(entry.storedPosition || 0) > 0).map((entry) => (
     createNotification(entry.customerId, 'Queue Position Updated', `${entry.token} is now queue position ${queue.positions.get(Number(entry.id))}.`)
   )));

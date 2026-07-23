@@ -2,7 +2,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const sessionKey = 'autocare-session';
   const session = window.AutoCareApi.getSession();
   if (!session || session.role !== 'admin' || !session.authenticated) {
-    window.location.replace('login.html?role=admin&next=queue-management.html');
+    window.location.replace('login.html');
     return;
   }
 
@@ -49,7 +49,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function showToast(message, tone = 'success') {
     selectors.toast.className = `toast toast--${tone}`;
-    selectors.toast.innerHTML = `<span class="toast__icon">${tone === 'error' ? '!' : '✓'}</span><span class="toast__message">${escapeHtml(message)}</span>`;
+    selectors.toast.innerHTML = `<span class="toast__icon">i</span><div class="toast__content"><strong class="toast__title">Notification</strong><span class="toast__message">${escapeHtml(message)}</span></div><button class="toast__close" type="button" aria-label="Close notification">&times;</button>`;
+    selectors.toast.querySelector('.toast__close').addEventListener('click', () => selectors.toast.classList.remove('is-visible'));
     selectors.toast.classList.add('is-visible');
     window.clearTimeout(showToast.timer);
     showToast.timer = window.setTimeout(() => selectors.toast.classList.remove('is-visible'), 3600);

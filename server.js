@@ -163,26 +163,31 @@ function requireAuth(role) {
 function requireDashboardAccess(role) {
   return async (req, res, next) => {
     const token = getTokenFromRequest(req);
+    const dashboardForRole = {
+      admin: '/admin-dashboard.html',
+      customer: '/customer-dashboard.html',
+      technician: '/technician-dashboard.html'
+    };
 
     if (!token) {
-      return res.redirect('/index.html');
+      return res.redirect('/login.html');
     }
 
     let session;
     try {
       session = jwt.verify(token, jwtSecret);
       if (session.role !== role) {
-        return res.redirect('/index.html');
+        return res.redirect(dashboardForRole[session.role] || '/login.html');
       }
     } catch (error) {
-      return res.redirect('/index.html');
+      return res.redirect('/login.html');
     }
 
     try {
       const userRecord = await withDatabaseTimeout(store.getById(store.collections.users, session.id));
       if (!userRecord || String(userRecord.status || '').toLowerCase() !== 'active' || userRecord.role !== role) {
         clearSessionCookie(res);
-        return res.redirect('/index.html');
+        return res.redirect('/login.html');
       }
       return next();
     } catch (error) {
@@ -234,6 +239,8 @@ function validateRole(role) {
 function validateProfileAvatar(avatar) {
   const value = String(avatar || '');
   if (!value) return '';
+  const storedPath = imageStorage.pathFromPublicUrl(value);
+  if (storedPath.startsWith('customers/') || storedPath.startsWith('mechanics/')) return value;
   if (!/^data:image\/(?:jpeg|png|webp);base64,[a-z0-9+/=]+$/i.test(value)) {
     const error = new Error('Profile picture must be a JPG, PNG or WebP image.');
     error.status = 400;
@@ -328,8 +335,13 @@ app.get('/api/health', async (req, res, next) => {
   }
 });
 
+function cachePublicResponse(res, maxAgeSeconds) {
+  res.set('Cache-Control', `public, max-age=${maxAgeSeconds}, stale-while-revalidate=${maxAgeSeconds * 4}`);
+}
+
 app.get('/api/public/service-ratings', async (req, res, next) => {
   try {
+    cachePublicResponse(res, 60);
     res.json({ services: await withDatabaseTimeout(store.getPublicServiceRatings()) });
   } catch (error) {
     next(error);
@@ -337,11 +349,15 @@ app.get('/api/public/service-ratings', async (req, res, next) => {
 });
 
 app.get('/api/public/pricing-plans', async (req, res, next) => {
-  try { res.json({ plans: await withDatabaseTimeout(store.getPublicPricingPlans()) }); } catch (error) { next(error); }
+  try {
+    cachePublicResponse(res, 300);
+    res.json({ plans: await withDatabaseTimeout(store.getPublicPricingPlans()) });
+  } catch (error) { next(error); }
 });
 
 app.get('/api/public/stats', async (req, res, next) => {
   try {
+    cachePublicResponse(res, 60);
     res.json(await withDatabaseTimeout(store.getPublicStats()));
   } catch (error) {
     next(error);
@@ -349,7 +365,10 @@ app.get('/api/public/stats', async (req, res, next) => {
 });
 
 app.get('/api/public/landing-content', async (req, res, next) => {
-  try { res.json(await withDatabaseTimeout(store.getPublicLandingContent())); } catch (error) { next(error); }
+  try {
+    cachePublicResponse(res, 300);
+    res.json(await withDatabaseTimeout(store.getPublicLandingContent()));
+  } catch (error) { next(error); }
 });
 
 app.get('/api/public/queue-display', async (req, res, next) => {
@@ -444,14 +463,14 @@ app.delete('/api/images', requireAuth(), async (req, res, next) => {
 });
 
 function pricingPlanPayload(body) {
-  requireFields(body, ['name', 'badge', 'image', 'buttonText']);
+  requireFields(body, ['name', 'badge', 'buttonText']);
   const price = Number(body.price);
   if (!Number.isFinite(price) || price < 0) {
     const error = new Error('Plan price must be zero or a positive number.');
     error.status = 400;
     throw error;
   }
-  const image = landingImage(body.image, 'Plan image');
+  const image = body.image ? landingImage(body.image, 'Plan image') : '';
   const features = Array.isArray(body.features) ? body.features : String(body.features || '').split(/\r?\n/);
   const cleanedFeatures = features.map((item) => String(item).trim()).filter(Boolean).slice(0, 10);
   if (!cleanedFeatures.length) {
@@ -463,9 +482,21 @@ function pricingPlanPayload(body) {
 }
 
 function servicePayload(body) {
-  requireFields(body, ['name', 'price', 'duration', 'description']);
-  const fallback = `${String(process.env.SUPABASE_URL || '').replace(/\/$/, '')}/storage/v1/object/public/${process.env.SUPABASE_STORAGE_BUCKET || 'service-station'}/company/system-assets/service-wheel-closeup.png`;
-  return { ...body, image: landingImage(body.image || fallback, 'Service photo') };
+  requireFields(body, ['name', 'duration', 'description']);
+  const laborCost = Number(body.laborCost || 0);
+  const serviceCharges = Number(body.serviceCharges ?? body.price ?? 0);
+  if (![laborCost, serviceCharges].every((value) => Number.isFinite(value) && value >= 0)) {
+    const error = new Error('Labor cost and service charge must be zero or positive amounts.');
+    error.status = 400;
+    throw error;
+  }
+  return {
+    ...body,
+    laborCost,
+    serviceCharges,
+    price: laborCost + serviceCharges,
+    image: body.image ? landingImage(body.image, 'Service photo') : ''
+  };
 }
 
 function landingContentPayload(section, body) {
@@ -474,13 +505,13 @@ function landingContentPayload(section, body) {
     error.status = 400;
     throw error;
   }
-  const common = { image: landingImage(body.image, 'Content photo'), active: body.active !== false };
+  const common = { image: body.image ? landingImage(body.image, 'Content photo') : '', active: body.active !== false };
   if (section === 'recentWork') {
-    requireFields(body, ['title', 'image']);
+    requireFields(body, ['title']);
     return { ...common, title: String(body.title).trim().slice(0, 100) };
   }
   if (section === 'news') {
-    requireFields(body, ['date', 'category', 'title', 'image']);
+    requireFields(body, ['date', 'category', 'title']);
     const parsedDate = new Date(`${body.date}T00:00:00Z`);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(body.date) || Number.isNaN(parsedDate.getTime()) || parsedDate.toISOString().slice(0, 10) !== body.date) {
       const error = new Error('News date must use YYYY-MM-DD format.');
@@ -512,16 +543,16 @@ app.post('/api/auth/register', async (req, res, next) => {
 
 app.post('/api/auth/login', async (req, res, next) => {
   try {
-    const { role, email, password } = req.body;
-    requireFields(req.body, ['role', 'email', 'password']);
-    const validatedRole = validateRole(role);
-    const userRecord = await withDatabaseTimeout(store.findUserByEmailRole(validateEmail(email), validatedRole));
+    const { email, password } = req.body;
+    requireFields(req.body, ['email', 'password']);
+    const userRecord = await withDatabaseTimeout(store.findUserByEmail(validateEmail(email)));
     const isValid = userRecord ? await bcrypt.compare(password, userRecord.passwordHash) : false;
 
     if (!isValid || String(userRecord.status || '').toLowerCase() !== 'active') {
-      return res.status(401).json({ message: 'Invalid email, password or selected role.' });
+      return res.status(401).json({ message: 'Invalid email or password.' });
     }
 
+    validateRole(userRecord.role);
     const user = store.publicUser(userRecord);
     const token = signUser(user);
     sendAuthCookie(res, token);
@@ -576,6 +607,14 @@ app.use(express.static(path.join(__dirname)));
 app.get('/api/customer/dashboard', requireAuth('customer'), async (req, res, next) => {
   try {
     res.json(await store.getCustomerDashboard(req.user.id));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get('/api/customer/bookings/progress', requireAuth('customer'), async (req, res, next) => {
+  try {
+    res.json({ bookings: await store.getCustomerBookingProgress(req.user.id) });
   } catch (error) {
     next(error);
   }
@@ -808,7 +847,7 @@ app.put('/api/technician/jobs/:id/accept', requireAuth('technician'), async (req
 
 app.post('/api/technician/jobs/:id/progress', requireAuth('technician'), async (req, res, next) => {
   try {
-    requireFields(req.body, ['progressPercentage', 'status']);
+    requireFields(req.body, ['status']);
     const progress = await store.updateTechnicianProgress(req.user.id, { ...req.body, serviceJobId: req.params.id });
     queueStore.invalidateReferenceData('serviceJobs');
     res.status(201).json(progress);
@@ -891,7 +930,7 @@ app.post('/api/technician/jobs/:id/documents/upload', requireAuth('technician'),
 
 app.put('/api/technician/jobs/:id/complete', requireAuth('technician'), async (req, res, next) => {
   try {
-    const job = await store.completeTechnicianJob(req.user.id, req.params.id);
+    const job = await store.completeTechnicianJob(req.user.id, req.params.id, req.body);
     queueStore.invalidateReferenceData('serviceJobs');
     res.json(job);
   } catch (error) {
@@ -1068,6 +1107,15 @@ app.put('/api/admin/bookings/:id/status', requireAuth('admin'), async (req, res,
     const booking = await store.advanceBooking(req.params.id);
     if (!booking) return res.status(404).json({ message: 'Booking not found.' });
     res.json(booking);
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get('/api/admin/bookings/:id/available-technicians', requireAuth('admin'), async (req, res, next) => {
+  try {
+    const technicians = await store.getAvailableTechniciansForBooking(req.params.id);
+    res.json({ technicians });
   } catch (error) {
     next(error);
   }
@@ -1575,7 +1623,7 @@ app.get('/api/admin/service-jobs/:id/details', requireAuth('admin'), async (req,
 
 app.post('/api/admin/invoices', requireAuth('admin'), async (req, res, next) => {
   try {
-    requireFields(req.body, ['customerId', 'service', 'amount', 'payment', 'date']);
+    requireFields(req.body, ['customerId', 'service', 'payment', 'date']);
     res.status(201).json(await store.createInvoice(req.body));
   } catch (error) {
     next(error);

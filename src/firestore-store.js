@@ -35,8 +35,6 @@ const collections = {
 
 const landingStatsDocument = 'landing-stats';
 const companySettingsDocument = 'company';
-const systemAssetBase = `${String(process.env.SUPABASE_URL || '').replace(/\/$/, '')}/storage/v1/object/public/${process.env.SUPABASE_STORAGE_BUCKET || 'service-station'}/company/system-assets`;
-const systemAsset = (fileName) => `${systemAssetBase}/${fileName}`;
 const landingContentDocumentPrefix = 'landing-content';
 const landingStatDefaults = {
   happyCustomers: 20000,
@@ -44,19 +42,21 @@ const landingStatDefaults = {
 };
 const landingContentDefaults = {
   recentWork: [
-    { title: 'Suspension Inspection', image: systemAsset('service-wheel-closeup.png'), active: true },
-    { title: 'Exhaust System Repair', image: systemAsset('workshop-lift-mechanic.png'), active: true },
-    { title: 'Engine Diagnostics', image: systemAsset('about-mechanic-red-car.png'), active: true }
+    { title: 'Suspension Inspection', image: '', active: true },
+    { title: 'Exhaust System Repair', image: '', active: true },
+    { title: 'Engine Diagnostics', image: '', active: true }
   ],
   news: [
-    { date: '2026-01-23', category: 'Maintenance', title: 'A well-maintained car is like a well tuned instrument.', image: systemAsset('about-mechanic-red-car.png'), active: true },
-    { date: '2026-01-11', category: 'Auto Service', title: 'The best car service is the one that keeps you moving forward.', image: systemAsset('workshop-lift-mechanic.png'), active: true },
-    { date: '2026-01-07', category: 'Car Care', title: 'We provide peace of mind with top-notch car service.', image: systemAsset('hero-blue-workshop.png'), active: true }
+    { date: '2026-01-23', category: 'Maintenance', title: 'A well-maintained car is like a well tuned instrument.', image: '', active: true },
+    { date: '2026-01-11', category: 'Auto Service', title: 'The best car service is the one that keeps you moving forward.', image: '', active: true },
+    { date: '2026-01-07', category: 'Car Care', title: 'We provide peace of mind with top-notch car service.', image: '', active: true }
   ]
 };
 
-const defaultImage = systemAsset('hero-blue-workshop.png');
-const defaultServiceImage = systemAsset('service-wheel-closeup.png');
+function uploadedImageUrl(value) {
+  const url = String(value || '').trim();
+  return url.includes('/company/system-assets/') ? '' : url;
+}
 const serviceJobStatuses = ['Pending', 'Assigned', 'In Progress', 'Waiting For Parts', 'Quality Check', 'Completed', 'Cancelled'];
 const inventoryCategories = ['Engine Parts', 'Brake System', 'Electrical', 'Suspension', 'Cooling System', 'Filters', 'Fluids & Lubricants', 'Batteries', 'Tires & Wheels', 'Accessories'];
 const partConditions = ['Brand New', 'Used', 'Refurbished', 'Reconditioned', 'Customer Supplied'];
@@ -70,6 +70,11 @@ const serviceDayStartHour = Number(process.env.SERVICE_DAY_START_HOUR || 8);
 const serviceDayEndHour = Number(process.env.SERVICE_DAY_END_HOUR || 17);
 const serviceSlotMinutes = Number(process.env.SERVICE_SLOT_MINUTES || 60);
 const readCache = new Map();
+const defaultCollectionCacheMs = Math.max(5000, Number(process.env.FIRESTORE_COLLECTION_CACHE_MS) || 15 * 1000);
+const queryCacheMs = Math.max(5000, Number(process.env.FIRESTORE_QUERY_CACHE_MS) || 30 * 1000);
+const documentCacheMs = Math.max(5000, Number(process.env.FIRESTORE_DOCUMENT_CACHE_MS) || 30 * 1000);
+const authUserCacheMs = Math.max(1000, Number(process.env.AUTH_USER_CACHE_MS) || 5 * 1000);
+const readCacheMaxEntries = Math.max(100, Number(process.env.FIRESTORE_CACHE_MAX_ENTRIES) || 2000);
 const stableCollectionCacheMs = {
   [collections.servicePackages]: Math.max(60000, Number(process.env.SERVICE_PACKAGE_CACHE_MS) || 5 * 60 * 1000),
   [collections.pricingPlans]: Math.max(60000, Number(process.env.PRICING_PLAN_CACHE_MS) || 5 * 60 * 1000),
@@ -94,8 +99,26 @@ const readCacheStats = {
   startedAt: new Date().toISOString(),
   hits: 0,
   misses: 0,
-  invalidations: 0
+  invalidations: 0,
+  evictions: 0
 };
+
+function pruneReadCache() {
+  if (readCache.size < readCacheMaxEntries) return;
+  const now = Date.now();
+  for (const [key, entry] of readCache.entries()) {
+    if (entry.expiresAt <= now) {
+      readCache.delete(key);
+      readCacheStats.evictions += 1;
+    }
+  }
+  while (readCache.size >= readCacheMaxEntries) {
+    const oldestKey = readCache.keys().next().value;
+    if (oldestKey === undefined) break;
+    readCache.delete(oldestKey);
+    readCacheStats.evictions += 1;
+  }
+}
 
 async function cachedRead(key, ttl, loader) {
   const existing = readCache.get(key);
@@ -105,6 +128,7 @@ async function cachedRead(key, ttl, loader) {
   }
 
   readCacheStats.misses += 1;
+  pruneReadCache();
   const value = Promise.resolve().then(loader);
   readCache.set(key, { expiresAt: Date.now() + ttl, value });
   try {
@@ -115,8 +139,18 @@ async function cachedRead(key, ttl, loader) {
   }
 }
 
-function invalidateReadCaches(collection) {
+function invalidateReadCaches(collection, id) {
   if (readCache.delete(`collection:${collection}`)) readCacheStats.invalidations += 1;
+  for (const key of readCache.keys()) {
+    if (key.startsWith(`query:${collection}:`)
+      || (id === undefined && key.startsWith(`document:${collection}:`))) {
+      readCache.delete(key);
+      readCacheStats.invalidations += 1;
+    }
+  }
+  if (id !== undefined && readCache.delete(`document:${collection}:${id}`)) {
+    readCacheStats.invalidations += 1;
+  }
   (publicProjectionDependencies[collection] || []).forEach((projection) => {
     if (readCache.delete(`public:${projection}`)) readCacheStats.invalidations += 1;
   });
@@ -138,6 +172,18 @@ function getFirestoreReadCacheStats() {
 
 function fieldValue() {
   return admin.firestore.FieldValue.serverTimestamp();
+}
+
+function documentTtl(collection) {
+  return collection === collections.users ? authUserCacheMs : documentCacheMs;
+}
+
+function cacheDocumentRecord(collection, item) {
+  pruneReadCache();
+  readCache.set(`document:${collection}:${item.id}`, {
+    expiresAt: Date.now() + documentTtl(collection),
+    value: Promise.resolve(item)
+  });
 }
 
 function asId(value) {
@@ -507,29 +553,49 @@ async function all(collection) {
     const snapshot = await db.collection(collection).get();
     return snapshot.docs.map((doc) => ({ id: Number(doc.id), ...doc.data() }));
   };
-  const ttl = stableCollectionCacheMs[collection];
-  const items = ttl
-    ? await cachedRead(`collection:${collection}`, ttl, loadCollection)
-    : await loadCollection();
+  const ttl = stableCollectionCacheMs[collection] || defaultCollectionCacheMs;
+  const items = await cachedRead(`collection:${collection}`, ttl, loadCollection);
+  items.forEach((item) => cacheDocumentRecord(collection, item));
   return items.map((item) => ({ ...item }));
 }
 
 async function allWhere(collection, field, value) {
   assertFirebaseConfigured();
-  const snapshot = await db.collection(collection).where(field, '==', value).get();
-  return snapshot.docs.map((doc) => ({ id: Number(doc.id), ...doc.data() }));
+  const key = `query:${collection}:equal:${field}:${JSON.stringify(value)}`;
+  const items = await cachedRead(key, queryCacheMs, async () => {
+    const snapshot = await db.collection(collection).where(field, '==', value).get();
+    return snapshot.docs.map((doc) => ({ id: Number(doc.id), ...doc.data() }));
+  });
+  items.forEach((item) => cacheDocumentRecord(collection, item));
+  return items.map((item) => ({ ...item }));
 }
 
 async function allWhereAny(collection, field, values) {
   const uniqueValues = [...new Set(values.map(Number).filter(Number.isFinite))];
   if (!uniqueValues.length) return [];
-  return (await Promise.all(uniqueValues.map((value) => allWhere(collection, field, value)))).flat();
+  const chunks = [];
+  for (let index = 0; index < uniqueValues.length; index += 30) {
+    chunks.push(uniqueValues.slice(index, index + 30));
+  }
+  const groups = await Promise.all(chunks.map(async (chunk) => {
+    const key = `query:${collection}:in:${field}:${JSON.stringify(chunk)}`;
+    return cachedRead(key, queryCacheMs, async () => {
+      const snapshot = await db.collection(collection).where(field, 'in', chunk).get();
+      return snapshot.docs.map((doc) => ({ id: Number(doc.id), ...doc.data() }));
+    });
+  }));
+  const items = groups.flat();
+  items.forEach((item) => cacheDocumentRecord(collection, item));
+  return items.map((item) => ({ ...item }));
 }
 
 async function getById(collection, id) {
   assertFirebaseConfigured();
-  const snapshot = await docRef(collection, id).get();
-  return snapshot.exists ? { id: Number(snapshot.id), ...snapshot.data() } : null;
+  const item = await cachedRead(`document:${collection}:${id}`, documentTtl(collection), async () => {
+    const snapshot = await docRef(collection, id).get();
+    return snapshot.exists ? { id: Number(snapshot.id), ...snapshot.data() } : null;
+  });
+  return item ? { ...item } : null;
 }
 
 async function nextId(transaction, collection) {
@@ -576,7 +642,7 @@ async function createDocument(collection, data) {
     transaction.set(ref, { ...data, id, createdAt: fieldValue() });
     return { ...data, id };
   });
-  invalidateReadCaches(collection);
+  invalidateReadCaches(collection, item.id);
   return item;
 }
 
@@ -586,7 +652,7 @@ async function createQueuedBookingDocument(data) {
   const queueRef = db.collection('meta').doc(`booking-queue-${bookingDate}`);
   const bookingsForDate = db.collection(collections.bookings).where('bookingDate', '==', bookingDate);
 
-  return db.runTransaction(async (transaction) => {
+  const booking = await db.runTransaction(async (transaction) => {
     const [bookingsSnapshot, queueSnapshot] = await Promise.all([
       transaction.get(bookingsForDate),
       transaction.get(queueRef)
@@ -610,6 +676,8 @@ async function createQueuedBookingDocument(data) {
     transaction.set(ref, { ...data, bookingDate, queuePosition, id, createdAt: fieldValue() });
     return { ...data, bookingDate, queuePosition, id };
   });
+  invalidateReadCaches(collections.bookings, booking.id);
+  return booking;
 }
 
 async function moveBookingToDateQueue(id, data) {
@@ -619,7 +687,7 @@ async function moveBookingToDateQueue(id, data) {
   const queueRef = db.collection('meta').doc(`booking-queue-${bookingDate}`);
   const bookingsForDate = db.collection(collections.bookings).where('bookingDate', '==', bookingDate);
 
-  return db.runTransaction(async (transaction) => {
+  const booking = await db.runTransaction(async (transaction) => {
     const [bookingSnapshot, bookingsSnapshot, queueSnapshot] = await Promise.all([
       transaction.get(bookingRef),
       transaction.get(bookingsForDate),
@@ -639,6 +707,8 @@ async function moveBookingToDateQueue(id, data) {
     transaction.set(bookingRef, { ...data, bookingDate, queuePosition, updatedAt: fieldValue() }, { merge: true });
     return { ...bookingSnapshot.data(), ...data, bookingDate, queuePosition, id: Number(id) };
   });
+  if (booking) invalidateReadCaches(collections.bookings, id);
+  return booking;
 }
 
 async function updateDocument(collection, id, data) {
@@ -647,14 +717,14 @@ async function updateDocument(collection, id, data) {
   const snapshot = await ref.get();
   if (!snapshot.exists) return null;
   await ref.set({ ...data, updatedAt: fieldValue() }, { merge: true });
-  invalidateReadCaches(collection);
-  return getById(collection, id);
+  invalidateReadCaches(collection, id);
+  return { id: Number(snapshot.id), ...snapshot.data(), ...data };
 }
 
 async function deleteDocument(collection, id) {
   assertFirebaseConfigured();
   await docRef(collection, id).delete();
-  invalidateReadCaches(collection);
+  invalidateReadCaches(collection, id);
 }
 
 function publicUser(user) {
@@ -713,13 +783,13 @@ function vehicleView(vehicle) {
     year: vehicle.year,
     fuelType: vehicle.fuelType || '',
     color: vehicle.color || '',
-    image: vehicle.frontImage || vehicle.imageUrl || defaultImage,
-    frontImage: vehicle.frontImage || vehicle.imageUrl || '',
-    rearImage: vehicle.rearImage || '',
-    leftImage: vehicle.leftImage || '',
-    rightImage: vehicle.rightImage || '',
-    interiorImage: vehicle.interiorImage || '',
-    engineImage: vehicle.engineImage || ''
+    image: uploadedImageUrl(vehicle.frontImage || vehicle.imageUrl),
+    frontImage: uploadedImageUrl(vehicle.frontImage || vehicle.imageUrl),
+    rearImage: uploadedImageUrl(vehicle.rearImage),
+    leftImage: uploadedImageUrl(vehicle.leftImage),
+    rightImage: uploadedImageUrl(vehicle.rightImage),
+    interiorImage: uploadedImageUrl(vehicle.interiorImage),
+    engineImage: uploadedImageUrl(vehicle.engineImage)
   };
 }
 
@@ -730,7 +800,7 @@ function pricingPlanView(plan) {
     badge: plan.badge || '',
     price: Number(plan.price || 0),
     billingPeriod: plan.billingPeriod || 'month',
-    image: plan.image || defaultImage,
+    image: uploadedImageUrl(plan.image),
     features: Array.isArray(plan.features) ? plan.features.filter(Boolean) : [],
     buttonText: plan.buttonText || `Choose ${plan.name || 'Plan'}`,
     featured: Boolean(plan.featured),
@@ -873,6 +943,7 @@ async function selectCustomerPackage(userId, pricingPlanId) {
     }
     return { changed: !unchanged, planName: plan.name || 'Service Plan' };
   });
+  if (result.changed) invalidateReadCaches(collections.customerPackages, customerId);
 
   const selected = await getById(collections.customerPackages, customerId);
   const plan = await getById(collections.pricingPlans, selected.pricingPlanId);
@@ -1058,6 +1129,7 @@ async function reviewCustomerPackageRequest(adminUserId, requestId, decision, re
     packageRequestId: request.id,
     updatedAt: fieldValue()
   }, { merge: true });
+  invalidateReadCaches(collections.customerPackages, request.userId);
   await updateDocument(collections.customerPackageRequests, request.id, {
     status: 'Approved',
     paymentStatus: Number(request.price || 0) > 0 ? 'Paid' : 'Not Required',
@@ -1239,17 +1311,66 @@ async function dashboardContext() {
   };
 }
 
+async function contextForJobs(jobs, knownTechnicians = []) {
+  const technicianMap = new Map(knownTechnicians.map((technician) => [Number(technician.id), technician]));
+  const missingTechnicianIds = [...new Set(jobs
+    .map((job) => Number(job.assignedTechnicianId))
+    .filter((id) => Number.isFinite(id) && !technicianMap.has(id)))];
+  const loadedTechnicians = (await Promise.all(
+    missingTechnicianIds.map((id) => getById(collections.technicians, id))
+  )).filter(Boolean);
+  loadedTechnicians.forEach((technician) => technicianMap.set(Number(technician.id), technician));
+  const technicians = [...technicianMap.values()];
+
+  const userIds = [...new Set([
+    ...jobs.map((job) => Number(job.customerId)),
+    ...technicians.map((technician) => Number(technician.userId))
+  ].filter(Number.isFinite))];
+  const vehicleIds = [...new Set(jobs.map((job) => Number(job.vehicleId)).filter(Number.isFinite))];
+  const bookingIds = [...new Set(jobs.map((job) => Number(job.bookingId)).filter(Number.isFinite))];
+  const [users, vehicles, bookings] = await Promise.all([
+    Promise.all(userIds.map((id) => getById(collections.users, id))),
+    Promise.all(vehicleIds.map((id) => getById(collections.vehicles, id))),
+    Promise.all(bookingIds.map((id) => getById(collections.bookings, id)))
+  ]);
+  const existingUsers = users.filter(Boolean);
+  const existingVehicles = vehicles.filter(Boolean);
+  const existingBookings = bookings.filter(Boolean);
+
+  return {
+    usersById: new Map(existingUsers.map((user) => [Number(user.id), user])),
+    vehiclesById: new Map(existingVehicles.map((vehicle) => [Number(vehicle.id), vehicle])),
+    bookingsById: new Map(existingBookings.map((booking) => [Number(booking.id), booking])),
+    techniciansById: technicianMap
+  };
+}
+
 async function adminUsers() {
   return allWhere(collections.users, 'role', 'admin');
 }
 
-async function createUserNotification(userId, type, message) {
+async function createUserNotification(userId, type, message, metadata = {}) {
   return createDocument(collections.notifications, {
     userId: asId(userId),
     type,
     message,
-    unread: true
+    unread: true,
+    ...(metadata.action ? { action: String(metadata.action) } : {}),
+    ...(metadata.serviceJobId ? { serviceJobId: asId(metadata.serviceJobId) } : {}),
+    ...(metadata.invoiceId ? { invoiceId: asId(metadata.invoiceId) } : {})
   });
+}
+
+function receivedNotificationView(notification) {
+  return {
+    id: notification.id,
+    type: notification.type,
+    message: notification.message,
+    unread: notification.unread,
+    action: notification.action || '',
+    serviceJobId: notification.serviceJobId || null,
+    invoiceId: notification.invoiceId || null
+  };
 }
 
 function vehicleNotificationLabel(vehicle) {
@@ -1290,7 +1411,7 @@ async function getUserNotifications(userId) {
   const notifications = await allWhere(collections.notifications, 'userId', Number(userId));
   return sortById(notifications)
     .reverse()
-    .map(({ id, type, message, unread }) => ({ id, type, message, unread }));
+    .map(receivedNotificationView);
 }
 
 function sentNotificationView(notification, usersById) {
@@ -1331,7 +1452,7 @@ async function getAdminMessageCenter(userId) {
   return {
     received: sortById(received)
       .reverse()
-      .map(({ id, type, message, unread }) => ({ id, type, message, unread })),
+      .map(receivedNotificationView),
     sent: sortById(sent)
       .reverse()
       .map((item) => sentNotificationView(item, usersById)),
@@ -1341,9 +1462,9 @@ async function getAdminMessageCenter(userId) {
   };
 }
 
-async function notifyAdmins(type, message) {
+async function notifyAdmins(type, message, metadata = {}) {
   const admins = await adminUsers();
-  await Promise.all(admins.map((user) => createUserNotification(user.id, type, message)));
+  await Promise.all(admins.map((user) => createUserNotification(user.id, type, message, metadata)));
 }
 
 async function getTechnicianByUserId(userId) {
@@ -1387,6 +1508,7 @@ function landingContentView(settings = {}) {
     return [section, defaults.map((fallback, index) => ({
       ...fallback,
       ...(savedItems[index] || {}),
+      image: uploadedImageUrl(savedItems[index]?.image || fallback.image),
       slot: index
     }))];
   }));
@@ -1412,6 +1534,16 @@ async function findUserByEmailRole(email, role) {
   const snapshot = await db.collection(collections.users)
     .where('emailLower', '==', emailKey(email))
     .where('role', '==', role)
+    .limit(1)
+    .get();
+
+  return snapshot.empty ? null : { id: Number(snapshot.docs[0].id), ...snapshot.docs[0].data() };
+}
+
+async function findUserByEmail(email) {
+  assertFirebaseConfigured();
+  const snapshot = await db.collection(collections.users)
+    .where('emailLower', '==', emailKey(email))
     .limit(1)
     .get();
 
@@ -1457,6 +1589,7 @@ async function ensureUserByEmailRole({ id, role, name, email, phone = '', passwo
 
   if (!preferredSnapshot.exists) {
     await preferredRef.set({ ...userData, id, createdAt: fieldValue() });
+    invalidateReadCaches(collections.users, id);
     return { id, ...userData };
   }
 
@@ -1693,7 +1826,7 @@ function buildInventoryReports(parts, movements, usages, context = {}) {
 
 async function getAdminDashboard(userId) {
   assertFirebaseConfigured();
-  const [users, vehicles, bookings, packages, pricingPlans, packageRequests, invoices, emergencies, notifications, notificationDrafts, feedback, technicians, serviceJobs, inventoryParts, suppliers, categories, movements, usages, photos, documents, landingStatsSnapshot, landingContentSettings, companySettingsSnapshot] = await Promise.all([
+  const [users, vehicles, bookings, packages, pricingPlans, packageRequests, invoices, emergencies, receivedNotifications, sentNotifications, notificationDrafts, feedback, technicians, serviceJobs, inventoryParts, suppliers, categories, movements, usages, photos, documents, landingStatsSnapshot, landingContentSettings, companySettingsSnapshot] = await Promise.all([
     all(collections.users),
     all(collections.vehicles),
     all(collections.bookings),
@@ -1702,8 +1835,9 @@ async function getAdminDashboard(userId) {
     all(collections.customerPackageRequests),
     all(collections.invoices),
     all(collections.emergencyRequests),
-    all(collections.notifications),
-    all(collections.notificationDrafts),
+    allWhere(collections.notifications, 'userId', Number(userId)),
+    allWhere(collections.notifications, 'senderUserId', Number(userId)),
+    allWhere(collections.notificationDrafts, 'createdByUserId', Number(userId)),
     all(collections.feedback),
     all(collections.technicians),
     all(collections.serviceJobs),
@@ -1755,7 +1889,16 @@ async function getAdminDashboard(userId) {
     inventoryReports,
     technicianWorkload: buildTechnicianWorkload(visibleTechnicians, jobViews, context.usersById),
     technicianPerformance: buildTechnicianPerformance(visibleTechnicians, jobViews, context.usersById),
-    packages: sortById(packages.filter((service) => service.archived !== true)).map(({ id, name, price, duration, description, image }) => ({ id, name, price: Number(price), duration, description, image: image || defaultServiceImage })),
+    packages: sortById(packages.filter((service) => service.archived !== true)).map(({ id, name, price, laborCost, serviceCharges, duration, description, image }) => ({
+      id,
+      name,
+      price: Number(price),
+      laborCost: Number(laborCost || 0),
+      serviceCharges: Number(serviceCharges ?? price ?? 0),
+      duration,
+      description,
+      image: uploadedImageUrl(image)
+    })),
     pricingPlans: pricingPlans.map(pricingPlanView).sort((a, b) => a.displayOrder - b.displayOrder || a.id - b.id),
     packageRequests: sortById(packageRequests).reverse().map((request) => packageRequestView(
       request,
@@ -1764,9 +1907,9 @@ async function getAdminDashboard(userId) {
     )),
     invoices: sortDateDesc(invoices.map((item) => invoiceView(item, serviceMap)), 'date'),
     emergencies: sortById(emergencies).reverse().map(({ id, userId, customerId, location, problem, status }) => ({ id, customerId: customerId || userId, location, problem, status })),
-    notifications: sortById(notifications.filter((item) => Number(item.userId) === Number(userId))).reverse().map(({ id, type, message, unread }) => ({ id, type, message, unread })),
-    sentNotifications: sortById(notifications.filter((item) => Number(item.senderUserId) === Number(userId))).reverse().map((item) => sentNotificationView(item, context.usersById)),
-    notificationDrafts: sortById(notificationDrafts.filter((item) => Number(item.createdByUserId) === Number(userId))).reverse().map((item) => notificationDraftView(item, context.usersById)),
+    notifications: sortById(receivedNotifications).reverse().map(receivedNotificationView),
+    sentNotifications: sortById(sentNotifications).reverse().map((item) => sentNotificationView(item, context.usersById)),
+    notificationDrafts: sortById(notificationDrafts).reverse().map((item) => notificationDraftView(item, context.usersById)),
     feedback: sortById(feedback).reverse().map(({ id, userId, customerId, rating, comment }) => ({ id, customerId: customerId || userId, rating, comment })),
     landingStats: landingStatsView(
       landingStatsSnapshot.exists ? landingStatsSnapshot.data() : {},
@@ -1777,6 +1920,17 @@ async function getAdminDashboard(userId) {
     landingContent: landingContentView(landingContentSettings),
     companySettings: companySettingsSnapshot.exists ? companySettingsSnapshot.data() : {}
   };
+}
+
+async function getCustomerBookingProgress(userId) {
+  const bookings = await allWhere(collections.bookings, 'userId', Number(userId));
+  return bookings
+    .filter((booking) => booking.hiddenForCustomer !== true)
+    .map((booking) => ({
+      id: booking.id,
+      status: booking.status,
+      progress: Number(booking.progress || 0)
+    }));
 }
 
 async function updateCompanySettings(data) {
@@ -1793,20 +1947,25 @@ async function updateCompanySettings(data) {
 }
 
 async function getAdminServiceJobDetails(serviceJobId) {
-  const [job, context, notes, progress, usages, replacedParts, photos, documents] = await Promise.all([
-    getById(collections.serviceJobs, serviceJobId),
-    dashboardContext(),
-    all(collections.technicianNotes),
-    all(collections.technicianProgress),
-    all(collections.serviceJobParts),
-    all(collections.replacedParts),
-    all(collections.serviceImages),
-    all(collections.documents)
-  ]);
-
+  const job = await getById(collections.serviceJobs, serviceJobId);
   if (!job) return null;
 
   const id = Number(serviceJobId);
+  const [context, notes, progress, usages, replacedParts, photos, documents] = await Promise.all([
+    contextForJobs([job]),
+    allWhere(collections.technicianNotes, 'serviceJobId', id),
+    allWhere(collections.technicianProgress, 'serviceJobId', id),
+    allWhere(collections.serviceJobParts, 'serviceJobId', id),
+    allWhere(collections.replacedParts, 'serviceJobId', id),
+    allWhere(collections.serviceImages, 'serviceJobId', id),
+    allWhere(collections.documents, 'serviceJobId', id)
+  ]);
+  const parts = (await Promise.all(
+    [...new Set(usages.map((usage) => Number(usage.partId)).filter(Number.isFinite))]
+      .map((partId) => getById(collections.inventoryParts, partId))
+  )).filter(Boolean);
+  context.partsById = new Map(parts.map((part) => [Number(part.id), part]));
+
   return {
     job: serviceJobView(job, context),
     progress: sortById(progress.filter((item) => Number(item.serviceJobId) === id)).reverse().map((item) => ({
@@ -1847,7 +2006,7 @@ async function createVehicle(userId, data) {
     year: String(data.year).trim(),
     fuelType: String(data.fuelType || '').trim(),
     color: String(data.color || '').trim(),
-    imageUrl: String(data.frontImage || data.image || defaultImage).trim(),
+    imageUrl: String(data.frontImage || data.image || '').trim(),
     frontImage: String(data.frontImage || data.image || '').trim(),
     rearImage: String(data.rearImage || '').trim(),
     leftImage: String(data.leftImage || '').trim(),
@@ -1877,7 +2036,7 @@ async function updateVehicle(id, userId, data, enforceOwner = true) {
     year: String(data.year).trim(),
     fuelType: String(data.fuelType ?? current.fuelType ?? '').trim(),
     color: String(data.color ?? current.color ?? '').trim(),
-    imageUrl: String(data.frontImage || data.image || current.frontImage || current.imageUrl || defaultImage).trim(),
+    imageUrl: String(data.frontImage || data.image || current.frontImage || current.imageUrl || '').trim(),
     frontImage: String(data.frontImage ?? current.frontImage ?? data.image ?? current.imageUrl ?? '').trim(),
     rearImage: String(data.rearImage ?? current.rearImage ?? '').trim(),
     leftImage: String(data.leftImage ?? current.leftImage ?? '').trim(),
@@ -1912,6 +2071,25 @@ async function deleteVehicle(id, userId, enforceOwner = true) {
 
 function bookingProgress(status) {
   return status === 'Completed' ? 100 : status === 'In Progress' ? 70 : status === 'Approved' ? 35 : status === 'Cancelled' ? 0 : 10;
+}
+
+function serviceJobProgress(status) {
+  return {
+    Pending: 0,
+    Assigned: 35,
+    'In Progress': 70,
+    'Waiting For Parts': 70,
+    'Quality Check': 90,
+    Completed: 100,
+    Cancelled: 0
+  }[status] ?? 0;
+}
+
+function bookingStatusForServiceJob(status) {
+  if (status === 'Completed') return 'Completed';
+  if (status === 'Cancelled') return 'Cancelled';
+  if (['In Progress', 'Waiting For Parts', 'Quality Check'].includes(status)) return 'In Progress';
+  return 'Approved';
 }
 
 function normalizeServiceType(value) {
@@ -2027,12 +2205,15 @@ async function bookingAvailability({ serviceName, date, time, excludeBookingId =
     throw error;
   }
 
-  const [bookings, technicians, users, serviceMap] = await Promise.all([
-    all(collections.bookings),
+  const [bookings, technicians, serviceMap] = await Promise.all([
+    allWhere(collections.bookings, 'bookingDate', formatDate(date)),
     all(collections.technicians),
-    all(collections.users),
     servicesById()
   ]);
+  const users = (await Promise.all(
+    [...new Set(technicians.map((technician) => Number(technician.userId)).filter(Number.isFinite))]
+      .map((userId) => getById(collections.users, userId))
+  )).filter(Boolean);
   const usersById = new Map(users.map((user) => [Number(user.id), user]));
   const durationMinutes = parseDurationMinutes(service.duration);
   const start = dateTimeMs(date, time);
@@ -2059,6 +2240,39 @@ async function bookingAvailability({ serviceName, date, time, excludeBookingId =
     availableTechnicians: techniciansAvailable.map((technician) => ({ ...technician, user: usersById.get(Number(technician.userId)) })),
     availableBays: baysAvailable
   };
+}
+
+async function getAvailableTechniciansForBooking(bookingId) {
+  const booking = await getById(collections.bookings, bookingId);
+  if (!booking) {
+    const error = new Error('Booking not found.');
+    error.status = 404;
+    throw error;
+  }
+  if (!['Pending', 'Approved'].includes(booking.status)) {
+    const error = new Error('Technicians can only be suggested for pending or approved bookings.');
+    error.status = 409;
+    throw error;
+  }
+
+  const service = booking.servicePackageId
+    ? await getById(collections.servicePackages, booking.servicePackageId)
+    : null;
+  const serviceName = service?.name || booking.serviceName;
+  if (!serviceName) {
+    const error = new Error('The booking does not have a valid service package.');
+    error.status = 400;
+    throw error;
+  }
+
+  const availability = await bookingAvailability({
+    serviceName,
+    date: formatDate(booking.bookingDate),
+    time: booking.bookingTime,
+    excludeBookingId: booking.id
+  });
+
+  return availability.availableTechnicians.map((technician) => technicianView(technician, technician.user));
 }
 
 function assertBookingCapacity(availability, data) {
@@ -2274,6 +2488,7 @@ async function cancelBooking(id, userId, enforceOwner = true, reason = '') {
     };
   });
   if (!booking) return false;
+  invalidateReadCaches(collections.bookings);
   const [service, vehicle] = await Promise.all([
     getById(collections.servicePackages, current.servicePackageId),
     getById(collections.vehicles, current.vehicleId)
@@ -2300,13 +2515,18 @@ async function advanceBooking(id) {
   const current = await getById(collections.bookings, id);
   if (!current) return null;
 
+  if (current.status === 'Pending') {
+    const error = new Error('Assign a technician before approving this booking.');
+    error.status = 409;
+    throw error;
+  }
+
   const flow = {
-    Pending: ['Approved', 35],
     Approved: ['In Progress', 70],
     'In Progress': ['Completed', 100],
     Completed: ['Completed', 100]
   };
-  const [status, progress] = flow[current.status] || ['Approved', 35];
+  const [status, progress] = flow[current.status] || [current.status, current.progress];
   const booking = await updateDocument(collections.bookings, id, { status, progress });
   if (status !== current.status) {
     await createUserNotification(current.userId, 'Booking Status Updated', `Your booking #BK-${id} is now ${status}.`);
@@ -2365,7 +2585,7 @@ async function createFeedback(userId, data) {
     throw error;
   }
 
-  const bookings = await all(collections.bookings);
+  const bookings = await allWhere(collections.bookings, 'userId', Number(userId));
   const hasCompletedService = bookings.some((booking) => (
     Number(booking.userId) === Number(userId)
     && booking.status === 'Completed'
@@ -2411,7 +2631,7 @@ async function getPublicServiceRatings() {
           price: Number(service.price || 0),
           duration: service.duration || '',
           description: service.description || '',
-          image: service.image || defaultServiceImage,
+          image: uploadedImageUrl(service.image),
           averageRating: reviews.length ? Number((total / reviews.length).toFixed(1)) : 0,
           reviewCount: reviews.length,
           recentReviews: reviews
@@ -2570,19 +2790,19 @@ async function deleteCustomer(id) {
   const customer = await getById(collections.users, id);
   if (!customer || customer.role !== 'customer') return false;
 
+  const customerId = Number(id);
   const [vehicles, bookings, invoices, jobs, emergencies, feedback, notifications, notificationDrafts, queueEntries, customerPackage] = await Promise.all([
-    all(collections.vehicles),
-    all(collections.bookings),
-    all(collections.invoices),
-    all(collections.serviceJobs),
-    all(collections.emergencyRequests),
-    all(collections.feedback),
-    all(collections.notifications),
-    all(collections.notificationDrafts),
-    all(collections.queueEntries),
+    allWhere(collections.vehicles, 'userId', customerId),
+    allWhere(collections.bookings, 'userId', customerId),
+    allWhere(collections.invoices, 'userId', customerId),
+    allWhere(collections.serviceJobs, 'customerId', customerId),
+    allWhere(collections.emergencyRequests, 'userId', customerId),
+    allWhere(collections.feedback, 'userId', customerId),
+    allWhere(collections.notifications, 'userId', customerId),
+    allWhere(collections.notificationDrafts, 'userId', customerId),
+    allWhere(collections.queueEntries, 'customerId', customerId),
     getById(collections.customerPackages, id)
   ]);
-  const customerId = Number(id);
   const dependencies = [
     ['vehicle', vehicles.some((item) => Number(item.userId) === customerId)],
     ['booking', bookings.some((item) => Number(item.userId) === customerId)],
@@ -2618,6 +2838,10 @@ async function deleteCustomer(id) {
       }, { merge: true });
     }
     await batch.commit();
+    [
+      collections.users, collections.vehicles, collections.bookings, collections.queueEntries,
+      collections.notifications, collections.notificationDrafts, collections.customerPackages
+    ].forEach((collection) => invalidateReadCaches(collection));
     return true;
   }
 
@@ -2632,7 +2856,11 @@ async function deleteCustomer(id) {
 
 async function itemCodeExists(itemCode, ignoreId) {
   const normalized = String(itemCode || '').trim().toUpperCase();
-  const parts = await all(collections.inventoryParts);
+  const [byItemCode, byLegacySku] = await Promise.all([
+    allWhere(collections.inventoryParts, 'itemCode', normalized),
+    allWhere(collections.inventoryParts, 'sku', normalized)
+  ]);
+  const parts = [...new Map([...byItemCode, ...byLegacySku].map((part) => [Number(part.id), part])).values()];
   return parts.some((part) => String(part.itemCode || part.sku || '').toUpperCase() === normalized && Number(part.id) !== Number(ignoreId));
 }
 
@@ -3068,7 +3296,7 @@ async function getIndividualReportPdf(reportType) {
 
 async function employeeNoExists(employeeNo, ignoreId) {
   const normalized = String(employeeNo || '').trim().toUpperCase();
-  const technicians = await all(collections.technicians);
+  const technicians = await allWhere(collections.technicians, 'employeeNo', normalized);
   return technicians.some((technician) => (
     technician.employeeNo === normalized && Number(technician.id) !== Number(ignoreId)
   ));
@@ -3147,9 +3375,11 @@ async function deleteTechnician(id) {
   const technician = await getById(collections.technicians, id);
   if (!technician) return false;
 
-  const [jobs, bookings] = await Promise.all([all(collections.serviceJobs), all(collections.bookings)]);
-  const hasLinkedWork = jobs.some((job) => Number(job.assignedTechnicianId) === Number(id))
-    || bookings.some((booking) => Number(booking.assignedTechnicianId) === Number(id));
+  const [jobs, bookings] = await Promise.all([
+    allWhere(collections.serviceJobs, 'assignedTechnicianId', Number(id)),
+    allWhere(collections.bookings, 'assignedTechnicianId', Number(id))
+  ]);
+  const hasLinkedWork = jobs.length > 0 || bookings.length > 0;
   if (hasLinkedWork) {
     const batch = db.batch();
     const timestamp = fieldValue();
@@ -3162,20 +3392,18 @@ async function deleteTechnician(id) {
       batch.set(docRef(collections.bookings, booking.id), { assignedTechnicianId: null, updatedAt: timestamp }, { merge: true });
     });
     await batch.commit();
+    [collections.technicians, collections.users, collections.serviceJobs, collections.bookings]
+      .forEach((collection) => invalidateReadCaches(collection));
     return true;
   }
 
   const [notifications, notificationDrafts] = await Promise.all([
-    all(collections.notifications),
-    all(collections.notificationDrafts)
+    allWhere(collections.notifications, 'userId', Number(technician.userId)),
+    allWhere(collections.notificationDrafts, 'userId', Number(technician.userId))
   ]);
   await Promise.all([
-    ...notifications
-      .filter((notification) => Number(notification.userId) === Number(technician.userId))
-      .map((notification) => deleteDocument(collections.notifications, notification.id)),
-    ...notificationDrafts
-      .filter((draft) => Number(draft.userId) === Number(technician.userId))
-      .map((draft) => deleteDocument(collections.notificationDrafts, draft.id))
+    ...notifications.map((notification) => deleteDocument(collections.notifications, notification.id)),
+    ...notificationDrafts.map((draft) => deleteDocument(collections.notificationDrafts, draft.id))
   ]);
   await deleteDocument(collections.technicians, id);
   await deleteDocument(collections.users, technician.userId);
@@ -3243,7 +3471,7 @@ async function createServiceJob(data) {
     await createUserNotification(technician.userId, 'Service Job Assigned', `Service job #SJ-${job.id} has been assigned to you.`);
   }
 
-  const context = await dashboardContext();
+  const context = await contextForJobs([job]);
   return serviceJobView(job, context);
 }
 
@@ -3254,29 +3482,72 @@ async function assignBookingTechnician(bookingId, technicianId, data = {}) {
     error.status = 404;
     throw error;
   }
-  if (booking.status !== 'Approved') {
-    const error = new Error('Approve the booking before assigning a technician.');
+  if (!['Pending', 'Approved'].includes(booking.status)) {
+    const error = new Error('Only pending or approved bookings can be assigned to a technician.');
     error.status = 409;
     throw error;
   }
 
+  const wasPending = booking.status === 'Pending';
   const existingJob = (await allWhere(collections.serviceJobs, 'bookingId', Number(bookingId)))
     .find((job) => job.status !== 'Cancelled');
-  if (existingJob) return assignTechnician(existingJob.id, technicianId);
+  let job;
 
-  const service = booking.servicePackageId
-    ? await getById(collections.servicePackages, booking.servicePackageId)
-    : null;
-  return createServiceJob({
-    bookingId: Number(bookingId),
-    vehicleId: booking.vehicleId,
-    customerId: booking.userId,
-    serviceType: service?.name || booking.serviceName || 'General Service',
-    assignedTechnicianId: Number(technicianId),
-    priority: data.priority || 'Normal',
-    startDate: data.startDate || formatDate(booking.bookingDate),
-    expectedCompletionDate: data.expectedCompletionDate || formatDate(booking.bookingDate)
-  });
+  if (existingJob && Number(existingJob.assignedTechnicianId) === Number(technicianId)) {
+    await assertTechnician(technicianId, true);
+    const availability = await bookingAvailability({
+      serviceName: existingJob.serviceType || booking.serviceName,
+      date: formatDate(booking.bookingDate),
+      time: booking.bookingTime,
+      excludeBookingId: booking.id
+    });
+    if (!availability.availableTechnicians.some((technician) => Number(technician.id) === Number(technicianId))) {
+      const error = new Error('Selected technician is not qualified or is already assigned during this booking period.');
+      error.status = 409;
+      throw error;
+    }
+    await updateDocument(collections.bookings, booking.id, {
+      status: 'Approved',
+      progress: 35,
+      assignedTechnicianId: asId(technicianId)
+    });
+    const updatedJob = await updateDocument(collections.serviceJobs, existingJob.id, {
+      status: 'Assigned',
+      assignedDate: existingJob.assignedDate || today()
+    });
+    const context = await contextForJobs([updatedJob]);
+    job = serviceJobView(updatedJob, context);
+  } else if (existingJob) {
+    job = await assignTechnician(existingJob.id, technicianId);
+    await updateDocument(collections.bookings, booking.id, {
+      status: 'Approved',
+      progress: 35,
+      assignedTechnicianId: asId(technicianId)
+    });
+  } else {
+    const service = booking.servicePackageId
+      ? await getById(collections.servicePackages, booking.servicePackageId)
+      : null;
+    job = await createServiceJob({
+      bookingId: Number(bookingId),
+      vehicleId: booking.vehicleId,
+      customerId: booking.userId,
+      serviceType: service?.name || booking.serviceName || 'General Service',
+      assignedTechnicianId: Number(technicianId),
+      priority: data.priority || 'Normal',
+      startDate: data.startDate || formatDate(booking.bookingDate),
+      expectedCompletionDate: data.expectedCompletionDate || formatDate(booking.bookingDate)
+    });
+  }
+
+  if (wasPending) {
+    await createUserNotification(
+      booking.userId,
+      'Booking Approved',
+      `Your booking #BK-${bookingId} was approved and a technician was assigned.`
+    );
+  }
+  return job;
 }
 
 async function assignTechnician(serviceJobId, technicianId) {
@@ -3322,25 +3593,25 @@ async function assignTechnician(serviceJobId, technicianId) {
   await createUserNotification(technician.userId, 'Service Job Assigned', `Service job #SJ-${serviceJobId} has been assigned to you.`);
   await notifyAdmins('Technician Assignment', `Service job #SJ-${serviceJobId} was assigned to technician #${technician.employeeNo}.`);
 
-  const context = await dashboardContext();
+  const context = await contextForJobs([updated]);
   return serviceJobView(updated, context);
 }
 
 async function getTechnicianWorkload() {
-  const [technicians, jobs, context] = await Promise.all([
+  const [technicians, jobs] = await Promise.all([
     all(collections.technicians),
-    all(collections.serviceJobs),
-    dashboardContext()
+    all(collections.serviceJobs)
   ]);
+  const context = await contextForJobs(jobs, technicians);
   return buildTechnicianWorkload(technicians, jobs.map((job) => serviceJobView(job, context)), context.usersById);
 }
 
 async function getTechnicianPerformance() {
-  const [technicians, jobs, context] = await Promise.all([
+  const [technicians, jobs] = await Promise.all([
     all(collections.technicians),
-    all(collections.serviceJobs),
-    dashboardContext()
+    all(collections.serviceJobs)
   ]);
+  const context = await contextForJobs(jobs, technicians);
   return buildTechnicianPerformance(technicians, jobs.map((job) => serviceJobView(job, context)), context.usersById);
 }
 
@@ -3352,15 +3623,15 @@ async function getTechnicianDashboard(userId) {
     throw error;
   }
 
-  const [jobs, notes, progressEntries, partsUsed, inventoryParts, notifications, context] = await Promise.all([
+  const [jobs, notes, progressEntries, partsUsed, inventoryParts, notifications] = await Promise.all([
     allWhere(collections.serviceJobs, 'assignedTechnicianId', Number(technician.id)),
     allWhere(collections.technicianNotes, 'technicianId', Number(technician.id)),
     allWhere(collections.technicianProgress, 'technicianId', Number(technician.id)),
     allWhere(collections.serviceJobParts, 'usedByTechnician', Number(technician.id)),
     all(collections.inventoryParts),
-    allWhere(collections.notifications, 'userId', Number(userId)),
-    dashboardContext()
+    allWhere(collections.notifications, 'userId', Number(userId))
   ]);
+  const context = await contextForJobs(jobs, [technician]);
 
   const assignedJobs = jobs.map((job) => serviceJobView(job, context));
   const assignedJobIds = new Set(assignedJobs.map((job) => Number(job.id)));
@@ -3393,19 +3664,20 @@ async function getAssignedServiceJob(userId, jobId) {
   const technician = await getTechnicianByUserId(userId);
   const job = await getById(collections.serviceJobs, jobId);
   if (!technician || !job || Number(job.assignedTechnicianId) !== Number(technician.id)) return null;
+  const numericJobId = Number(jobId);
   const [notes, progressEntries, partsUsed, images, context] = await Promise.all([
-    all(collections.technicianNotes),
-    all(collections.technicianProgress),
-    all(collections.serviceJobParts),
-    all(collections.serviceImages),
-    dashboardContext()
+    allWhere(collections.technicianNotes, 'serviceJobId', numericJobId),
+    allWhere(collections.technicianProgress, 'serviceJobId', numericJobId),
+    allWhere(collections.serviceJobParts, 'serviceJobId', numericJobId),
+    allWhere(collections.serviceImages, 'serviceJobId', numericJobId),
+    contextForJobs([job], [technician])
   ]);
   return {
     ...serviceJobView(job, context),
-    notes: sortById(notes.filter((note) => Number(note.serviceJobId) === Number(jobId))).reverse(),
-    progressHistory: sortById(progressEntries.filter((entry) => Number(entry.serviceJobId) === Number(jobId))).reverse(),
-    usedParts: sortById(partsUsed.filter((part) => Number(part.serviceJobId) === Number(jobId))).reverse(),
-    images: sortById(images.filter((image) => Number(image.serviceJobId) === Number(jobId))).reverse().map((image) => fileView(image, 'photo'))
+    notes: sortById(notes).reverse(),
+    progressHistory: sortById(progressEntries).reverse(),
+    usedParts: sortById(partsUsed).reverse(),
+    images: sortById(images).reverse().map((image) => fileView(image, 'photo'))
   };
 }
 
@@ -3454,9 +3726,8 @@ async function recordStoredPhoto(user, data, storedFile) {
     error.status = 400;
     throw error;
   }
-  const duplicate = (await all(collections.serviceImages)).find((item) => (
-    Number(item.serviceJobId) === Number(data.serviceJobId)
-    && item.fileName === storedFile.originalName
+  const duplicate = (await allWhere(collections.serviceImages, 'serviceJobId', Number(data.serviceJobId))).find((item) => (
+    item.fileName === storedFile.originalName
     && item.photoType === data.photoType
   ));
   if (duplicate) {
@@ -3492,6 +3763,7 @@ async function recordStoredPhoto(user, data, storedFile) {
       [galleryField]: admin.firestore.FieldValue.arrayUnion(storedFile.relativePath),
       updatedAt: fieldValue()
     }, { merge: true });
+    invalidateReadCaches(collections.serviceJobs, job.id);
   }
   await createUploadAudit({ fileKind: 'photo', fileId: photo.id, action: 'Uploaded', userId: user.id, role: user.role });
   await createUserNotification(job.customerId, 'Service Photo Uploaded', `${data.photoType} photo uploaded for service job #SJ-${job.id}.`);
@@ -3510,9 +3782,8 @@ async function recordStoredDocument(user, data, storedFile) {
     error.status = 400;
     throw error;
   }
-  const duplicate = (await all(collections.documents)).find((item) => (
-    Number(item.serviceJobId) === Number(data.serviceJobId)
-    && item.fileName === storedFile.originalName
+  const duplicate = (await allWhere(collections.documents, 'serviceJobId', Number(data.serviceJobId))).find((item) => (
+    item.fileName === storedFile.originalName
     && item.documentType === data.documentType
   ));
   if (duplicate) {
@@ -3583,6 +3854,7 @@ async function deleteStoredFile(user, kind, id) {
       completedImages: removeUrl,
       updatedAt: fieldValue()
     }, { merge: true });
+    invalidateReadCaches(collections.serviceJobs, file.serviceJobId);
   }
   await createUploadAudit({ fileKind: kind, fileId: Number(id), action: 'Deleted', userId: user.id, role: user.role });
   return file;
@@ -3653,20 +3925,14 @@ async function updateTechnicianProgress(userId, data) {
     throw error;
   }
 
-  const progress = Number(data.progressPercentage);
-  if (!Number.isFinite(progress) || progress < 0 || progress > 100) {
-    const error = new Error('Progress must be between 0 and 100.');
-    error.status = 400;
-    throw error;
-  }
-
   const status = data.status || job.status;
   assertServiceJobStatus(status);
-  if (status === 'Completed' && progress < 100) {
-    const error = new Error('Progress must be 100% before completing a job.');
+  if (status === 'Completed') {
+    const error = new Error('Use the Complete Job action to finish this service.');
     error.status = 400;
     throw error;
   }
+  const progress = serviceJobProgress(status);
 
   const progressEntry = await createDocument(collections.technicianProgress, {
     serviceJobId: asId(data.serviceJobId),
@@ -3684,16 +3950,18 @@ async function updateTechnicianProgress(userId, data) {
   const updated = await updateDocument(collections.serviceJobs, data.serviceJobId, update);
   await notifyAdmins('Service Status Updated', `Service job #SJ-${data.serviceJobId} changed to ${status}.`);
 
-  if (status === 'Completed') {
-    await createUserNotification(job.customerId, 'Work Completed', `Your ${job.serviceType} work is complete. Your vehicle is ready for final admin review.`);
-  }
   const linkedQueueEntries = await allWhere(collections.queueEntries, 'serviceJobId', Number(data.serviceJobId));
   await Promise.all(linkedQueueEntries.map((entry) => updateDocument(collections.queueEntries, entry.id, status === 'Completed'
     ? { status: 'Completed', completedAt: fieldValue() }
     : { status: 'In Service', ...(entry.serviceStartedAt ? {} : { serviceStartedAt: fieldValue() }) })));
-  if (status === 'Completed' && job.bookingId) await updateDocument(collections.bookings, job.bookingId, { status: 'Completed', progress: 100 });
+  if (job.bookingId) {
+    await updateDocument(collections.bookings, job.bookingId, {
+      status: bookingStatusForServiceJob(status),
+      progress
+    });
+  }
 
-  const context = await dashboardContext();
+  const context = await contextForJobs([updated], [technician]);
   return { progress: progressEntry, job: serviceJobView(updated, context) };
 }
 
@@ -3822,6 +4090,9 @@ async function addUsedPart(userId, data) {
 
     return usageData;
   });
+  invalidateReadCaches(collections.serviceJobParts, usage.id);
+  invalidateReadCaches(collections.inventoryMovements);
+  invalidateReadCaches(collections.inventoryParts, data.partId);
 
   const updatedPart = await getById(collections.inventoryParts, data.partId);
   if (updatedPart) await maybeCreateLowStockAlert(updatedPart);
@@ -3903,6 +4174,8 @@ async function returnUnusedPart(userId, data) {
     transaction.set(docRef(collections.inventoryMovements, movementId), movement);
     return movement;
   });
+  invalidateReadCaches(collections.inventoryMovements, result.id);
+  invalidateReadCaches(collections.inventoryParts, data.partId);
 
   return result;
 }
@@ -3949,7 +4222,7 @@ async function uploadServiceImage(userId, data) {
   });
 }
 
-async function completeTechnicianJob(userId, serviceJobId) {
+async function completeTechnicianJob(userId, serviceJobId, data = {}) {
   const technician = await getTechnicianByUserId(userId);
   const job = await getById(collections.serviceJobs, serviceJobId);
   if (!technician || !job || Number(job.assignedTechnicianId) !== Number(technician.id)) {
@@ -3958,18 +4231,8 @@ async function completeTechnicianJob(userId, serviceJobId) {
     throw error;
   }
   if (job.status === 'Completed') {
-    const context = await dashboardContext();
+    const context = await contextForJobs([job], [technician]);
     return serviceJobView(job, context);
-  }
-
-  const progressEntries = await all(collections.technicianProgress);
-  const latestProgress = progressEntries
-    .filter((entry) => Number(entry.serviceJobId) === Number(serviceJobId) && Number(entry.technicianId) === Number(technician.id))
-    .sort((a, b) => Number(b.id) - Number(a.id))[0];
-  if (!latestProgress || Number(latestProgress.progressPercentage) < 100) {
-    const error = new Error('Technician cannot complete a job without updating progress to 100%.');
-    error.status = 400;
-    throw error;
   }
 
   const updated = await updateDocument(collections.serviceJobs, serviceJobId, {
@@ -3977,7 +4240,18 @@ async function completeTechnicianJob(userId, serviceJobId) {
     progress: 100,
     completionDate: today()
   });
-  await notifyAdmins('Service Job Completed', `Service job #SJ-${serviceJobId} is ready for admin review.`);
+  await createDocument(collections.technicianProgress, {
+    serviceJobId: asId(serviceJobId),
+    technicianId: technician.id,
+    progressPercentage: 100,
+    status: 'Completed',
+    remarks: String(data.remarks || '').trim()
+  });
+  await notifyAdmins(
+    'Service Job Completed',
+    `Service job #SJ-${serviceJobId} is ready for invoicing.`,
+    { action: 'open-completed-billing', serviceJobId }
+  );
   await createUserNotification(job.customerId, 'Work Completed', `Your ${job.serviceType} work is complete. Your vehicle is ready for final admin review.`);
 
   const linkedQueueEntries = await allWhere(collections.queueEntries, 'serviceJobId', Number(serviceJobId));
@@ -3986,7 +4260,7 @@ async function completeTechnicianJob(userId, serviceJobId) {
   })));
   if (job.bookingId) await updateDocument(collections.bookings, job.bookingId, { status: 'Completed', progress: 100 });
 
-  const context = await dashboardContext();
+  const context = await contextForJobs([updated]);
   return serviceJobView(updated, context);
 }
 
@@ -4007,7 +4281,7 @@ async function acceptTechnicianJob(userId, serviceJobId) {
     status: 'Assigned', acceptedAt: fieldValue()
   });
   await notifyAdmins('Queue Job Accepted', `Service job #SJ-${serviceJobId} was accepted by the assigned technician.`);
-  const context = await dashboardContext();
+  const context = await contextForJobs([updated], [technician]);
   return serviceJobView(updated, context);
 }
 
@@ -4015,23 +4289,27 @@ async function createService(data) {
   const service = await createDocument(collections.servicePackages, {
     name: data.name.trim(),
     price: Number(data.price),
+    laborCost: Number(data.laborCost || 0),
+    serviceCharges: Number(data.serviceCharges || 0),
     duration: data.duration.trim(),
     description: data.description.trim(),
-    image: data.image || defaultServiceImage,
+    image: uploadedImageUrl(data.image),
     active: true
   });
-  return { id: service.id, name: service.name, price: service.price, duration: service.duration, description: service.description, image: service.image };
+  return { id: service.id, name: service.name, price: service.price, laborCost: service.laborCost, serviceCharges: service.serviceCharges, duration: service.duration, description: service.description, image: service.image };
 }
 
 async function updateService(id, data) {
   const service = await updateDocument(collections.servicePackages, id, {
     name: data.name.trim(),
     price: Number(data.price),
+    laborCost: Number(data.laborCost || 0),
+    serviceCharges: Number(data.serviceCharges || 0),
     duration: data.duration.trim(),
     description: data.description.trim(),
-    image: data.image || defaultServiceImage
+    image: uploadedImageUrl(data.image)
   });
-  return service ? { id: service.id, name: service.name, price: service.price, duration: service.duration, description: service.description, image: service.image } : null;
+  return service ? { id: service.id, name: service.name, price: service.price, laborCost: service.laborCost, serviceCharges: service.serviceCharges, duration: service.duration, description: service.description, image: service.image } : null;
 }
 
 async function deleteService(id) {
@@ -4060,27 +4338,50 @@ async function createInvoice(data) {
       error.status = 400;
       throw error;
     }
-    const usages = await all(collections.serviceJobParts);
+    const existingInvoice = (await allWhere(collections.invoices, 'serviceJobId', Number(data.serviceJobId)))[0];
+    if (existingInvoice) {
+      const error = new Error(`Invoice #INV-${existingInvoice.id} already exists for this completed job.`);
+      error.status = 409;
+      throw error;
+    }
+    const usages = await allWhere(collections.serviceJobParts, 'serviceJobId', Number(data.serviceJobId));
     partsTotal = usages
-      .filter((usage) => Number(usage.serviceJobId) === Number(data.serviceJobId))
       .reduce((sum, usage) => sum + Number(usage.totalPrice || Number(usage.quantity || 0) * Number(usage.unitPrice || 0)), 0);
   }
 
-  const service = await findServiceByName(data.service, false);
+  const invoiceServiceName = serviceJob?.serviceType || data.service;
+  const invoiceCustomerId = serviceJob?.customerId || data.customerId;
+  const service = await findServiceByName(invoiceServiceName, false);
   if (!service) {
     const error = new Error('Selected service package was not found.');
     error.status = 400;
     throw error;
   }
 
-  const laborCost = Number(data.laborCost || data.amount || 0);
-  const serviceCharges = Number(data.serviceCharges || 0);
+  const configuredLaborCost = Number(service.laborCost || 0);
+  const configuredServiceCharges = Number(service.serviceCharges ?? service.price ?? 0);
+  const laborCost = data.laborCost === undefined || data.laborCost === ''
+    ? configuredLaborCost
+    : Number(data.laborCost);
+  const serviceCharges = data.serviceCharges === undefined || data.serviceCharges === ''
+    ? configuredServiceCharges
+    : Number(data.serviceCharges);
   const tax = Number(data.tax || 0);
   const discount = Number(data.discount || 0);
+  if (![laborCost, serviceCharges, tax, discount].every((value) => Number.isFinite(value) && value >= 0)) {
+    const error = new Error('Invoice charges must be zero or positive amounts.');
+    error.status = 400;
+    throw error;
+  }
   const grandTotal = partsTotal + laborCost + serviceCharges + tax - discount;
+  if (grandTotal < 0) {
+    const error = new Error('Discount cannot exceed the invoice subtotal and tax.');
+    error.status = 400;
+    throw error;
+  }
 
   const invoice = await createDocument(collections.invoices, {
-    userId: asId(data.customerId),
+    userId: asId(invoiceCustomerId),
     serviceJobId: data.serviceJobId ? asId(data.serviceJobId) : null,
     servicePackageId: service.id,
     partsTotal,
@@ -4168,20 +4469,18 @@ async function getInvoicePdf(id, requester) {
   const invoice = await getById(collections.invoices, id);
   if (!invoice || (requester.role !== 'admin' && invoice.userId !== requester.id)) return null;
 
-  const [user, servicePackage, pricingPlan, job, parts, vehicles, technicians, users] = await Promise.all([
+  const [user, servicePackage, pricingPlan, job, parts] = await Promise.all([
     getById(collections.users, invoice.userId),
     invoice.servicePackageId ? getById(collections.servicePackages, invoice.servicePackageId) : null,
     invoice.pricingPlanId ? getById(collections.pricingPlans, invoice.pricingPlanId) : null,
     invoice.serviceJobId ? getById(collections.serviceJobs, invoice.serviceJobId) : null,
-    all(collections.serviceJobParts),
-    all(collections.vehicles),
-    all(collections.technicians),
-    all(collections.users)
+    invoice.serviceJobId ? allWhere(collections.serviceJobParts, 'serviceJobId', Number(invoice.serviceJobId)) : []
   ]);
-  const vehicle = job ? vehicles.find((item) => Number(item.id) === Number(job.vehicleId)) : null;
-  const technician = job ? technicians.find((item) => Number(item.id) === Number(job.assignedTechnicianId)) : null;
-  const technicianUser = technician ? users.find((item) => Number(item.id) === Number(technician.userId)) : null;
-  const invoiceParts = parts.filter((part) => Number(part.serviceJobId) === Number(invoice.serviceJobId));
+  const [vehicle, technician] = await Promise.all([
+    job?.vehicleId ? getById(collections.vehicles, job.vehicleId) : null,
+    job?.assignedTechnicianId ? getById(collections.technicians, job.assignedTechnicianId) : null
+  ]);
+  const technicianUser = technician?.userId ? await getById(collections.users, technician.userId) : null;
 
   return createInvoicePdfBuffer({
     invoice,
@@ -4190,7 +4489,7 @@ async function getInvoicePdf(id, requester) {
     job,
     vehicle,
     technicianName: technicianUser?.name || technician?.name || 'Unassigned',
-    parts: invoiceParts
+    parts
   });
 }
 
@@ -4254,14 +4553,17 @@ module.exports = {
   deleteTechnician,
   deleteVehicle,
   findUserByEmailRole,
+  findUserByEmail,
   getAdminDashboard,
   getAdminMessageCenter,
   getAdminServiceJobDetails,
   getById,
+  getCustomerBookingProgress,
   getCustomerDashboard,
   getEmergencyRequests,
   getEntityMedia,
   getReferencedMediaUrls,
+  getAvailableTechniciansForBooking,
   getBookingSlots,
   getInventoryReports,
   getIndividualReportPdf,

@@ -86,18 +86,24 @@ document.addEventListener('DOMContentLoaded', () => {
   function showToast(message, type = toastType(message)) {
     window.clearTimeout(els.toast.hideTimer);
     const icon = document.createElement('span');
+    const content = document.createElement('div');
+    const title = document.createElement('strong');
     const text = document.createElement('span');
     const close = document.createElement('button');
     icon.className = 'toast__icon';
-    icon.textContent = type === 'error' ? '!' : type === 'warning' ? '!' : '✓';
+    icon.textContent = 'i';
+    content.className = 'toast__content';
+    title.className = 'toast__title';
+    title.textContent = 'Notification';
     text.className = 'toast__message';
     text.textContent = message;
+    content.append(title, text);
     close.className = 'toast__close';
     close.type = 'button';
     close.setAttribute('aria-label', 'Close notification');
     close.textContent = '×';
     close.addEventListener('click', () => els.toast.classList.remove('is-visible'));
-    els.toast.replaceChildren(icon, text, close);
+    els.toast.replaceChildren(icon, content, close);
     els.toast.className = `toast toast--${type} is-visible`;
     els.toast.hideTimer = window.setTimeout(() => els.toast.classList.remove('is-visible'), 3600);
   }
@@ -302,14 +308,15 @@ document.addEventListener('DOMContentLoaded', () => {
     renderNotifications();
   }
 
-  function field(name, label, type = 'text', value = '', options = []) {
+  function field(name, label, type = 'text', value = '', options = [], required = true) {
+    const requiredAttribute = required ? ' required' : '';
     if (type === 'select') {
-      return `<label><span>${label}</span><select name="${name}" required>${options.map((option) => `<option value="${option.value}" ${String(option.value) === String(value) ? 'selected' : ''}>${option.label}</option>`).join('')}</select></label>`;
+      return `<label><span>${label}</span><select name="${name}"${requiredAttribute}>${options.map((option) => `<option value="${option.value}" ${String(option.value) === String(value) ? 'selected' : ''}>${option.label}</option>`).join('')}</select></label>`;
     }
     if (type === 'textarea') {
-      return `<label class="full"><span>${label}</span><textarea name="${name}" required>${value}</textarea></label>`;
+      return `<label class="full"><span>${label}</span><textarea name="${name}"${requiredAttribute}>${value}</textarea></label>`;
     }
-    return `<label><span>${label}</span><input name="${name}" type="${type}" value="${value}" required /></label>`;
+    return `<label><span>${label}</span><input name="${name}" type="${type}" value="${value}"${requiredAttribute} /></label>`;
   }
 
   function jobSummary(job) {
@@ -327,13 +334,14 @@ document.addEventListener('DOMContentLoaded', () => {
       showToast('Job details are still loading. Try again in a moment.');
       return;
     }
-    const statusOptions = ['Assigned', 'In Progress', 'Waiting For Parts', 'Quality Check', 'Completed'].map((status) => ({ value: status, label: status }));
+    const statusOptions = ['Assigned', 'In Progress', 'Waiting For Parts', 'Quality Check'].map((status) => ({ value: status, label: status }));
     const partOptions = state.inventoryParts.map((part) => ({ value: part.id, label: `${part.name} (${part.stock} available)` }));
     const config = {
       progress: {
         title: `Update #SJ-${job.id}`,
         submitLabel: 'Update Progress',
-        body: field('progressPercentage', 'Progress Percentage', 'number', job.progress || 0) + field('status', 'Status', 'select', job.status || 'In Progress', statusOptions) + field('remarks', 'Work Details / Remarks', 'textarea', '')
+        body: field('status', 'Status', 'select', job.status || 'In Progress', statusOptions)
+          + field('remarks', 'Work Details / Remarks', 'textarea', '')
       },
       note: {
         title: `Add Note #SJ-${job.id}`,
@@ -343,12 +351,12 @@ document.addEventListener('DOMContentLoaded', () => {
       part: {
         title: `Record Parts #SJ-${job.id}`,
         submitLabel: 'Save Used Part',
-        body: field('partId', 'Spare Part', 'select', partOptions[0]?.value, partOptions) + field('quantity', 'Quantity Used', 'number', '1') + field('condition', 'Part Condition', 'select', 'Brand New', ['Brand New', 'Used', 'Refurbished', 'Reconditioned', 'Customer Supplied'].map((condition) => ({ value: condition, label: condition }))) + field('warrantyStartDate', 'Warranty Start', 'date', new Date().toISOString().slice(0, 10)) + field('warrantyExpiryDate', 'Warranty Expiry', 'date', new Date().toISOString().slice(0, 10)) + '<label class="full"><span>Part Photo</span><input name="partPhoto" type="file" accept=".jpg,.jpeg,.png" /></label><div class="full notification-list" id="file-preview"></div>' + field('note', 'Part Usage Note', 'textarea', '')
+        body: field('partId', 'Spare Part', 'select', partOptions[0]?.value, partOptions) + field('quantity', 'Quantity Used', 'number', '1') + field('condition', 'Part Condition', 'select', 'Brand New', ['Brand New', 'Used', 'Refurbished', 'Reconditioned', 'Customer Supplied'].map((condition) => ({ value: condition, label: condition }))) + field('warrantyStartDate', 'Warranty Start', 'date', new Date().toISOString().slice(0, 10)) + field('warrantyExpiryDate', 'Warranty Expiry', 'date', new Date().toISOString().slice(0, 10)) + '<label class="full"><span>Part Photo</span><input name="partPhoto" type="file" accept=".jpg,.jpeg,.png" /></label><div class="full notification-list" id="file-preview"></div>' + field('note', 'Part Usage Note (Optional)', 'textarea', '', [], false)
       },
       returnPart: {
         title: `Return Parts #SJ-${job.id}`,
         submitLabel: 'Save Return',
-        body: field('partId', 'Spare Part', 'select', partOptions[0]?.value, partOptions) + field('quantity', 'Quantity Returned', 'number', '1') + field('condition', 'Return Condition', 'select', 'Brand New', ['Brand New', 'Used', 'Refurbished', 'Reconditioned'].map((condition) => ({ value: condition, label: condition }))) + field('note', 'Return Note', 'textarea', '')
+        body: field('partId', 'Spare Part', 'select', partOptions[0]?.value, partOptions) + field('quantity', 'Quantity Returned', 'number', '1') + field('condition', 'Return Condition', 'select', 'Brand New', ['Brand New', 'Used', 'Refurbished', 'Reconditioned'].map((condition) => ({ value: condition, label: condition }))) + field('note', 'Return Note (Optional)', 'textarea', '', [], false)
       },
       replacePart: {
         title: `Record Replaced Part #SJ-${job.id}`,
@@ -400,7 +408,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (mode === 'progress') {
       await window.AutoCareApi.request(`/api/technician/jobs/${id}/progress`, {
         method: 'POST',
-        body: JSON.stringify({ ...data, progressPercentage: Number(data.progressPercentage) })
+        body: JSON.stringify(data)
       });
     }
     if (mode === 'note') {
@@ -451,11 +459,10 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     }
     if (mode === 'complete') {
-      await window.AutoCareApi.request(`/api/technician/jobs/${id}/progress`, {
-        method: 'POST',
-        body: JSON.stringify({ progressPercentage: 100, status: 'Quality Check', remarks: data.remarks })
+      await window.AutoCareApi.request(`/api/technician/jobs/${id}/complete`, {
+        method: 'PUT',
+        body: JSON.stringify({ remarks: data.remarks })
       });
-      await window.AutoCareApi.request(`/api/technician/jobs/${id}/complete`, { method: 'PUT' });
     }
 
     els.modal.close();
@@ -535,9 +542,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const profileForm = document.getElementById('technician-profile-form');
     profileForm.addEventListener('submit', async (event) => {
       event.preventDefault();
+      let uploadedAvatar;
       try {
         const avatarFile = profileForm.elements.avatar.files[0];
-        const avatar = avatarFile ? await window.AutoCareApi.optimizeProfileImage(avatarFile) : state.profile.avatar;
+        uploadedAvatar = avatarFile ? await window.AutoCareImages.upload(avatarFile, 'mechanics') : null;
+        const avatar = uploadedAvatar?.url || state.profile.avatar;
         const result = await window.AutoCareApi.request('/api/profile', {
           method: 'PUT',
           body: JSON.stringify({ name: profileForm.elements.name.value, email: profileForm.elements.email.value, phone: profileForm.elements.phone.value, avatar })
@@ -548,6 +557,7 @@ document.addEventListener('DOMContentLoaded', () => {
         renderProfile();
         window.AutoCareApi.showSuccess('The technician profile was saved successfully.');
       } catch (error) {
+        if (uploadedAvatar) await window.AutoCareImages.rollback({ uploads: [uploadedAvatar] });
         showToast(error.message || 'Profile update failed.');
       }
     });

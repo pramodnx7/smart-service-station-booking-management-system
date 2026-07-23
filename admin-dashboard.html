@@ -8,9 +8,9 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="css/admin-dashboard.css?v=booking-assignment-1" />
+  <link rel="stylesheet" href="css/admin-dashboard.css?v=invoice-builder-13" />
   <link rel="stylesheet" href="css/responsive.css?v=mobile-1" />
-  <link rel="stylesheet" href="css/dashboard-refresh.css?v=save-popup-1" />
+  <link rel="stylesheet" href="css/dashboard-refresh.css?v=professional-toast-10" />
   <link rel="stylesheet" href="css/image-management.css?v=1" />
 </head>
 <body class="admin-dashboard">
@@ -266,6 +266,15 @@
               <div><h2>Billing & Payments</h2><p>View invoices, download receipts and track payment history.</p></div>
               <button class="btn btn--blue" type="button" data-action="new-invoice">Create Invoice</button>
             </div>
+            <div class="completed-billing-work" id="completed-billing-work"></div>
+            <div class="upcoming-booking-filters billing-filters" aria-label="Invoice filters">
+              <label class="upcoming-booking-search"><span data-icon="search"></span><input id="billing-search" type="search" placeholder="Search invoice, customer or service..." /></label>
+              <select id="billing-payment-filter" aria-label="Filter invoices by payment status"><option value="All">All payments</option><option value="Paid">Paid</option><option value="Unpaid">Unpaid</option></select>
+              <select id="billing-service-filter" aria-label="Filter invoices by service"><option value="All">All services</option></select>
+              <select id="billing-date-filter" aria-label="Filter invoices by date"><option value="All">All dates</option><option value="Today">Today</option><option value="30">Last 30 days</option><option value="Month">This month</option></select>
+              <button class="mini-btn" type="button" data-action="clear-billing-filters">Clear</button>
+              <span class="overview-booking-count" id="billing-result-count">0 invoices</span>
+            </div>
             <div class="table-wrap"><table><thead><tr><th>Invoice</th><th>Customer</th><th>Service</th><th>Amount</th><th>Payment</th><th>Action</th></tr></thead><tbody id="billing-body"></tbody></table></div>
           </div>
         </section>
@@ -399,8 +408,8 @@
   </dialog>
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
-  <script src="js/api.js?v=save-popup-1"></script>
-  <script src="js/image-management.js?v=1"></script>
-  <script src="js/admin-dashboard.js?v=booking-assignment-1"></script>
+  <script src="js/api.js?v=firestore-performance-1"></script>
+  <script src="js/image-management.js?v=firestore-performance-1"></script>
+  <script src="js/admin-dashboard.js?v=invoice-builder-13"></script>
 </body>
 </html>

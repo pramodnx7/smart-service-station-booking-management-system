@@ -61,6 +61,14 @@
     });
   }
 
+  async function upload(file, folder, onProgress = () => {}) {
+    validate(file, false);
+    return requestUpload('/api/images/upload', {
+      folder,
+      file: await payload(file)
+    }, onProgress);
+  }
+
   function setError(element, message = '') {
     const error = element.querySelector('.image-uploader__error');
     error.textContent = message;
@@ -208,5 +216,5 @@
   });
   document.addEventListener('DOMContentLoaded', () => enhance());
 
-  window.AutoCareImages = { collect, commit, enhance, rollback, uploader };
+  window.AutoCareImages = { collect, commit, enhance, rollback, upload, uploader };
 })();

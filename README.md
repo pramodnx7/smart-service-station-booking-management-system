@@ -56,7 +56,7 @@ while Supabase Storage stores uploaded images and documents.
 - Operational dashboard and statistics
 - Customer, vehicle, and technician management
 - Service and pricing-plan management
-- Booking approval with immediate technician-assignment popup, editing, rescheduling, and cancellation
+- Booking approval that requires technician assignment, plus editing, rescheduling, and cancellation
 - Service-job creation and technician assignment
 - Appointment, walk-in, and emergency queue handling
 - Service-bay management
@@ -314,9 +314,12 @@ Login requires:
 
 - A valid email address
 - A matching password
-- The correct selected role
 - An active user record
 - An available Firestore connection
+
+The user does not select a role during login. The backend reads the preset role
+from the authenticated Firestore account and the frontend opens the matching
+admin, customer, or technician dashboard automatically.
 
 Public registration creates customer accounts only. Administrators create other
 administrators or technicians through approved administrative workflows.
@@ -335,7 +338,6 @@ Example login request:
 
 ```json
 {
-  "role": "customer",
   "email": "customer@example.com",
   "password": "your-password"
 }
@@ -545,6 +547,8 @@ dashboard.
 
 An administrator can inspect cache hits, misses, invalidations, and active
 entries at `GET /api/admin/firestore-read-cache`.
+The complete findings, implemented changes, remaining high-risk work, and
+measurement procedure are in [docs/PERFORMANCE_AUDIT.md](docs/PERFORMANCE_AUDIT.md).
 
 ### Login says the email, password, or role is invalid
 

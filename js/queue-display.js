@@ -2,6 +2,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const escapeHtml = (value) => String(value ?? '').replace(/[&<>'"]/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[character]));
   const timeElement = document.getElementById('display-time');
   const dateElement = document.getElementById('display-date');
+  let refreshing = false;
 
   function updateClock() {
     const now = new Date();
@@ -10,6 +11,8 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   async function refreshDisplay() {
+    if (refreshing) return;
+    refreshing = true;
     try {
       const response = await fetch('/api/public/queue-display', { cache: 'no-store' });
       if (!response.ok) throw new Error('Queue unavailable.');
@@ -19,6 +22,8 @@ document.addEventListener('DOMContentLoaded', () => {
       document.getElementById('display-updated').textContent = `Updated ${new Date(data.generatedAt).toLocaleTimeString('en-LK')}`;
     } catch (error) {
       document.getElementById('display-updated').textContent = 'Reconnecting to queue...';
+    } finally {
+      refreshing = false;
     }
   }
 

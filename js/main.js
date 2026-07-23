@@ -4,6 +4,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const newsletterForm = document.getElementById('newsletter-form');
 
   const escapeHtml = (value) => String(value ?? '').replace(/[&<>'"]/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[character]));
+  const photoMarkup = (url, alt) => url
+    ? `<img src="${escapeHtml(url)}" alt="${escapeHtml(alt)}" />`
+    : '<div class="public-media-placeholder" role="img" aria-label="No photo available"><span>No photo available</span></div>';
   const renderPricingPlans = async () => {
     const grid = document.querySelector('.pricing__grid');
     if (!grid) return;
@@ -20,7 +23,7 @@ document.addEventListener('DOMContentLoaded', () => {
         '<path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2-5.6-3-5.6 3 1.1-6.2L3 9.6l6.2-.9L12 3Z"/>',
         '<path d="M12 3 4 6v5c0 5 3.2 8.5 8 10 4.8-1.5 8-5 8-10V6l-8-3Z"/><path d="m8.5 12 2.3 2.3 4.7-5"/>'
       ];
-      grid.innerHTML = plans.map((plan, index) => `<article class="pricing-card ${plan.featured ? 'pricing-card--featured' : ''}"><div class="pricing-card__visual"><img src="${escapeHtml(plan.image)}" alt="${escapeHtml(plan.name)}" /><span class="pricing-card__tag">${escapeHtml(plan.badge)}</span></div><div class="pricing-card__body"><div class="pricing-card__heading"><span><svg viewBox="0 0 24 24" aria-hidden="true">${icons[index % icons.length]}</svg></span><div><small>${escapeHtml(plan.billingPeriod)} package</small><h3>${escapeHtml(plan.name)}</h3></div></div><strong><small>LKR</small>${Number(plan.price).toLocaleString('en-LK')}<span>/ ${escapeHtml(plan.billingPeriod)}</span></strong><ul>${plan.features.map((feature) => `<li>${escapeHtml(feature)}</li>`).join('')}</ul></div><a href="login.html?role=customer&next=customer-dashboard.html%23bookings"><span>${escapeHtml(plan.buttonText)}</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></a></article>`).join('');
+      grid.innerHTML = plans.map((plan, index) => `<article class="pricing-card ${plan.featured ? 'pricing-card--featured' : ''}"><div class="pricing-card__visual">${photoMarkup(plan.image, plan.name)}<span class="pricing-card__tag">${escapeHtml(plan.badge)}</span></div><div class="pricing-card__body"><div class="pricing-card__heading"><span><svg viewBox="0 0 24 24" aria-hidden="true">${icons[index % icons.length]}</svg></span><div><small>${escapeHtml(plan.billingPeriod)} package</small><h3>${escapeHtml(plan.name)}</h3></div></div><strong><small>LKR</small>${Number(plan.price).toLocaleString('en-LK')}<span>/ ${escapeHtml(plan.billingPeriod)}</span></strong><ul>${plan.features.map((feature) => `<li>${escapeHtml(feature)}</li>`).join('')}</ul></div><a href="login.html?next=customer-dashboard.html%23bookings"><span>${escapeHtml(plan.buttonText)}</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></a></article>`).join('');
     } catch (error) {
       grid.innerHTML = '<p>Pricing plans could not be loaded.</p>';
     }
@@ -42,7 +45,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const reviewComments = (service.recentReviews || []).map((review) => (
           `<blockquote class="service-review"><p>“${escapeHtml(review.comment)}”</p><footer>${escapeHtml(review.customerName)} · ${Number(review.rating)} / 5</footer></blockquote>`
         )).join('');
-        return `<article data-service-card="${escapeHtml(service.name)}"><img src="${escapeHtml(service.image)}" alt="${escapeHtml(service.name)}" /><strong>${escapeHtml(service.name)}</strong><span>LKR ${Number(service.price).toLocaleString('en-LK')}</span><small>${escapeHtml(service.duration)}</small><p>${escapeHtml(service.description)}</p><div class="service-rating" data-service-rating aria-label="${service.reviewCount ? `${service.averageRating} out of 5 stars from ${service.reviewCount} reviews` : 'No customer reviews yet'}"><div class="stars" aria-hidden="true" style="--rating-fill:${Math.max(0, Math.min(100, service.averageRating * 20))}%"><span>★★★★★</span><span class="stars__fill">★★★★★</span></div><small>${summary}</small></div><div class="service-reviews" aria-label="Recent customer comments">${reviewComments}</div></article>`;
+        return `<article data-service-card="${escapeHtml(service.name)}">${photoMarkup(service.image, service.name)}<strong>${escapeHtml(service.name)}</strong><span>LKR ${Number(service.price).toLocaleString('en-LK')}</span><small>${escapeHtml(service.duration)}</small><p>${escapeHtml(service.description)}</p><div class="service-rating" data-service-rating aria-label="${service.reviewCount ? `${service.averageRating} out of 5 stars from ${service.reviewCount} reviews` : 'No customer reviews yet'}"><div class="stars" aria-hidden="true" style="--rating-fill:${Math.max(0, Math.min(100, service.averageRating * 20))}%"><span>★★★★★</span><span class="stars__fill">★★★★★</span></div><small>${summary}</small></div><div class="service-reviews" aria-label="Recent customer comments">${reviewComments}</div></article>`;
       }).join('') : '<p>No active services are currently available.</p>';
 
       const reviewSummary = document.getElementById('review-summary');
@@ -78,10 +81,11 @@ document.addEventListener('DOMContentLoaded', () => {
       const response = await fetch('/api/public/landing-content');
       if (!response.ok) throw new Error('Landing content unavailable.');
       const { recentWork = [], news = [] } = await response.json();
-      gallery.innerHTML = recentWork.length ? recentWork.map((item) => `<article class="gallery-item"><img src="${escapeHtml(item.image)}" alt="${escapeHtml(item.title)}" /><span>${escapeHtml(item.title)}</span></article>`).join('') : '<p>No recent work is currently published.</p>';
-      newsGrid.innerHTML = news.length ? news.map((item) => {
+      gallery.innerHTML = recentWork.length ? recentWork.map((item) => `<article class="gallery-item">${photoMarkup(item.image, item.title)}<span>${escapeHtml(item.title)}</span></article>`).join('') : '<p>No recent work is currently published.</p>';
+      newsGrid.innerHTML = news.length ? news.map((item, index) => {
         const formattedDate = new Date(`${item.date}T00:00:00`).toLocaleDateString('en-LK', { day: '2-digit', month: 'short', year: 'numeric' });
-        return `<article class="article-card"><img src="${escapeHtml(item.image)}" alt="${escapeHtml(item.title)}" /><div><span>${escapeHtml(formattedDate)} | ${escapeHtml(item.category)}</span><h3>${escapeHtml(item.title)}</h3><a href="#articles">Read More</a></div></article>`;
+        const articleId = Number.isInteger(Number(item.slot)) ? Number(item.slot) : index;
+        return `<article class="article-card">${photoMarkup(item.image, item.title)}<div><span>${escapeHtml(formattedDate)} | ${escapeHtml(item.category)}</span><h3>${escapeHtml(item.title)}</h3><a href="news.html?article=${articleId}">Read More</a></div></article>`;
       }).join('') : '<p>No news is currently published.</p>';
       activeWorkIndex = 0;
       updateWorkCarousel();

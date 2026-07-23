@@ -12,46 +12,18 @@ document.addEventListener('DOMContentLoaded', () => {
   const signupPhone = document.getElementById('signup-phone');
   const signupPassword = document.getElementById('signup-password');
   const signupPasswordToggle = document.getElementById('toggle-signup-password');
-  const title = document.getElementById('login-title');
-  const copy = document.getElementById('login-copy');
-  const submit = document.getElementById('login-submit');
   const loginNote = document.getElementById('login-note');
   const signupNote = document.getElementById('signup-note');
   const openSignup = document.getElementById('open-signup');
   const openLogin = document.getElementById('open-login');
-  const roleButtons = Array.from(document.querySelectorAll('[data-role]'));
   const requestedNextTarget = new URLSearchParams(window.location.search).get('next');
   const nextTarget = requestedNextTarget
     && /^customer-dashboard\.html(?:#[a-z0-9_-]+)?$/i.test(requestedNextTarget)
     ? requestedNextTarget
     : null;
-  const params = new URLSearchParams(window.location.search);
-  let activeRole = ['admin', 'customer', 'technician'].includes(params.get('role')) ? params.get('role') : 'admin';
-
   function setStatus(message, isSuccess = false) {
     status.textContent = message;
     status.classList.toggle('is-success', isSuccess);
-  }
-
-  function setRole(role) {
-    activeRole = ['admin', 'customer', 'technician'].includes(role) ? role : 'admin';
-    roleButtons.forEach((button) => {
-      const isActive = button.dataset.role === activeRole;
-      button.classList.toggle('is-active', isActive);
-      button.setAttribute('aria-selected', String(isActive));
-    });
-
-    const copyByRole = {
-      admin: 'Sign in as an admin to manage service station operations.',
-      customer: 'Sign in as a customer to manage vehicles, bookings and invoices.',
-      technician: 'Sign in as a technician to manage assigned service jobs.'
-    };
-    title.textContent = `${activeRole[0].toUpperCase()}${activeRole.slice(1)} Login`;
-    copy.textContent = copyByRole[activeRole];
-    email.placeholder = 'name@example.com';
-    const submitLabel = submit.querySelector('span');
-    if (submitLabel) submitLabel.textContent = `Login as ${activeRole[0].toUpperCase()}${activeRole.slice(1)}`;
-    setStatus('');
   }
 
   function showLoginView() {
@@ -66,7 +38,6 @@ document.addEventListener('DOMContentLoaded', () => {
     form.classList.add('hidden');
     loginNote.classList.add('hidden');
     signupNote.classList.remove('hidden');
-    setRole('customer');
     setStatus('Create a customer account to manage bookings and vehicles.', true);
   }
 
@@ -94,10 +65,6 @@ document.addEventListener('DOMContentLoaded', () => {
     window.location.href = dashboards[role] || 'index.html';
   }
 
-  roleButtons.forEach((button) => {
-    button.addEventListener('click', () => setRole(button.dataset.role));
-  });
-
   openSignup.addEventListener('click', () => {
     showSignupView();
     signupName.focus();
@@ -124,7 +91,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     try {
       const result = await window.AutoCareApi.login({
-        role: activeRole,
         email: email.value.trim(),
         password: password.value
       });
@@ -163,7 +129,6 @@ document.addEventListener('DOMContentLoaded', () => {
       setPasswordVisibility(signupPassword, signupPasswordToggle, false);
 
       showLoginView();
-      setRole('customer');
       setStatus('Customer account created. Click login.', true);
       signupForm.reset();
       password.focus();
@@ -172,7 +137,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  setRole(activeRole);
   setPasswordVisibility(password, loginPasswordToggle, false);
   setPasswordVisibility(signupPassword, signupPasswordToggle, false);
   const session = window.AutoCareApi.getSession();
