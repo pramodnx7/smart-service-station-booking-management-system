@@ -41,7 +41,13 @@ function initializeFirebase() {
     const serviceAccountPath = path.resolve(process.cwd(), process.env.FIREBASE_SERVICE_ACCOUNT_PATH.trim());
     if (fs.existsSync(serviceAccountPath)) {
       try {
-        options.credential = admin.credential.cert(require(serviceAccountPath));
+        const serviceAccount = require(serviceAccountPath);
+        const configuredProjectId = String(process.env.FIREBASE_PROJECT_ID || '').trim();
+        if (configuredProjectId && serviceAccount.project_id && configuredProjectId !== serviceAccount.project_id) {
+          firebaseConfigurationError = `FIREBASE_PROJECT_ID (${configuredProjectId}) does not match the service account project (${serviceAccount.project_id}).`;
+          return null;
+        }
+        options.credential = admin.credential.cert(serviceAccount);
       } catch (error) {
         firebaseConfigurationError = `Firebase service account file is invalid: ${serviceAccountPath} (${error.message})`;
         return null;

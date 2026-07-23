@@ -1,6 +1,5 @@
 {
   "firestore": {
-    "database": "service-station-mt-system",
     "rules": "firestore.rules",
     "indexes": "firestore.indexes.json"
   },

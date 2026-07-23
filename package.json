@@ -7,6 +7,8 @@
     "start": "node --use-system-ca server.js",
     "dev": "nodemon --exec \"node --use-system-ca\" server.js",
     "check": "node scripts/check-syntax.js",
+    "firebase:provision": "node --use-system-ca scripts/provision-firestore.js",
+    "firebase:check-schema": "node --use-system-ca scripts/provision-firestore.js --check",
     "firebase:seed-people": "node --use-system-ca scripts/seed-demo-people.js",
     "firebase:seed-bookings": "node --use-system-ca scripts/seed-demo-bookings.js",
     "firebase:migrate-images": "node --use-system-ca scripts/migrate-images-to-supabase.js --execute",
